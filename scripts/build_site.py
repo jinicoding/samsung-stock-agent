@@ -122,6 +122,42 @@ def build():
         pre code {{ background: none; padding: 0; }}
         a {{ color: #58a6ff; text-decoration: none; }}
         a:hover {{ text-decoration: underline; }}
+        .about {{
+            margin-top: 3rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid #30363d;
+        }}
+        .about h2 {{
+            color: #58a6ff;
+            margin-bottom: 1rem;
+        }}
+        .about h3 {{
+            color: #e6edf3;
+            margin: 1.5rem 0 0.5rem;
+            font-size: 1rem;
+        }}
+        .about p {{
+            color: #8b949e;
+            margin: 0.5rem 0;
+        }}
+        .about em {{ color: #58a6ff; font-style: normal; }}
+        table {{
+            width: 100%;
+            border-collapse: collapse;
+            margin: 0.5rem 0;
+        }}
+        td {{
+            padding: 0.4rem 0.8rem;
+            border: 1px solid #21262d;
+            color: #c9d1d9;
+            font-size: 0.9rem;
+        }}
+        td:first-child {{
+            color: #58a6ff;
+            font-weight: 600;
+            white-space: nowrap;
+            width: 120px;
+        }}
         footer {{
             margin-top: 3rem;
             padding-top: 1rem;
@@ -141,6 +177,37 @@ def build():
     <main>
         {journal_html}
     </main>
+
+    <section class="about">
+        <h2>싸나이는 누구인가</h2>
+        <p>
+            <strong>싸나이(SSANAI)</strong>는 <strong>S</strong>amsung <strong>S</strong>tock <strong>A</strong>nalyst <strong>AI</strong>의 약자입니다.
+            삼성전자(005930.KS) 주식을 분석하는 자기진화형 AI 에이전트로,
+            스스로 코드를 읽고, 부족한 점을 찾고, 개선하고, 테스트하고, 커밋합니다.
+        </p>
+        <p>
+            기능 목록을 미리 정하지 않습니다. 에이전트가 <em>"최고의 삼성전자 AI 애널리스트"</em>라는
+            목표를 향해 매 세션마다 스스로 판단하고 하나씩 구축합니다.
+            단순 숫자 나열이 아닌, 데이터를 해석하여 "왜 이 숫자가 중요한지" 맥락을 설명하는 것이 핵심입니다.
+        </p>
+        <p>
+            <a href="https://github.com/yologdev/yoyo-evolve">yoyo-evolve</a>의
+            자기진화 파이프라인을 기반으로 구축되었습니다.
+            위 저널은 싸나이가 매 진화 세션마다 직접 작성하는 기록입니다.
+        </p>
+
+        <h3>진화 파이프라인</h3>
+        <pre><code>pytest 검증 → Phase A: 계획 → Phase B: 구현 → 보호파일 체크 → pytest 검증 → 저널 작성 → push</code></pre>
+
+        <h3>현재 보유 능력</h3>
+        <table>
+            <tr><td>데이터 수집</td><td>KIS API (주가, 수급, 환율), Naver Finance (외인 지분)</td></tr>
+            <tr><td>데이터 저장</td><td>SQLite (4 테이블)</td></tr>
+            <tr><td>리포트 발송</td><td>Telegram 다중 구독자</td></tr>
+            <tr><td>기술적 분석</td><td>이동평균(5/20/60일), 변동률, 거래량 변화율</td></tr>
+            <tr><td>LLM 인사이트</td><td>진화 중...</td></tr>
+        </table>
+    </section>
 
     <footer>
         <a href="https://github.com/jinicoding/samsung-stock-agent">GitHub</a> ·

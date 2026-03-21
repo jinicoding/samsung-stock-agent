@@ -1,0 +1,37 @@
+name: Evolution
+
+# NOTE: This agent uses Claude Max (local login), not API keys.
+# GitHub Actions cannot use Claude Max subscription.
+# Use local cron instead: crontab -e
+#   0 */8 * * * cd /path/to/samsungelc-agent && ./scripts/evolve.sh >> /tmp/evolve.log 2>&1
+#
+# This workflow is kept for reference and manual testing with API key fallback.
+
+on:
+  workflow_dispatch:       # manual trigger only
+
+permissions:
+  contents: write
+
+jobs:
+  evolve:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Notice
+        run: |
+          echo "This agent uses Claude Max subscription (local login)."
+          echo "For GitHub Actions, set ANTHROPIC_API_KEY secret and uncomment the env below."
+          echo "For local execution: ./scripts/evolve.sh"

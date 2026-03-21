@@ -1,0 +1,72 @@
+name: Synthesize Memory
+
+on:
+  # schedule:
+  #   - cron: '0 12 * * *'  # Daily at noon UTC — enable when ready
+  workflow_dispatch:       # Manual trigger
+
+permissions:
+  contents: write
+
+jobs:
+  synthesize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check if synthesis needed
+        id: check
+        run: |
+          LEARNINGS_COUNT=$(grep -c '.' memory/learnings.jsonl 2>/dev/null) || LEARNINGS_COUNT=0
+          echo "learnings=$LEARNINGS_COUNT" >> "$GITHUB_OUTPUT"
+          if [ "$LEARNINGS_COUNT" -eq 0 ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "No archive entries — skipping synthesis."
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+            echo "Learnings: $LEARNINGS_COUNT entries"
+          fi
+
+      - name: Install Claude CLI
+        if: steps.check.outputs.skip != 'true'
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: Configure git
+        if: steps.check.outputs.skip != 'true'
+        run: |
+          git config user.name "stock-analyst[bot]"
+          git config user.email "stock-analyst[bot]@users.noreply.github.com"
+
+      - name: Synthesize active learnings
+        if: steps.check.outputs.skip != 'true'
+        # NOTE: Requires Claude Max login or ANTHROPIC_API_KEY
+        run: |
+          cp memory/active_learnings.md memory/active_learnings.md.bak 2>/dev/null || true
+
+          PROMPT="Read memory/learnings.jsonl and regenerate memory/active_learnings.md.
+
+          Apply time-weighted compression:
+          - Recent (last 2 weeks): Full markdown entries
+          - Medium (2-8 weeks): 1-2 sentence summaries
+          - Old (8+ weeks): Grouped by theme
+
+          Keep under ~200 lines. Write to memory/active_learnings.md starting with:
+          # Active Learnings"
+
+          if ! timeout 180 claude -p "$PROMPT" --model claude-sonnet-4-6; then
+            echo "WARNING: Synthesis failed."
+            cp memory/active_learnings.md.bak memory/active_learnings.md 2>/dev/null || true
+          fi
+          rm -f memory/active_learnings.md.bak
+
+      - name: Commit and push if changed
+        if: steps.check.outputs.skip != 'true'
+        run: |
+          if git diff --quiet memory/ 2>/dev/null; then
+            echo "No changes."
+            exit 0
+          fi
+          git add memory/
+          git commit -m "synthesize: regenerate active memory context" || exit 0
+          git pull --rebase || { git rebase --abort 2>/dev/null; exit 1; }
+          git push

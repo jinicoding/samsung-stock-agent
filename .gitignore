@@ -24,6 +24,9 @@ ISSUE_RESPONSE.md
 .vscode/
 .idea/
 
+# Build output
+site/
+
 # OS
 .DS_Store
 Thumbs.db

@@ -63,7 +63,7 @@ def build():
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Samsung Stock Agent — Day {day}</title>
+    <title>싸나이 SSANAI — Day {day}</title>
     <style>
         * {{ margin: 0; padding: 0; box-sizing: border-box; }}
         body {{
@@ -133,8 +133,8 @@ def build():
 </head>
 <body>
     <header>
-        <h1>Samsung Stock Agent</h1>
-        <p>삼성전자 주식 분석 AI 에이전트 — 스스로 진화하며 최고의 애널리스트를 목표로 성장</p>
+        <h1>싸나이 SSANAI</h1>
+        <p>Samsung Stock Analyst AI — 스스로 진화하며 최고의 애널리스트를 목표로 성장</p>
         <span class="badge">Day {day}</span>
     </header>
 

@@ -34,8 +34,8 @@ jobs:
       - name: Configure git
         if: steps.check.outputs.skip != 'true'
         run: |
-          git config user.name "stock-analyst[bot]"
-          git config user.email "stock-analyst[bot]@users.noreply.github.com"
+          git config user.name "ssanai[bot]"
+          git config user.email "ssanai[bot]@users.noreply.github.com"
 
       - name: Synthesize active learnings
         if: steps.check.outputs.skip != 'true'

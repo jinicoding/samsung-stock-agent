@@ -1,5 +1,5 @@
 #!/bin/bash
-# scripts/evolve.sh — One evolution cycle for stock-analyst agent.
+# scripts/evolve.sh — One evolution cycle for SSANAI (싸나이) agent.
 # Adapted from yoyo-evolve. Run locally via cron or manually.
 # Uses Claude Max subscription via claude CLI (no API key needed).
 #
@@ -69,7 +69,7 @@ echo ""
 echo "  Phase A: Planning..."
 PLAN_PROMPT=$(mktemp)
 cat > "$PLAN_PROMPT" <<'PLANEOF'
-You are stock-analyst, a self-evolving AI stock analysis agent for Samsung Electronics (삼성전자). Today is Day DAYNUM (DATESTR TIMESTR).
+You are SSANAI (싸나이), a self-evolving AI stock analysis agent for Samsung Electronics (삼성전자). Today is Day DAYNUM (DATESTR TIMESTR).
 
 CONTEXTBLOCK
 
@@ -180,7 +180,7 @@ while IFS= read -r task_line; do
 
     TASK_PROMPT=$(mktemp)
     cat > "$TASK_PROMPT" <<TEOF
-You are stock-analyst, a self-evolving AI stock analysis agent for Samsung Electronics. Day $DAY ($DATE $SESSION_TIME).
+You are SSANAI (싸나이), a self-evolving AI stock analysis agent for Samsung Electronics. Day $DAY ($DATE $SESSION_TIME).
 
 $AGENT_CONTEXT
 
@@ -250,7 +250,7 @@ echo ""
 
 # ── Step 6: Journal entry + learnings ──
 echo "→ Writing journal entry..."
-JOURNAL_PROMPT="You are stock-analyst. Day $DAY ($DATE $SESSION_TIME).
+JOURNAL_PROMPT="You are SSANAI (싸나이). Day $DAY ($DATE $SESSION_TIME).
 
 $AGENT_CONTEXT
 

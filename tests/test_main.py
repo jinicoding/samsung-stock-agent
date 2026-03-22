@@ -1,0 +1,130 @@
+"""main.py 일일 파이프라인 흐름 테스트 (DB/API 모킹)."""
+
+from unittest.mock import MagicMock, patch
+
+import pytest
+
+
+# 테스트용 샘플 데이터
+SAMPLE_PRICES = [
+    {"date": f"2026-03-{d:02d}", "open": 55000, "high": 56000, "low": 54000, "close": 55000 + d * 100, "volume": 10000000}
+    for d in range(1, 61)
+]
+
+SAMPLE_TRADING = [
+    {"date": f"2026-03-{d:02d}", "institution": 100000, "foreign_total": 200000, "individual": -300000, "other_corp": 0}
+    for d in range(1, 21)
+]
+
+SAMPLE_OWNERSHIP = [
+    {"date": f"2026-03-{d:02d}", "listed_shares": 5969782550, "foreign_shares": 3000000000, "ownership_pct": 50.25, "limit_shares": 0, "exhaustion_pct": 0.0}
+    for d in range(1, 21)
+]
+
+SAMPLE_INDICATORS = {
+    "current_date": "2026-03-20",
+    "current_price": 61000,
+    "ma5": 60500,
+    "ma20": 58000,
+    "ma60": 55000,
+    "price_vs_ma5_pct": 0.83,
+    "price_vs_ma20_pct": 5.17,
+    "price_vs_ma60_pct": 10.91,
+    "change_1d_pct": 0.5,
+    "change_5d_pct": 2.1,
+    "change_20d_pct": 8.3,
+    "volume_ratio_5d": 1.2,
+}
+
+SAMPLE_SD = {
+    "foreign_consecutive_net_buy": 3,
+    "foreign_consecutive_net_sell": 0,
+    "institution_consecutive_net_buy": 2,
+    "institution_consecutive_net_sell": 0,
+    "foreign_cumulative_5d": 500000,
+    "foreign_cumulative_20d": 2000000,
+    "institution_cumulative_5d": 300000,
+    "institution_cumulative_20d": 1000000,
+    "ownership_trend": "increasing",
+    "ownership_change_pct": 0.15,
+    "overall_judgment": "buy_dominant",
+}
+
+SAMPLE_REPORT_HTML = "<b>삼성전자 일일 분석</b>"
+
+
+@patch("src.main.send_message")
+@patch("src.main.generate_daily_report", return_value=SAMPLE_REPORT_HTML)
+@patch("src.main.analyze_supply_demand", return_value=SAMPLE_SD)
+@patch("src.main.compute_technical_indicators", return_value=SAMPLE_INDICATORS)
+@patch("src.main.get_foreign_ownership", return_value=SAMPLE_OWNERSHIP)
+@patch("src.main.get_foreign_trading", return_value=SAMPLE_TRADING)
+@patch("src.main.get_prices", return_value=SAMPLE_PRICES)
+@patch("src.main.backfill_supply_demand")
+@patch("src.main.backfill_prices")
+@patch("src.main.init_db")
+def test_pipeline_full(
+    mock_init, mock_bf_prices, mock_bf_sd,
+    mock_prices, mock_trading, mock_ownership,
+    mock_tech, mock_sd, mock_report, mock_send,
+):
+    """전체 파이프라인: 백필→조회→분석→리포트→발송."""
+    from src.main import main
+
+    main()
+
+    mock_init.assert_called_once()
+    mock_bf_prices.assert_called_once()
+    mock_bf_sd.assert_called_once()
+    mock_prices.assert_called_once_with(60)
+    mock_trading.assert_called_once_with(20)
+    mock_ownership.assert_called_once_with(20)
+    mock_tech.assert_called_once_with(SAMPLE_PRICES)
+    mock_sd.assert_called_once_with(SAMPLE_TRADING, SAMPLE_OWNERSHIP)
+    mock_report.assert_called_once_with(SAMPLE_INDICATORS, supply_demand=SAMPLE_SD)
+    mock_send.assert_called_once_with(SAMPLE_REPORT_HTML)
+
+
+@patch("src.main.send_message")
+@patch("src.main.generate_daily_report", return_value=SAMPLE_REPORT_HTML)
+@patch("src.main.analyze_supply_demand", return_value=SAMPLE_SD)
+@patch("src.main.compute_technical_indicators", return_value=SAMPLE_INDICATORS)
+@patch("src.main.get_foreign_ownership", return_value=SAMPLE_OWNERSHIP)
+@patch("src.main.get_foreign_trading", return_value=SAMPLE_TRADING)
+@patch("src.main.get_prices", return_value=SAMPLE_PRICES)
+@patch("src.main.backfill_supply_demand")
+@patch("src.main.backfill_prices")
+@patch("src.main.init_db")
+def test_pipeline_dry_run(
+    mock_init, mock_bf_prices, mock_bf_sd,
+    mock_prices, mock_trading, mock_ownership,
+    mock_tech, mock_sd, mock_report, mock_send,
+    capsys,
+):
+    """--dry-run: 리포트를 stdout에 출력하고 발송하지 않는다."""
+    from src.main import main
+
+    main(dry_run=True)
+
+    mock_report.assert_called_once()
+    mock_send.assert_not_called()
+    captured = capsys.readouterr()
+    assert SAMPLE_REPORT_HTML in captured.out
+
+
+@patch("src.main.generate_daily_report")
+@patch("src.main.get_prices", return_value=[])
+@patch("src.main.backfill_supply_demand")
+@patch("src.main.backfill_prices")
+@patch("src.main.init_db")
+def test_pipeline_no_prices_skips_report(
+    mock_init, mock_bf_prices, mock_bf_sd,
+    mock_prices, mock_report,
+):
+    """주가 데이터가 없으면 리포트를 생성하지 않는다."""
+    from src.main import main
+
+    main()
+
+    mock_prices.assert_called_once_with(60)
+    mock_report.assert_not_called()

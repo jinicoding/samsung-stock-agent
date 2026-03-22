@@ -133,6 +133,81 @@ class TestGenerateDailyReport:
         report = generate_daily_report(indicators)
         assert "-1.50%" in report
 
+    def test_backward_compatible_without_supply_demand(self):
+        """supply_demand=None이면 수급 섹션 없이 기존 리포트 생성."""
+        indicators = _full_indicators()
+        report = generate_daily_report(indicators)
+        assert "수급 동향" not in report
+
+    def test_supply_demand_section_present(self):
+        """supply_demand가 주어지면 수급 섹션이 포함된다."""
+        indicators = _full_indicators()
+        sd = _supply_demand_buy_dominant()
+        report = generate_daily_report(indicators, supply_demand=sd)
+        assert "수급 동향" in report
+
+    def test_supply_demand_foreign_consecutive_buy(self):
+        """외국인 연속 순매수 표시."""
+        sd = _supply_demand_buy_dominant()
+        report = generate_daily_report(_full_indicators(), supply_demand=sd)
+        assert "외국인" in report
+        assert "연속" in report
+        assert "순매수" in report
+
+    def test_supply_demand_institution_consecutive_sell(self):
+        """기관 연속 순매도 표시."""
+        sd = _supply_demand_sell_dominant()
+        report = generate_daily_report(_full_indicators(), supply_demand=sd)
+        assert "기관" in report
+        assert "순매도" in report
+
+    def test_supply_demand_cumulative_5d(self):
+        """5일 누적 순매매 표시."""
+        sd = _supply_demand_buy_dominant()
+        report = generate_daily_report(_full_indicators(), supply_demand=sd)
+        assert "5일 누적" in report
+
+    def test_supply_demand_ownership_trend_increasing(self):
+        """보유비율 증가 추이 화살표."""
+        sd = _supply_demand_buy_dominant()
+        report = generate_daily_report(_full_indicators(), supply_demand=sd)
+        assert "↑" in report
+
+    def test_supply_demand_ownership_trend_decreasing(self):
+        """보유비율 감소 추이 화살표."""
+        sd = _supply_demand_sell_dominant()
+        report = generate_daily_report(_full_indicators(), supply_demand=sd)
+        assert "↓" in report
+
+    def test_supply_demand_judgment_buy_dominant(self):
+        """매수우위 판정 이모지."""
+        sd = _supply_demand_buy_dominant()
+        report = generate_daily_report(_full_indicators(), supply_demand=sd)
+        assert "매수우위" in report
+        assert "🟢" in report
+
+    def test_supply_demand_judgment_sell_dominant(self):
+        """매도우위 판정 이모지."""
+        sd = _supply_demand_sell_dominant()
+        report = generate_daily_report(_full_indicators(), supply_demand=sd)
+        assert "매도우위" in report
+        assert "🔴" in report
+
+    def test_supply_demand_judgment_neutral(self):
+        """중립 판정 이모지."""
+        sd = _supply_demand_neutral()
+        report = generate_daily_report(_full_indicators(), supply_demand=sd)
+        assert "중립" in report
+        assert "🟡" in report
+
+    def test_supply_demand_no_ownership_data(self):
+        """보유비율 데이터 없을 때도 에러 없이 동작."""
+        sd = _supply_demand_buy_dominant()
+        sd["ownership_trend"] = None
+        sd["ownership_change_pct"] = None
+        report = generate_daily_report(_full_indicators(), supply_demand=sd)
+        assert "수급 동향" in report
+
 
 # --- helpers ---
 
@@ -174,4 +249,52 @@ def _full_indicators(
         "change_5d_pct": 3.0,
         "change_20d_pct": 5.0,
         "volume_ratio_5d": 1.2,
+    }
+
+
+def _supply_demand_buy_dominant() -> dict:
+    return {
+        "foreign_consecutive_net_buy": 5,
+        "foreign_consecutive_net_sell": 0,
+        "institution_consecutive_net_buy": 3,
+        "institution_consecutive_net_sell": 0,
+        "foreign_cumulative_5d": 1500000,
+        "foreign_cumulative_20d": 3000000,
+        "institution_cumulative_5d": 800000,
+        "institution_cumulative_20d": 1200000,
+        "ownership_trend": "increasing",
+        "ownership_change_pct": 0.3,
+        "overall_judgment": "buy_dominant",
+    }
+
+
+def _supply_demand_sell_dominant() -> dict:
+    return {
+        "foreign_consecutive_net_buy": 0,
+        "foreign_consecutive_net_sell": 4,
+        "institution_consecutive_net_buy": 0,
+        "institution_consecutive_net_sell": 6,
+        "foreign_cumulative_5d": -2000000,
+        "foreign_cumulative_20d": -5000000,
+        "institution_cumulative_5d": -1000000,
+        "institution_cumulative_20d": -3000000,
+        "ownership_trend": "decreasing",
+        "ownership_change_pct": -0.5,
+        "overall_judgment": "sell_dominant",
+    }
+
+
+def _supply_demand_neutral() -> dict:
+    return {
+        "foreign_consecutive_net_buy": 1,
+        "foreign_consecutive_net_sell": 0,
+        "institution_consecutive_net_buy": 0,
+        "institution_consecutive_net_sell": 1,
+        "foreign_cumulative_5d": 200000,
+        "foreign_cumulative_20d": -100000,
+        "institution_cumulative_5d": -50000,
+        "institution_cumulative_20d": 300000,
+        "ownership_trend": "sideways",
+        "ownership_change_pct": 0.02,
+        "overall_judgment": "neutral",
     }

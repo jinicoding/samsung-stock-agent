@@ -136,11 +136,87 @@ def _temp_emoji(temp: str) -> str:
     return "🟡"
 
 
-def generate_daily_report(indicators: dict) -> str:
+def _format_shares(shares: int | None) -> str:
+    """주 단위 순매매를 읽기 쉬운 형식으로."""
+    if shares is None:
+        return "N/A"
+    sign = "+" if shares > 0 else ""
+    if abs(shares) >= 1_000_000:
+        return f"{sign}{shares / 1_000_000:.1f}백만주"
+    if abs(shares) >= 10_000:
+        return f"{sign}{shares / 10_000:.1f}만주"
+    return f"{sign}{shares:,}주"
+
+
+def _ownership_arrow(trend: str | None) -> str:
+    if trend == "increasing":
+        return "↑"
+    if trend == "decreasing":
+        return "↓"
+    return "→"
+
+
+def _judgment_label(judgment: str) -> tuple[str, str]:
+    """종합 판정을 (라벨, 이모지) 튜플로."""
+    if judgment == "buy_dominant":
+        return "매수우위", "🟢"
+    if judgment == "sell_dominant":
+        return "매도우위", "🔴"
+    return "중립", "🟡"
+
+
+def _build_supply_demand_section(sd: dict) -> list[str]:
+    """수급 분석 결과를 HTML 라인 리스트로."""
+    lines = []
+    lines.append("")
+    lines.append("<b>📊 수급 동향</b>")
+
+    # 외국인 연속 매수/매도
+    fb = sd["foreign_consecutive_net_buy"]
+    fs = sd["foreign_consecutive_net_sell"]
+    if fb > 0:
+        lines.append(f"  외국인: 연속 {fb}일 순매수")
+    elif fs > 0:
+        lines.append(f"  외국인: 연속 {fs}일 순매도")
+    else:
+        lines.append("  외국인: 매매 전환")
+
+    # 기관 연속 매수/매도
+    ib = sd["institution_consecutive_net_buy"]
+    is_ = sd["institution_consecutive_net_sell"]
+    if ib > 0:
+        lines.append(f"  기관: 연속 {ib}일 순매수")
+    elif is_ > 0:
+        lines.append(f"  기관: 연속 {is_}일 순매도")
+    else:
+        lines.append("  기관: 매매 전환")
+
+    # 5일 누적 순매매
+    lines.append(f"  5일 누적: 외국인 {_format_shares(sd['foreign_cumulative_5d'])} | 기관 {_format_shares(sd['institution_cumulative_5d'])}")
+
+    # 보유비율 추이
+    trend = sd.get("ownership_trend")
+    change = sd.get("ownership_change_pct")
+    arrow = _ownership_arrow(trend)
+    if change is not None:
+        sign = "+" if change > 0 else ""
+        lines.append(f"  보유비율: {arrow} ({sign}{change:.2f}%p)")
+    elif trend is not None:
+        lines.append(f"  보유비율: {arrow}")
+
+    # 종합 판정
+    label, emoji = _judgment_label(sd["overall_judgment"])
+    lines.append(f"  <b>수급 판정:</b> {emoji} {label}")
+
+    return lines
+
+
+def generate_daily_report(indicators: dict, supply_demand: dict | None = None) -> str:
     """기술적 지표 dict를 HTML 텔레그램 메시지로 변환한다.
 
     Args:
         indicators: compute_technical_indicators()의 반환값.
+        supply_demand: analyze_supply_demand()의 반환값 (선택).
 
     Returns:
         HTML 형식 문자열 (Telegram HTML parse_mode용).
@@ -185,5 +261,9 @@ def generate_daily_report(indicators: dict) -> str:
 
     # 4) 종합 시장 온도
     lines.append(f"<b>시장 온도:</b> {_temp_emoji(temperature)} {temperature}")
+
+    # 5) 수급 동향 (선택)
+    if supply_demand is not None:
+        lines.extend(_build_supply_demand_section(supply_demand))
 
     return "\n".join(lines)

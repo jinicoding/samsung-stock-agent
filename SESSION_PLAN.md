@@ -1,13 +1,13 @@
 ## Session Plan
 
-### Task 1: 일일 분석 리포트 생성기 구축
+### Task 1: 수급 분석 모듈 구축 — 외국인/기관 매매 동향 해석
+Files: tests/test_supply_demand_analysis.py, src/analysis/supply_demand.py
+Description: DB의 foreign_trading, foreign_ownership 데이터를 분석하는 모듈을 구축한다. 테스트를 먼저 작성한다. 핵심 기능: (1) 외국인/기관 N일 연속 순매수/순매도 카운트, (2) N일 누적 순매매 합계, (3) 외국인 보유비율 변화 추이(증가/감소/횡보), (4) 수급 종합 판정(매수 우위/매도 우위/중립). 입력은 list[dict] 형태의 DB rows, 출력은 분석 결과 dict. foreign_trading rows: {date, institution, foreign_total, individual, other_corp}. foreign_ownership rows: {date, ownership_pct, foreign_shares, ...}.
+
+### Task 2: 일일 리포트에 수급 섹션 추가
 Files: src/analysis/report.py, tests/test_report.py
-Description: 기술적 지표(compute_technical_indicators 결과)를 투자자가 읽기 좋은 HTML 텔레그램 메시지로 변환하는 모듈을 만든다. 포맷: (1) 현재가 및 전일 대비 등락, (2) 이동평균선 위치 해석 (정배열/역배열/골든크로스/데드크로스), (3) 거래량 이상 감지, (4) 종합 시장 온도 (강세/중립/약세). 테스트를 먼저 작성한다.
+Description: generate_daily_report()가 수급 분석 결과도 받아서 리포트에 포함하도록 확장한다. 기존 indicators 파라미터에 더해 supply_demand 파라미터를 선택적으로 받는다(하위호환 유지). 리포트에 추가할 섹션: (1) 외국인/기관 순매매(당일 + 5일 누적), (2) 연속 순매수/순매도 일수, (3) 외국인 보유비율 변화, (4) 수급 종합 판정. 기존 테스트가 깨지지 않도록 supply_demand=None이면 수급 섹션을 생략한다. 시장 온도 판정(assess_market_temperature)에도 수급 요소를 반영한다.
 
-### Task 2: main.py 일일 파이프라인 완성
+### Task 3: main.py 일일 파이프라인 완성 — 데이터 수집 → 분석 → 리포트 → 발송
 Files: src/main.py, tests/test_main.py
-Description: main.py를 실제 동작하는 일일 파이프라인으로 완성한다: DB 초기화 → 주가 데이터 수집(fetch + upsert) → 기술적 분석 실행 → 리포트 생성 → 텔레그램 발송. 각 단계의 실패를 처리하고, 데이터 수집 없이도 기존 DB 데이터로 분석/리포트가 동작하도록 fallback을 둔다. KIS API 호출을 mock하는 테스트를 작성한다.
-
-### Task 3: 수급 분석 모듈 구축
-Files: src/analysis/supply_demand.py, tests/test_supply_demand_analysis.py
-Description: 외국인/기관 순매매 데이터와 외인 지분율을 분석하는 모듈을 만든다. 핵심 지표: (1) 외국인 N일 연속 순매수/순매도 카운트, (2) 기관 순매매 추세, (3) 외인 지분율 변화 방향, (4) 수급 종합 신호 (외인+기관 동시 매수 = 강력 매수세 등). 이 분석 결과를 Task 1의 리포트에 통합할 수 있는 dict 형태로 반환한다.
+Description: main()을 실제 동작하는 일일 파이프라인으로 구현한다. 흐름: (1) init_db(), (2) fetch_samsung_ohlcv()로 최근 90일 주가 수집 → DB 저장, (3) fetch_foreign_trading()으로 수급 수집 → DB 저장, (4) DB에서 데이터 조회, (5) compute_technical_indicators() 실행, (6) compute_supply_demand_indicators() 실행, (7) generate_daily_report() 실행, (8) send_message()로 텔레그램 발송. 각 단계에서 API 실패 시 해당 섹션만 스킵하고 나머지는 계속 진행(graceful degradation). 테스트에서는 외부 API를 mock하여 파이프라인 흐름을 검증한다.

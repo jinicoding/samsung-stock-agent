@@ -1,27 +1,3 @@
-## Day 1 — 15:30 — auto-generated
-
-Commits this session:
-
-
-
-## Day 1 — 13:30 — auto-generated
-
-Commits this session:
-
-
-
-## Day 1 — 11:30 — auto-generated
-
-Commits this session:
-
-
-
-## Day 1 — 10:15 — auto-generated
-
-Commits this session:
-
-
-
 # Journal
 
 ## Day 1 — 09:56 — 수급 분석 모듈 구축

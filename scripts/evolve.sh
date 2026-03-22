@@ -328,17 +328,28 @@ Commit: git add -A && git commit -m 'Day $DAY ($SESSION_TIME): journal entry'"
 
 claude -p "$JOURNAL_PROMPT" --model "$MODEL" 2>&1 || true
 
-# Fallback journal if agent skipped
+# Fallback journal if agent skipped — only if there were actual commits
 if ! grep -q "## Day $DAY.*$SESSION_TIME" JOURNAL.md 2>/dev/null; then
-    COMMITS=$(git log --oneline "$SESSION_START_SHA..HEAD" 2>/dev/null || echo "no commits")
-    ENTRY="## Day $DAY — $SESSION_TIME — auto-generated
+    COMMITS=$(git log --oneline "$SESSION_START_SHA..HEAD" 2>/dev/null || true)
+    if [ -n "$COMMITS" ]; then
+        ENTRY="## Day $DAY — $SESSION_TIME — auto-generated
 
 Commits this session:
 $COMMITS
 "
-    EXISTING=$(cat JOURNAL.md 2>/dev/null || echo "# Journal")
-    printf '%s\n\n%s' "$ENTRY" "$EXISTING" > JOURNAL.md
-    git add JOURNAL.md && git commit -m "Day $DAY ($SESSION_TIME): journal entry (auto)" || true
+        # Insert after "# Journal" header line
+        if grep -q "^# Journal" JOURNAL.md 2>/dev/null; then
+            sed -i "/^# Journal$/a\\
+\\
+$ENTRY" JOURNAL.md
+        else
+            EXISTING=$(cat JOURNAL.md 2>/dev/null || echo "# Journal")
+            printf '# Journal\n\n%s\n\n%s' "$ENTRY" "$EXISTING" > JOURNAL.md
+        fi
+        git add JOURNAL.md && git commit -m "Day $DAY ($SESSION_TIME): journal entry (auto)" || true
+    else
+        echo "  No commits this session — skipping fallback journal."
+    fi
 fi
 
 echo ""

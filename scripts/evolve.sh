@@ -143,6 +143,7 @@ open('$PLAN_PROMPT', 'w').write(prompt)
 PLAN_EXIT=0
 ${TIMEOUT_CMD:+$TIMEOUT_CMD "$TIMEOUT"} claude -p "$(cat "$PLAN_PROMPT")" \
     --model "$MODEL" \
+    --allowedTools "Bash Edit Read Write Glob Grep" \
     2>&1 || PLAN_EXIT=$?
 rm -f "$PLAN_PROMPT"
 
@@ -210,6 +211,7 @@ TEOF
     TASK_EXIT=0
     ${TIMEOUT_CMD:+$TIMEOUT_CMD "$IMPL_TIMEOUT"} claude -p "$(cat "$TASK_PROMPT")" \
         --model "$MODEL" \
+        --allowedTools "Bash Edit Read Write Glob Grep" \
         2>&1 || TASK_EXIT=$?
     rm -f "$TASK_PROMPT"
 
@@ -358,7 +360,9 @@ Only create issues for genuinely important next steps, not trivial improvements.
 
 Commit: git add -A && git commit -m 'Day $DAY ($SESSION_TIME): journal entry'"
 
-claude -p "$JOURNAL_PROMPT" --model "$MODEL" 2>&1 || true
+claude -p "$JOURNAL_PROMPT" --model "$MODEL" \
+    --allowedTools "Bash Edit Read Write Glob Grep" \
+    2>&1 || true
 
 # Fallback journal if agent skipped — only if there were actual commits
 if ! grep -q "## Day $DAY.*$SESSION_TIME" JOURNAL.md 2>/dev/null; then

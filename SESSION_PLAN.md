@@ -1,13 +1,13 @@
 ## Session Plan
 
-### Task 1: RSI(상대강도지수) 기술적 지표 추가
-Files: src/analysis/technical.py, tests/test_technical.py
-Description: 14일 RSI를 compute_technical_indicators()에 추가한다. RSI는 가장 기본적인 모멘텀 오실레이터로, 과매수(70↑)/과매도(30↓) 판단에 필수적이다. Wilder 방식의 평활 이동평균(exponential smoothing)으로 계산하되, 데이터 부족 시 None 반환. 테스트를 먼저 작성한다: (1) 14일 이상 데이터로 정상 계산, (2) 데이터 부족 시 None, (3) 전부 상승일 때 100에 가까운 값, (4) 전부 하락일 때 0에 가까운 값, (5) 반반일 때 50 근처.
-
-### Task 2: 환율 분석 모듈 구축 및 리포트 통합
-Files: src/analysis/exchange_rate.py (신규), src/analysis/report.py, src/main.py, tests/test_exchange_rate_analysis.py (신규)
-Description: 이미 수집 중인 USD/KRW 환율 데이터를 분석하여 리포트에 반영한다. (1) src/analysis/exchange_rate.py를 만들어 환율 현재가, 5일/20일 변동률, 추세 판정(원화강세/약세/보합)을 계산. (2) report.py에 환율 섹션을 추가하여 "USD/KRW: 1,380원 (+0.5%, 원화약세 → 수출기업 우호)" 형식으로 표시. (3) main.py에서 get_exchange_rates()를 호출하여 파이프라인에 연결. 삼성전자 실적의 60%+가 해외 매출이므로 환율 맥락은 투자 판단에 필수. 테스트 먼저 작성.
-
-### Task 3: RSI를 리포트에 반영 + 시장온도 판정에 통합
+### Task 1: RSI를 일일 리포트에 표시 + 시장온도 판정에 반영
 Files: src/analysis/report.py, tests/test_report.py
-Description: Task 1에서 추가한 RSI를 리포트에 표시한다. (1) "RSI(14): 45.2 (중립)" 형식으로 기술적 분석 섹션에 추가. RSI 상태를 분류: 70↑ 과매수🔴, 30↓ 과매도🟢, 그 외 중립🟡. (2) assess_market_temperature()에 RSI를 네 번째 스코어링 요소로 추가: 과매수 시 -1 (상승 과열), 과매도 시 +1 (반등 가능성). 테스트 먼저 작성.
+Description: RSI(14)가 technical.py에서 계산되지만 리포트에 전혀 표시되지 않는 버그를 수정한다. (1) 리포트에 RSI 값과 과매수(70↑)/과매도(30↓)/중립 상태를 표시하는 섹션 추가. (2) assess_market_temperature()에 RSI를 반영하여 과매수 시 약세 가산, 과매도 시 강세 가산. 테스트를 먼저 작성하고 구현한다.
+
+### Task 2: MACD 지표 추가 (계산 + 리포트)
+Files: src/analysis/technical.py, src/analysis/report.py, tests/test_technical.py, tests/test_report.py
+Description: MACD(12,26,9) 지표를 구현한다. (1) technical.py에 EMA 헬퍼와 MACD 계산 함수 추가 — MACD line(EMA12-EMA26), Signal line(MACD의 EMA9), Histogram(MACD-Signal) 반환. compute_technical_indicators()에 macd, macd_signal, macd_histogram 키 추가. (2) report.py에 MACD 크로스 상태(골든크로스/데드크로스/수렴/발산) 표시. 테스트 먼저 작성.
+
+### Task 3: 환율 분석을 리포트에 통합
+Files: src/analysis/technical.py, src/analysis/report.py, src/main.py, tests/test_report.py
+Description: 수집만 되고 사용되지 않는 exchange_rate 데이터를 분석하여 리포트에 추가한다. (1) 환율 분석 함수 추가 — 현재 환율, 5일/20일 변동률, 추세 판단(원화강세/약세/보합). (2) main.py에서 get_exchange_rates()를 호출하여 분석 후 리포트에 전달. (3) 리포트에 "💱 환율 동향" 섹션 추가 — 삼성전자 주가와의 연관성(원화 약세 시 수출 경쟁력↑) 맥락 설명 포함. 테스트 먼저 작성.

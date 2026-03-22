@@ -1,0 +1,26 @@
+name: "버그 리포트"
+description: "에이전트의 분석이나 리포트에서 발견된 문제를 보고합니다."
+labels: ["bug"]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: "문제 설명"
+      description: "어떤 문제가 발생했나요?"
+      placeholder: "예: 텔레그램 리포트에서 이동평균 괴리율이 잘못 계산됨"
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: "기대 동작"
+      description: "어떻게 동작해야 하나요?"
+    validations:
+      required: false
+  - type: textarea
+    id: evidence
+    attributes:
+      label: "증거/스크린샷 (선택)"
+      description: "문제를 보여주는 스크린샷이나 데이터가 있으면 첨부해주세요."
+    validations:
+      required: false

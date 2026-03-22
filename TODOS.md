@@ -17,6 +17,13 @@
 ## P2: evolve.sh dry-run 모드
 **What:** `./scripts/evolve.sh --dry-run` 플래그로 Claude API 없이 파이프라인 검증
 **Why:** API 비용 없이 진화 파이프라인의 모든 단계를 테스트
-**Context:** pytest 검증, 보호 파일 체크, 저널 작성 등의 단계를 dry-run으로 실행. 개발/디버깅 시 유용.
+**Context:** pytest 검증, 보호 파일 체크, 저널 작성, 이슈 로딩/코멘트 등의 단계를 dry-run으로 실행. dry-run 시 이슈 코멘트/전이/생성도 스킵해야 함. 개발/디버깅 시 유용.
 **Effort:** S (human: ~2시간 / CC: ~10분)
 **Depends on:** 없음
+
+## P3: 이슈 처리 성공률 대시보드
+**What:** 에이전트가 처리한 agent-input 이슈 수, 평균 처리 시간, 성공/실패 비율을 GitHub Pages 저널 사이트에 표시
+**Why:** 커뮤니티가 에이전트의 이슈 처리 현황을 한눈에 파악 가능. 에이전트 신뢰도 지표.
+**Context:** `gh issue list --state closed --label agent-input` 등으로 데이터 수집. 저널 사이트(scripts/build_site.py)에 통계 섹션 추가.
+**Effort:** M (human: ~1주 / CC: ~30분)
+**Depends on:** 이슈 통합 기능이 먼저 동작해야 함

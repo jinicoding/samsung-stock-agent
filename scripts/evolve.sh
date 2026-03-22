@@ -99,16 +99,21 @@ You MUST produce a file called SESSION_PLAN.md with your plan.
 
 Priority:
 0. Fix test failures (if any — this overrides everything)
-1. Analysis capability gaps — what do investors need that you can't do yet?
-2. Self-discovered bugs or data quality issues
-3. Report quality improvements
-4. New data sources or indicators
+1. Community issues (COMMUNITY ISSUES section above) — address user requests
+2. Analysis capability gaps — what do investors need that you can't do yet?
+3. Self-discovered bugs or data quality issues
+4. Report quality improvements
+5. New data sources or indicators
+
+IMPORTANT: If you address a community issue, include "Fixes #N" (to fully resolve)
+or "Partially-fixes #N" (if only part of the request is addressed) in the task title.
+Example: "### Task 1: 볼린저 밴드 분석 추가 (Fixes #12)"
 
 Write SESSION_PLAN.md with EXACTLY this format:
 
 ## Session Plan
 
-### Task 1: [title]
+### Task 1: [title] (Fixes #N or Partially-fixes #N if applicable)
 Files: [files to modify]
 Description: [what to do — specific enough for a focused implementation agent]
 
@@ -248,6 +253,53 @@ if ! pytest tests/ -q 2>&1; then
 fi
 echo ""
 
+# ── Step 5.5: Process issue references from SESSION_PLAN ──
+echo "→ Processing issue references..."
+if python3 scripts/issue_manager.py check >/dev/null 2>&1 && [ -f SESSION_PLAN.md ]; then
+    ISSUE_REFS=$(cat SESSION_PLAN.md | python3 scripts/issue_manager.py parse-refs 2>/dev/null || echo '{"fixes":[],"partials":[]}')
+    FIXES=$(echo "$ISSUE_REFS" | python3 -c "import sys,json; print(' '.join(str(x) for x in json.load(sys.stdin).get('fixes',[])))" 2>/dev/null || true)
+    PARTIALS=$(echo "$ISSUE_REFS" | python3 -c "import sys,json; print(' '.join(str(x) for x in json.load(sys.stdin).get('partials',[])))" 2>/dev/null || true)
+
+    SESSION_END_SHA=$(git rev-parse --short HEAD)
+    COMMITS_SUMMARY=$(git log --oneline "$SESSION_START_SHA".."$SESSION_END_SHA" 2>/dev/null | head -5 || echo "no commits")
+
+    for ISSUE_NUM in $FIXES; do
+        COMMENT_BODY="🤖 **싸나이 Day $DAY ($SESSION_TIME)** — 이 이슈를 처리했습니다.
+
+커밋:
+\`\`\`
+$COMMITS_SUMMARY
+\`\`\`
+
+[저널 보기](https://jinicoding.github.io/samsung-stock-agent/)"
+        python3 scripts/issue_manager.py transition --issue "$ISSUE_NUM" --action start 2>/dev/null || true
+        python3 scripts/issue_manager.py comment --issue "$ISSUE_NUM" --body "$COMMENT_BODY" 2>/dev/null || true
+        python3 scripts/issue_manager.py transition --issue "$ISSUE_NUM" --action complete 2>/dev/null || true
+    done
+
+    for ISSUE_NUM in $PARTIALS; do
+        COMMENT_BODY="🤖 **싸나이 Day $DAY ($SESSION_TIME)** — 이 이슈를 부분적으로 처리했습니다. 추가 작업이 남아있습니다.
+
+커밋:
+\`\`\`
+$COMMITS_SUMMARY
+\`\`\`
+
+[저널 보기](https://jinicoding.github.io/samsung-stock-agent/)"
+        python3 scripts/issue_manager.py comment --issue "$ISSUE_NUM" --body "$COMMENT_BODY" 2>/dev/null || true
+        python3 scripts/issue_manager.py transition --issue "$ISSUE_NUM" --action skip 2>/dev/null || true
+    done
+
+    if [ -n "$FIXES" ] || [ -n "$PARTIALS" ]; then
+        echo "  Fixes: ${FIXES:-none} | Partial: ${PARTIALS:-none}"
+    else
+        echo "  No issue references found in SESSION_PLAN.md"
+    fi
+else
+    echo "  Skipped (gh not available or no SESSION_PLAN.md)"
+fi
+echo ""
+
 # ── Step 6: Journal entry + learnings ──
 echo "→ Writing journal entry..."
 JOURNAL_PROMPT="You are SSANAI (싸나이). Day $DAY ($DATE $SESSION_TIME).
@@ -266,6 +318,11 @@ INSERT a new entry at the TOP of JOURNAL.md:
 
 If you learned something genuinely novel, append to memory/learnings.jsonl via python3:
 python3 -c \"import json; entry={'type':'lesson','day':$DAY,'ts':'$(date -u +%Y-%m-%dT%H:%M:%SZ)','source':'evolution','title':'SHORT','context':'WHAT','takeaway':'INSIGHT'}; open('memory/learnings.jsonl','a').write(json.dumps(entry,ensure_ascii=False)+chr(10))\"
+
+If you identified important follow-up work during this session (max 3 items), create
+agent-self issues via:
+python3 scripts/issue_manager.py create --title \"TITLE\" --body \"DESCRIPTION\" --label agent-self
+Only create issues for genuinely important next steps, not trivial improvements.
 
 Commit: git add -A && git commit -m 'Day $DAY ($SESSION_TIME): journal entry'"
 

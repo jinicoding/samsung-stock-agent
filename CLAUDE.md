@@ -30,6 +30,7 @@ To trigger a full evolution cycle (uses Claude Max subscription):
 export KIS_APP_KEY="..."         # Korea Investment Securities API
 export KIS_APP_SECRET="..."      # KIS API secret
 export TELEGRAM_BOT_TOKEN="..."  # Telegram bot token
+export GH_TOKEN="..."            # GitHub token (optional, for issue integration)
 ```
 
 For local cron setup:
@@ -56,11 +57,20 @@ See `.env.example` for the full list.
   - `subscribers.py` — Subscriber list loader
 - `src/main.py` — Daily orchestration entry point
 
+**Issue system** (`scripts/issue_manager.py`):
+- GitHub Issues를 에이전트-커뮤니티 소통 채널로 사용
+- 라벨: `agent-input` (사용자 요청), `agent-self` (에이전트 할일), `bug`, `in-progress`
+- `scripts/context.sh`가 이슈를 로드하여 `$AGENT_CONTEXT`에 포함
+- 진화 세션 후 처리한 이슈에 코멘트 + 상태 전이 자동화
+- 디자인 문서: `docs/designs/github-issues-integration.md`
+
 **Evolution loop** (`scripts/evolve.sh`):
 1. Verifies tests pass (`pytest tests/`)
-2. **Phase A** (Planning): Claude CLI reads source + journal, writes `SESSION_PLAN.md`
-3. **Phase B** (Implementation): Claude CLI executes each task (15 min each), with pytest verification gate
-4. Verifies tests, reverts on failure → writes journal entry → pushes
+2. Loads context including community issues (`scripts/context.sh`)
+3. **Phase A** (Planning): Claude CLI reads source + journal + issues, writes `SESSION_PLAN.md`
+4. **Phase B** (Implementation): Claude CLI executes each task (15 min each), with pytest verification gate
+5. Processes issue references (`Fixes #N` / `Partially-fixes #N`) — comments + transitions
+6. Verifies tests, reverts on failure → writes journal entry (+ agent-self issues) → pushes
 
 **Skills** (`skills/`): Three domain-specific skills guide the agent's evolution:
 - `self-assess` — evaluate analysis capabilities, find gaps

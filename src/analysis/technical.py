@@ -17,6 +17,30 @@ def _pct_change(old: float, new: float) -> float:
     return (new - old) / old * 100
 
 
+def _rsi(closes: list[float], period: int = 14) -> float | None:
+    """Wilder 방식 RSI 계산. 데이터가 period+1개 미만이면 None."""
+    if len(closes) < period + 1:
+        return None
+
+    deltas = [closes[i] - closes[i - 1] for i in range(1, len(closes))]
+
+    # 첫 period일의 평균 상승/하락폭
+    gains = [d if d > 0 else 0 for d in deltas[:period]]
+    losses = [-d if d < 0 else 0 for d in deltas[:period]]
+    avg_gain = sum(gains) / period
+    avg_loss = sum(losses) / period
+
+    # Wilder 평활 이동평균
+    for d in deltas[period:]:
+        avg_gain = (avg_gain * (period - 1) + (d if d > 0 else 0)) / period
+        avg_loss = (avg_loss * (period - 1) + (-d if d < 0 else 0)) / period
+
+    if avg_loss == 0:
+        return 100.0
+    rs = avg_gain / avg_loss
+    return 100 - (100 / (1 + rs))
+
+
 def compute_technical_indicators(rows: list[dict]) -> dict:
     """OHLCV rows로부터 기초 기술적 지표를 계산한다.
 
@@ -79,4 +103,6 @@ def compute_technical_indicators(rows: list[dict]) -> dict:
         "change_20d_pct": change_nd(20),
         # 거래량 변화율
         "volume_ratio_5d": volume_ratio,
+        # RSI (14일)
+        "rsi_14": _rsi(closes, 14),
     }

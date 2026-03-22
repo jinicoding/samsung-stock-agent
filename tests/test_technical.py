@@ -105,6 +105,49 @@ class TestVolumeChange:
         assert result["volume_ratio_5d"] is None
 
 
+class TestRSI:
+    """RSI(상대강도지수) 계산 테스트."""
+
+    def test_rsi_normal(self):
+        """14일 이상 데이터로 정상 RSI 계산."""
+        # 상승·하락 혼재 20일 데이터
+        prices = [50000 + (i % 3 - 1) * 500 + i * 100 for i in range(20)]
+        result = compute_technical_indicators(_make_rows(prices))
+        assert result["rsi_14"] is not None
+        assert 0 <= result["rsi_14"] <= 100
+
+    def test_rsi_insufficient_data(self):
+        """14일 미만 데이터면 RSI는 None."""
+        prices = [50000 + i * 100 for i in range(10)]
+        result = compute_technical_indicators(_make_rows(prices))
+        assert result["rsi_14"] is None
+
+    def test_rsi_all_up(self):
+        """전부 상승이면 RSI ≈ 100."""
+        prices = [50000 + i * 100 for i in range(20)]  # 매일 +100
+        result = compute_technical_indicators(_make_rows(prices))
+        assert result["rsi_14"] is not None
+        assert result["rsi_14"] > 99
+
+    def test_rsi_all_down(self):
+        """전부 하락이면 RSI ≈ 0."""
+        prices = [60000 - i * 100 for i in range(20)]  # 매일 -100
+        result = compute_technical_indicators(_make_rows(prices))
+        assert result["rsi_14"] is not None
+        assert result["rsi_14"] < 1
+
+    def test_rsi_half_and_half(self):
+        """상승·하락 반반이면 RSI ≈ 50."""
+        # 교대로 +500, -500
+        prices = [50000]
+        for i in range(19):
+            delta = 500 if i % 2 == 0 else -500
+            prices.append(prices[-1] + delta)
+        result = compute_technical_indicators(_make_rows(prices))
+        assert result["rsi_14"] is not None
+        assert 40 <= result["rsi_14"] <= 60
+
+
 class TestEdgeCases:
     """엣지 케이스 테스트."""
 

@@ -170,9 +170,10 @@ echo ""
 echo "  Phase B: Implementation..."
 IMPL_TIMEOUT=900
 TASK_NUM=0
+TOTAL_TASKS=$(grep -c '^### Task ' SESSION_PLAN.md 2>/dev/null || echo 0)
+echo "  Total planned tasks: $TOTAL_TASKS"
 while IFS= read -r task_line; do
     TASK_NUM=$((TASK_NUM + 1))
-    TOTAL_TASKS=$TASK_NUM
     task_title="${task_line#*: }"
     echo "  → Task $TASK_NUM: $task_title"
 

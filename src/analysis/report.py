@@ -50,10 +50,26 @@ def assess_volume(volume_ratio: float | None) -> str | None:
     return "감소"
 
 
+def classify_rsi(rsi: float | None) -> str:
+    """RSI 상태를 판단한다.
+
+    Returns:
+        "과매수" | "과매도" | "중립" | "N/A"
+    """
+    if rsi is None:
+        return "N/A"
+    if rsi >= 70:
+        return "과매수"
+    if rsi <= 30:
+        return "과매도"
+    return "중립"
+
+
 def assess_market_temperature(
     change_1d_pct: float | None,
     ma_alignment: str,
     volume_status: str | None,
+    rsi_14: float | None = None,
 ) -> str:
     """종합 시장 온도를 판정한다.
 
@@ -93,6 +109,16 @@ def assess_market_temperature(
             score += 1 if is_rising else -1
         elif volume_status == "감소":
             score -= 1 if is_rising else 0
+
+    # 4) RSI: 과매수 시 약세 가산, 과매도 시 강세 가산
+    if rsi_14 is not None:
+        rsi_status = classify_rsi(rsi_14)
+        if rsi_status != "중립":
+            count += 1
+            if rsi_status == "과매수":
+                score -= 2
+            elif rsi_status == "과매도":
+                score += 2
 
     if count == 0:
         return "중립"
@@ -227,9 +253,12 @@ def generate_daily_report(indicators: dict, supply_demand: dict | None = None) -
     change_5d = indicators.get("change_5d_pct")
     change_20d = indicators.get("change_20d_pct")
 
+    rsi_14 = indicators.get("rsi_14")
+
     ma_alignment = classify_ma_alignment(indicators)
     volume_status = assess_volume(indicators.get("volume_ratio_5d"))
-    temperature = assess_market_temperature(change_1d, ma_alignment, volume_status)
+    rsi_status = classify_rsi(rsi_14)
+    temperature = assess_market_temperature(change_1d, ma_alignment, volume_status, rsi_14=rsi_14)
 
     lines = []
 
@@ -259,7 +288,13 @@ def generate_daily_report(indicators: dict, supply_demand: dict | None = None) -
     lines.append(f"<b>거래량(5일비):</b> {vol_text} ({vol_label}) {_volume_emoji(volume_status)}")
     lines.append("")
 
-    # 4) 종합 시장 온도
+    # 4) RSI
+    if rsi_14 is not None:
+        rsi_emoji = "🔴" if rsi_status == "과매수" else "🟢" if rsi_status == "과매도" else ""
+        lines.append(f"<b>RSI(14):</b> {rsi_14:.1f} ({rsi_status}) {rsi_emoji}".rstrip())
+        lines.append("")
+
+    # 5) 종합 시장 온도
     lines.append(f"<b>시장 온도:</b> {_temp_emoji(temperature)} {temperature}")
 
     # 5) 수급 동향 (선택)

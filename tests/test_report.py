@@ -208,6 +208,80 @@ class TestGenerateDailyReport:
         report = generate_daily_report(_full_indicators(), supply_demand=sd)
         assert "수급 동향" in report
 
+    def test_contains_rsi_value(self):
+        """RSI 값이 리포트에 표시된다."""
+        indicators = _full_indicators(rsi_14=65.3)
+        report = generate_daily_report(indicators)
+        assert "RSI" in report
+        assert "65.3" in report
+
+    def test_rsi_overbought_label(self):
+        """RSI 70 이상이면 과매수 표시."""
+        indicators = _full_indicators(rsi_14=75.0)
+        report = generate_daily_report(indicators)
+        assert "과매수" in report
+
+    def test_rsi_oversold_label(self):
+        """RSI 30 이하이면 과매도 표시."""
+        indicators = _full_indicators(rsi_14=25.0)
+        report = generate_daily_report(indicators)
+        assert "과매도" in report
+
+    def test_rsi_neutral_label(self):
+        """RSI 30~70이면 중립 표시."""
+        indicators = _full_indicators(rsi_14=50.0)
+        report = generate_daily_report(indicators)
+        assert "RSI" in report
+        assert "중립" in report
+
+    def test_rsi_none_no_crash(self):
+        """RSI가 None이면 N/A로 표시, 에러 없음."""
+        indicators = _full_indicators(rsi_14=None)
+        report = generate_daily_report(indicators)
+        assert isinstance(report, str)
+
+
+class TestMarketTemperatureWithRSI:
+    """RSI가 시장 온도 판정에 반영되는지 테스트."""
+
+    def test_overbought_adds_bearish(self):
+        """과매수(RSI 70↑)는 약세 가산 → 강세에서 중립으로."""
+        result = assess_market_temperature(
+            change_1d_pct=1.5, ma_alignment="혼조", volume_status="보통",
+            rsi_14=80.0,
+        )
+        assert result != "강세"
+
+    def test_oversold_adds_bullish(self):
+        """과매도(RSI 30↓)는 강세 가산 → 약세에서 중립으로."""
+        result = assess_market_temperature(
+            change_1d_pct=-0.5, ma_alignment="혼조", volume_status="보통",
+            rsi_14=20.0,
+        )
+        assert result != "약세"
+
+    def test_neutral_rsi_no_effect(self):
+        """RSI 30~70은 온도 판정에 영향 없음."""
+        without_rsi = assess_market_temperature(
+            change_1d_pct=0.3, ma_alignment="혼조", volume_status="보통",
+        )
+        with_rsi = assess_market_temperature(
+            change_1d_pct=0.3, ma_alignment="혼조", volume_status="보통",
+            rsi_14=50.0,
+        )
+        assert without_rsi == with_rsi
+
+    def test_rsi_none_same_as_without(self):
+        """RSI가 None이면 기존과 동일하게 동작."""
+        without = assess_market_temperature(
+            change_1d_pct=2.0, ma_alignment="정배열", volume_status="증가",
+        )
+        with_none = assess_market_temperature(
+            change_1d_pct=2.0, ma_alignment="정배열", volume_status="증가",
+            rsi_14=None,
+        )
+        assert without == with_none
+
 
 # --- helpers ---
 
@@ -228,6 +302,7 @@ def _base_indicators(
         "change_5d_pct": 3.0,
         "change_20d_pct": 5.0,
         "volume_ratio_5d": 1.0,
+        "rsi_14": 50.0,
     }
 
 
@@ -235,6 +310,7 @@ def _full_indicators(
     current_price=55000,
     change_1d_pct=1.0,
     ma5=55000, ma20=54000, ma60=53000,
+    rsi_14=50.0,
 ) -> dict:
     return {
         "current_date": "2026-03-21",
@@ -249,6 +325,7 @@ def _full_indicators(
         "change_5d_pct": 3.0,
         "change_20d_pct": 5.0,
         "volume_ratio_5d": 1.2,
+        "rsi_14": rsi_14,
     }
 
 

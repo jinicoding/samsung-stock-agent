@@ -62,6 +62,8 @@ if ! command -v timeout &>/dev/null; then
 fi
 
 SESSION_START_SHA=$(git rev-parse HEAD)
+COMPLETED_TASKS=""
+TOTAL_TASKS=0
 echo "→ Starting evolution session..."
 echo ""
 
@@ -170,6 +172,7 @@ IMPL_TIMEOUT=900
 TASK_NUM=0
 while IFS= read -r task_line; do
     TASK_NUM=$((TASK_NUM + 1))
+    TOTAL_TASKS=$TASK_NUM
     task_title="${task_line#*: }"
     echo "  → Task $TASK_NUM: $task_title"
 
@@ -237,6 +240,7 @@ TEOF
         git reset --hard "$PRE_TASK_SHA" 2>/dev/null || true
         git clean -fd 2>/dev/null || true
     else
+        COMPLETED_TASKS="$COMPLETED_TASKS $TASK_NUM"
         echo "    Task $TASK_NUM: verified OK"
     fi
 
@@ -297,6 +301,33 @@ $COMMITS_SUMMARY
     fi
 else
     echo "  Skipped (gh not available or no SESSION_PLAN.md)"
+fi
+echo ""
+
+# ── Step 5.6: Create issues for incomplete tasks ──
+echo "→ Creating issues for incomplete tasks..."
+if python3 scripts/issue_manager.py check >/dev/null 2>&1 && [ -f SESSION_PLAN.md ]; then
+    CREATED_ISSUES=0
+    for T in $(seq 1 "$TOTAL_TASKS"); do
+        if echo "$COMPLETED_TASKS" | grep -qw "$T"; then
+            continue
+        fi
+        # Extract task title and description
+        TASK_TITLE=$(awk "/^### Task $T:/{gsub(/^### Task $T: /,\"\"); gsub(/ *\\(.*\\)$/,\"\"); print; exit}" SESSION_PLAN.md)
+        TASK_BODY=$(awk "/^### Task $T:/{found=1; next} found{if(/^### / && !/^### Task $T:/)exit; print}" SESSION_PLAN.md | head -10)
+
+        if [ -n "$TASK_TITLE" ]; then
+            python3 scripts/issue_manager.py create \
+                --title "$TASK_TITLE" \
+                --body "Day $DAY 세션에서 미완료된 태스크입니다.
+
+$TASK_BODY" \
+                --label agent-self 2>/dev/null && CREATED_ISSUES=$((CREATED_ISSUES + 1)) || true
+        fi
+    done
+    echo "  Created $CREATED_ISSUES issue(s) for incomplete tasks"
+else
+    echo "  Skipped (gh not available)"
 fi
 echo ""
 

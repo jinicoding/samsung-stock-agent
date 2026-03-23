@@ -2,7 +2,7 @@
 
 import pytest
 
-from src.analysis.report import generate_daily_report, classify_ma_alignment, assess_volume, assess_market_temperature
+from src.analysis.report import generate_daily_report, classify_ma_alignment, assess_volume, assess_market_temperature, classify_macd
 
 
 class TestClassifyMaAlignment:
@@ -241,6 +241,115 @@ class TestGenerateDailyReport:
         assert isinstance(report, str)
 
 
+class TestClassifyMACD:
+    """MACD 크로스 판정 테스트."""
+
+    def test_golden_cross(self):
+        """MACD > Signal → 골든크로스."""
+        assert classify_macd(100.0, 50.0, 50.0) == "골든크로스"
+
+    def test_dead_cross(self):
+        """MACD < Signal → 데드크로스."""
+        assert classify_macd(-100.0, -50.0, -50.0) == "데드크로스"
+
+    def test_data_insufficient(self):
+        """데이터 부족 시 N/A."""
+        assert classify_macd(None, None, None) == "N/A"
+
+    def test_histogram_expanding_positive(self):
+        """양의 히스토그램 → 골든크로스."""
+        assert classify_macd(200.0, 100.0, 100.0) == "골든크로스"
+
+    def test_histogram_expanding_negative(self):
+        """음의 히스토그램 → 데드크로스."""
+        assert classify_macd(-200.0, -100.0, -100.0) == "데드크로스"
+
+
+class TestReportContainsMACD:
+    """리포트에 MACD 섹션이 포함되는지 테스트."""
+
+    def test_macd_section_present(self):
+        """MACD 값이 있으면 섹션이 표시된다."""
+        indicators = _full_indicators()
+        indicators["macd"] = 150.0
+        indicators["macd_signal"] = 100.0
+        indicators["macd_histogram"] = 50.0
+        report = generate_daily_report(indicators)
+        assert "MACD" in report
+
+    def test_macd_golden_cross_in_report(self):
+        """골든크로스 상태가 리포트에 표시."""
+        indicators = _full_indicators()
+        indicators["macd"] = 150.0
+        indicators["macd_signal"] = 100.0
+        indicators["macd_histogram"] = 50.0
+        report = generate_daily_report(indicators)
+        assert "골든크로스" in report
+
+    def test_macd_dead_cross_in_report(self):
+        """데드크로스 상태가 리포트에 표시."""
+        indicators = _full_indicators()
+        indicators["macd"] = -150.0
+        indicators["macd_signal"] = -100.0
+        indicators["macd_histogram"] = -50.0
+        report = generate_daily_report(indicators)
+        assert "데드크로스" in report
+
+    def test_macd_none_no_crash(self):
+        """MACD가 None이면 MACD 섹션 없이 정상 동작."""
+        indicators = _full_indicators()
+        indicators["macd"] = None
+        indicators["macd_signal"] = None
+        indicators["macd_histogram"] = None
+        report = generate_daily_report(indicators)
+        assert isinstance(report, str)
+
+    def test_macd_histogram_direction(self):
+        """히스토그램 방향(확장/수축) 표시."""
+        indicators = _full_indicators()
+        indicators["macd"] = 150.0
+        indicators["macd_signal"] = 100.0
+        indicators["macd_histogram"] = 50.0
+        report = generate_daily_report(indicators)
+        # 양수 히스토그램 → 확장 or 관련 표현
+        assert "확장" in report or "수축" in report
+
+
+class TestMarketTemperatureWithMACD:
+    """MACD가 시장 온도 판정에 반영되는지 테스트."""
+
+    def test_golden_cross_adds_bullish(self):
+        """골든크로스는 강세 가산."""
+        without = assess_market_temperature(
+            change_1d_pct=0.5, ma_alignment="혼조", volume_status="보통",
+        )
+        with_macd = assess_market_temperature(
+            change_1d_pct=0.5, ma_alignment="혼조", volume_status="보통",
+            macd_cross="골든크로스",
+        )
+        # 골든크로스가 강세 방향으로 기여
+        assert with_macd != "약세"
+
+    def test_dead_cross_adds_bearish(self):
+        """데드크로스는 약세 가산."""
+        with_macd = assess_market_temperature(
+            change_1d_pct=-0.5, ma_alignment="혼조", volume_status="보통",
+            macd_cross="데드크로스",
+        )
+        assert with_macd != "강세"
+
+    def test_macd_none_same_as_without(self):
+        """MACD 없으면 기존과 동일."""
+        without = assess_market_temperature(
+            change_1d_pct=2.0, ma_alignment="정배열", volume_status="증가",
+        )
+        with_none = assess_market_temperature(
+            change_1d_pct=2.0, ma_alignment="정배열", volume_status="증가",
+            macd_cross="N/A",
+        )
+        assert without == with_none
+
+
 class TestMarketTemperatureWithRSI:
     """RSI가 시장 온도 판정에 반영되는지 테스트."""
 
@@ -326,6 +435,9 @@ def _full_indicators(
         "change_20d_pct": 5.0,
         "volume_ratio_5d": 1.2,
         "rsi_14": rsi_14,
+        "macd": None,
+        "macd_signal": None,
+        "macd_histogram": None,
     }
 
 

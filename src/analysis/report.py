@@ -65,11 +65,40 @@ def classify_rsi(rsi: float | None) -> str:
     return "중립"
 
 
+def classify_macd(
+    macd: float | None,
+    signal: float | None,
+    histogram: float | None,
+) -> str:
+    """MACD 크로스 상태를 판단한다.
+
+    Returns:
+        "골든크로스" | "데드크로스" | "N/A"
+    """
+    if macd is None or signal is None or histogram is None:
+        return "N/A"
+    if histogram > 0:
+        return "골든크로스"
+    if histogram < 0:
+        return "데드크로스"
+    return "N/A"
+
+
+def _histogram_direction(histogram: float | None) -> str:
+    """히스토그램 방향을 판단한다."""
+    if histogram is None:
+        return ""
+    if histogram > 0:
+        return "확장"
+    return "수축"
+
+
 def assess_market_temperature(
     change_1d_pct: float | None,
     ma_alignment: str,
     volume_status: str | None,
     rsi_14: float | None = None,
+    macd_cross: str | None = None,
 ) -> str:
     """종합 시장 온도를 판정한다.
 
@@ -119,6 +148,14 @@ def assess_market_temperature(
                 score -= 2
             elif rsi_status == "과매도":
                 score += 2
+
+    # 5) MACD 크로스 상태
+    if macd_cross is not None and macd_cross != "N/A":
+        count += 1
+        if macd_cross == "골든크로스":
+            score += 2
+        elif macd_cross == "데드크로스":
+            score -= 2
 
     if count == 0:
         return "중립"
@@ -255,10 +292,17 @@ def generate_daily_report(indicators: dict, supply_demand: dict | None = None) -
 
     rsi_14 = indicators.get("rsi_14")
 
+    macd = indicators.get("macd")
+    macd_signal = indicators.get("macd_signal")
+    macd_histogram = indicators.get("macd_histogram")
+
     ma_alignment = classify_ma_alignment(indicators)
     volume_status = assess_volume(indicators.get("volume_ratio_5d"))
     rsi_status = classify_rsi(rsi_14)
-    temperature = assess_market_temperature(change_1d, ma_alignment, volume_status, rsi_14=rsi_14)
+    macd_cross = classify_macd(macd, macd_signal, macd_histogram)
+    temperature = assess_market_temperature(
+        change_1d, ma_alignment, volume_status, rsi_14=rsi_14, macd_cross=macd_cross
+    )
 
     lines = []
 
@@ -294,7 +338,16 @@ def generate_daily_report(indicators: dict, supply_demand: dict | None = None) -
         lines.append(f"<b>RSI(14):</b> {rsi_14:.1f} ({rsi_status}) {rsi_emoji}".rstrip())
         lines.append("")
 
-    # 5) 종합 시장 온도
+    # 5) MACD
+    if macd is not None:
+        macd_emoji = "🟢" if macd_cross == "골든크로스" else "🔴" if macd_cross == "데드크로스" else ""
+        hist_dir = _histogram_direction(macd_histogram)
+        lines.append(f"<b>MACD(12,26,9):</b> {macd:.1f} / 시그널: {macd_signal:.1f}" if macd_signal is not None else f"<b>MACD(12,26,9):</b> {macd:.1f} / 시그널: N/A")
+        if macd_signal is not None:
+            lines.append(f"  크로스: {macd_cross} {macd_emoji} | 히스토그램: {macd_histogram:.1f} ({hist_dir})")
+        lines.append("")
+
+    # 6) 종합 시장 온도
     lines.append(f"<b>시장 온도:</b> {_temp_emoji(temperature)} {temperature}")
 
     # 5) 수급 동향 (선택)

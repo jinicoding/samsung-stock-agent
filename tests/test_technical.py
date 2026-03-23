@@ -2,7 +2,7 @@
 
 import pytest
 
-from src.analysis.technical import compute_technical_indicators
+from src.analysis.technical import compute_technical_indicators, _ema, _macd
 
 
 def _make_rows(prices: list[float], base_volume: int = 1_000_000) -> list[dict]:
@@ -146,6 +146,93 @@ class TestRSI:
         result = compute_technical_indicators(_make_rows(prices))
         assert result["rsi_14"] is not None
         assert 40 <= result["rsi_14"] <= 60
+
+
+class TestEMA:
+    """지수이동평균(EMA) 계산 정확성 테스트."""
+
+    def test_ema_basic(self):
+        """간단한 EMA 계산."""
+        closes = [10.0, 11.0, 12.0, 13.0, 14.0]
+        result = _ema(closes, 3)
+        # EMA3: 첫 SMA = (10+11+12)/3 = 11.0
+        # k = 2/4 = 0.5
+        # EMA[3] = 13*0.5 + 11.0*0.5 = 12.0
+        # EMA[4] = 14*0.5 + 12.0*0.5 = 13.0
+        assert len(result) == 5
+        assert abs(result[-1] - 13.0) < 0.01
+
+    def test_ema_insufficient_data(self):
+        """데이터가 window 미만이면 빈 리스트."""
+        result = _ema([10.0, 11.0], 5)
+        assert result == []
+
+
+class TestMACD:
+    """MACD(12,26,9) 계산 테스트."""
+
+    def test_macd_with_sufficient_data(self):
+        """26일 이상 데이터로 MACD 계산."""
+        prices = [50000 + i * 100 for i in range(35)]
+        macd_line, signal_line, histogram = _macd(prices)
+        assert macd_line is not None
+        assert signal_line is not None
+        assert histogram is not None
+
+    def test_macd_insufficient_data(self):
+        """26일 미만 데이터면 모두 None."""
+        prices = [50000 + i * 100 for i in range(20)]
+        macd_line, signal_line, histogram = _macd(prices)
+        assert macd_line is None
+        assert signal_line is None
+        assert histogram is None
+
+    def test_macd_signal_insufficient(self):
+        """26일 이상이지만 시그널(9일) 계산 불가 시 signal=None."""
+        # 정확히 26일: MACD 값 1개뿐이라 시그널 EMA9 불가
+        prices = [50000 + i * 100 for i in range(26)]
+        macd_line, signal_line, histogram = _macd(prices)
+        assert macd_line is not None
+        assert signal_line is None
+        assert histogram is None
+
+    def test_macd_golden_cross(self):
+        """상승 추세에서 MACD > Signal (골든크로스)."""
+        # 급상승 추세 → MACD가 시그널 위
+        prices = [50000] * 30 + [50000 + i * 500 for i in range(1, 16)]
+        macd_line, signal_line, histogram = _macd(prices)
+        if signal_line is not None:
+            assert histogram > 0  # MACD > Signal
+
+    def test_macd_dead_cross(self):
+        """하락 추세에서 MACD < Signal (데드크로스)."""
+        prices = [60000] * 30 + [60000 - i * 500 for i in range(1, 16)]
+        macd_line, signal_line, histogram = _macd(prices)
+        if signal_line is not None:
+            assert histogram < 0  # MACD < Signal
+
+    def test_macd_histogram_sign(self):
+        """히스토그램 = MACD - Signal."""
+        prices = [50000 + i * 100 for i in range(45)]
+        macd_line, signal_line, histogram = _macd(prices)
+        if signal_line is not None:
+            assert abs(histogram - (macd_line - signal_line)) < 0.01
+
+    def test_compute_indicators_includes_macd(self):
+        """compute_technical_indicators에 MACD 키가 포함된다."""
+        prices = [50000 + i * 100 for i in range(45)]
+        result = compute_technical_indicators(_make_rows(prices))
+        assert "macd" in result
+        assert "macd_signal" in result
+        assert "macd_histogram" in result
+
+    def test_compute_indicators_macd_none_insufficient(self):
+        """데이터 부족 시 MACD 키는 None."""
+        prices = [50000] * 10
+        result = compute_technical_indicators(_make_rows(prices))
+        assert result["macd"] is None
+        assert result["macd_signal"] is None
+        assert result["macd_histogram"] is None
 
 
 class TestEdgeCases:

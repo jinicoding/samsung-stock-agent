@@ -41,6 +41,60 @@ def _rsi(closes: list[float], period: int = 14) -> float | None:
     return 100 - (100 / (1 + rs))
 
 
+def _ema(closes: list[float], window: int) -> list[float]:
+    """지수이동평균(EMA) 전체 시리즈를 반환한다.
+
+    첫 window일은 SMA로 시작하고, 이후 EMA를 적용한다.
+    데이터가 window 미만이면 빈 리스트를 반환한다.
+    """
+    if len(closes) < window:
+        return []
+    k = 2 / (window + 1)
+    ema_values = [0.0] * len(closes)
+    # 첫 SMA
+    ema_values[window - 1] = sum(closes[:window]) / window
+    for i in range(window, len(closes)):
+        ema_values[i] = closes[i] * k + ema_values[i - 1] * (1 - k)
+    # window 이전 값은 의미 없으므로 그대로 두되, 전체 길이를 반환
+    return ema_values
+
+
+def _macd(
+    closes: list[float],
+    fast: int = 12,
+    slow: int = 26,
+    signal: int = 9,
+) -> tuple[float | None, float | None, float | None]:
+    """MACD 라인, 시그널 라인, 히스토그램의 최신 값을 반환한다.
+
+    Returns:
+        (macd_line, signal_line, histogram) — 데이터 부족 시 (None, None, None).
+    """
+    if len(closes) < slow:
+        return None, None, None
+
+    ema_fast = _ema(closes, fast)
+    ema_slow = _ema(closes, slow)
+
+    # MACD 라인 = EMA_fast - EMA_slow (slow-1 인덱스부터 유효)
+    macd_series = [
+        ema_fast[i] - ema_slow[i]
+        for i in range(slow - 1, len(closes))
+    ]
+
+    macd_line = macd_series[-1]
+
+    # 시그널 라인 = MACD 시리즈의 EMA(signal)
+    if len(macd_series) < signal:
+        return macd_line, None, None
+
+    signal_ema = _ema(macd_series, signal)
+    signal_line = signal_ema[-1]
+    histogram = macd_line - signal_line
+
+    return macd_line, signal_line, histogram
+
+
 def compute_technical_indicators(rows: list[dict]) -> dict:
     """OHLCV rows로부터 기초 기술적 지표를 계산한다.
 
@@ -86,6 +140,9 @@ def compute_technical_indicators(rows: list[dict]) -> dict:
         if avg_vol_5d > 0:
             volume_ratio = volumes[-1] / avg_vol_5d
 
+    # MACD (12, 26, 9)
+    macd_line, macd_signal, macd_histogram = _macd(closes)
+
     return {
         "current_date": rows[-1]["date"],
         "current_price": current,
@@ -105,4 +162,8 @@ def compute_technical_indicators(rows: list[dict]) -> dict:
         "volume_ratio_5d": volume_ratio,
         # RSI (14일)
         "rsi_14": _rsi(closes, 14),
+        # MACD (12, 26, 9)
+        "macd": macd_line,
+        "macd_signal": macd_signal,
+        "macd_histogram": macd_histogram,
     }

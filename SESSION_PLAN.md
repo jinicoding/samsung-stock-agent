@@ -1,9 +1,9 @@
 ## Session Plan
 
-### Task 1: 볼린저 밴드(20,2) 지표 추가 — 변동성 분석 도입
-Files: src/analysis/technical.py, src/analysis/report.py, tests/test_technical.py, tests/test_report.py
-Description: 볼린저 밴드(20일 SMA ± 2σ)를 기술적 분석 모듈에 추가한다. compute_technical_indicators에 bb_upper, bb_lower, bb_width, bb_pctb(현재가의 밴드 내 위치, 0~1) 키를 추가. 리포트에 밴드 위치(%B)와 밴드폭(변동성 수준)을 표시하고, 시장온도 판정에 반영한다(%B > 1.0이면 밴드 상단 돌파 = 과열, %B < 0이면 하단 이탈 = 침체). 테스트를 먼저 작성한다.
+### Task 1: USD/KRW 환율 분석 모듈 구축
+Files: tests/test_exchange_rate_analysis.py (신규), src/analysis/exchange_rate.py (신규)
+Description: 수집만 하고 분석에 전혀 사용하지 않던 USD/KRW 환율 데이터를 활용하는 분석 모듈을 구축한다. 삼성전자는 매출의 ~80%가 해외에서 발생하는 수출 기업이므로 환율은 실적과 직결된다. 구현 항목: (1) 환율 현재가·등락률(1일/5일/20일), (2) 환율 이동평균(5일/20일) 및 추세 판정(원화강세/원화약세/보합), (3) 주가-환율 상관관계 분석(최근 20일 종가 기준 피어슨 상관계수). 테스트를 먼저 작성하고 구현한다.
 
-### Task 2: 환율(USD/KRW) 분석을 일일 리포트에 통합
-Files: src/analysis/exchange_rate.py (신규), src/analysis/report.py, src/main.py, tests/test_exchange_rate_analysis.py (신규), tests/test_report.py
-Description: 수집만 하고 사용하지 않는 환율 데이터를 분석 모듈로 만들어 리포트에 통합한다. exchange_rate.py에서 당일 환율, 전일 대비 변동, 5일/20일 이동평균, 추세(원화 강세/약세/보합)를 계산. 삼성전자는 수출 비중이 높아 원화 약세 → 실적 긍정 / 원화 강세 → 실적 부정 맥락을 리포트에 한 줄 해설로 추가. main.py에서 exchange_rate 데이터를 조회하여 report에 전달하도록 파이프라인을 확장한다. 테스트를 먼저 작성한다.
+### Task 2: 환율 분석을 일일 리포트·파이프라인에 통합
+Files: src/analysis/report.py, tests/test_report.py, src/main.py, tests/test_main.py
+Description: Task 1에서 만든 환율 분석 결과를 리포트 HTML과 main.py 파이프라인에 연결한다. 리포트에 "💱 환율 동향" 섹션을 추가하여 USD/KRW 현재가, 추세(원화강세↓/약세↑), 주가-환율 상관계수, 투자 시사점(예: "원화 약세 구간 — 수출 실적 개선 기대")을 표시한다. main.py에서 get_exchange_rates(20)을 조회하고 분석 함수를 호출하여 generate_daily_report에 전달하는 흐름을 완성한다. 기존 테스트와의 하위 호환성을 유지한다(exchange_rate 파라미터 기본값 None).

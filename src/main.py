@@ -19,6 +19,7 @@ from src.analysis.technical import compute_technical_indicators
 from src.analysis.supply_demand import analyze_supply_demand
 from src.analysis.exchange_rate import analyze_exchange_rate
 from src.analysis.report import generate_daily_report
+from src.analysis.signal import compute_composite_signal
 from src.delivery.telegram_bot import send_message
 
 
@@ -52,8 +53,11 @@ def main(dry_run: bool = False):
     sd = analyze_supply_demand(trading, ownership) if trading else None
     er = analyze_exchange_rate(rates, prices) if rates else None
 
+    # 3.5) 종합 투자 시그널
+    sig = compute_composite_signal(indicators, sd or {}, er or {})
+
     # 4) 리포트 생성
-    report = generate_daily_report(indicators, supply_demand=sd, exchange_rate=er)
+    report = generate_daily_report(indicators, supply_demand=sd, exchange_rate=er, composite_signal=sig)
 
     # 5) 발송 또는 출력
     if dry_run:

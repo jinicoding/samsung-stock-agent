@@ -441,6 +441,67 @@ class TestMarketTemperatureWithBB:
         assert without == with_none
 
 
+class TestCompositeSignalInReport:
+    """종합 투자 시그널이 리포트에 표시되는지 테스트."""
+
+    def test_signal_section_absent_by_default(self):
+        """composite_signal=None이면 종합 시그널 섹션 없음."""
+        report = generate_daily_report(_full_indicators())
+        assert "종합 판정" not in report
+
+    def test_signal_section_present(self):
+        """composite_signal이 주어지면 종합 시그널 섹션이 포함된다."""
+        sig = _composite_signal_bullish()
+        report = generate_daily_report(_full_indicators(), composite_signal=sig)
+        assert "종합 판정" in report
+
+    def test_signal_grade_displayed(self):
+        """5단계 판정이 리포트에 표시된다."""
+        sig = _composite_signal_bullish()
+        report = generate_daily_report(_full_indicators(), composite_signal=sig)
+        assert sig["grade"] in report
+
+    def test_signal_score_displayed(self):
+        """종합 점수가 리포트에 표시된다."""
+        sig = _composite_signal_bullish()
+        report = generate_daily_report(_full_indicators(), composite_signal=sig)
+        assert "45" in report
+
+    def test_signal_three_axes_displayed(self):
+        """기술/수급/환율 3축 점수가 표시된다."""
+        sig = _composite_signal_bullish()
+        report = generate_daily_report(_full_indicators(), composite_signal=sig)
+        assert "기술" in report
+        assert "수급" in report
+        assert "환율" in report
+
+    def test_signal_section_before_price(self):
+        """종합 시그널 섹션이 현재가 섹션보다 앞에 위치한다."""
+        sig = _composite_signal_bullish()
+        report = generate_daily_report(_full_indicators(), composite_signal=sig)
+        signal_pos = report.index("종합 판정")
+        price_pos = report.index("현재가")
+        assert signal_pos < price_pos
+
+    def test_signal_strong_buy(self):
+        """강력매수신호 판정 표시."""
+        sig = _composite_signal_bullish()
+        sig["score"] = 80.0
+        sig["grade"] = "강력매수신호"
+        report = generate_daily_report(_full_indicators(), composite_signal=sig)
+        assert "강력매수신호" in report
+
+    def test_signal_strong_sell(self):
+        """강력매도신호 판정 표시."""
+        sig = {
+            "score": -75.0, "grade": "강력매도신호",
+            "technical_score": -80.0, "supply_score": -70.0, "exchange_score": -60.0,
+            "weights": {"technical": 40, "supply": 40, "exchange": 20},
+        }
+        report = generate_daily_report(_full_indicators(), composite_signal=sig)
+        assert "강력매도신호" in report
+
+
 class TestMarketTemperatureWithMACD:
     """MACD가 시장 온도 판정에 반영되는지 테스트."""
 
@@ -614,6 +675,17 @@ def _supply_demand_sell_dominant() -> dict:
         "ownership_trend": "decreasing",
         "ownership_change_pct": -0.5,
         "overall_judgment": "sell_dominant",
+    }
+
+
+def _composite_signal_bullish() -> dict:
+    return {
+        "score": 45.0,
+        "grade": "매수우세",
+        "technical_score": 50.0,
+        "supply_score": 60.0,
+        "exchange_score": 10.0,
+        "weights": {"technical": 40, "supply": 40, "exchange": 20},
     }
 
 

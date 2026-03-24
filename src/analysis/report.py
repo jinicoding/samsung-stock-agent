@@ -339,10 +339,47 @@ def _build_supply_demand_section(sd: dict) -> list[str]:
     return lines
 
 
+def _grade_emoji(grade: str) -> str:
+    """종합 시그널 등급 이모지."""
+    if grade == "강력매수신호":
+        return "🟢🟢"
+    if grade == "매수우세":
+        return "🟢"
+    if grade == "중립":
+        return "🟡"
+    if grade == "매도우세":
+        return "🔴"
+    return "🔴🔴"
+
+
+def _score_bar(score: float) -> str:
+    """점수를 시각적 게이지 바로 변환. -100~+100."""
+    # 10단계 (5칸 기준, -100~+100을 0~10으로 매핑)
+    filled = int((score + 100) / 20)
+    filled = max(0, min(10, filled))
+    return "█" * filled + "░" * (10 - filled)
+
+
+def _build_composite_signal_section(sig: dict) -> list[str]:
+    """종합 투자 시그널을 HTML 라인 리스트로."""
+    lines = []
+    grade = sig["grade"]
+    score = sig["score"]
+    lines.append(f"<b>🎯 오늘의 종합 판정: {_grade_emoji(grade)} {grade}</b>")
+    lines.append(f"  [{_score_bar(score)}] {score:+.1f}점")
+    lines.append("")
+    lines.append(f"  기술적: {sig['technical_score']:+.0f} (가중치 {sig['weights']['technical']}%)")
+    lines.append(f"  수급: {sig['supply_score']:+.0f} (가중치 {sig['weights']['supply']}%)")
+    lines.append(f"  환율: {sig['exchange_score']:+.0f} (가중치 {sig['weights']['exchange']}%)")
+    lines.append("")
+    return lines
+
+
 def generate_daily_report(
     indicators: dict,
     supply_demand: dict | None = None,
     exchange_rate: dict | None = None,
+    composite_signal: dict | None = None,
 ) -> str:
     """기술적 지표 dict를 HTML 텔레그램 메시지로 변환한다.
 
@@ -387,6 +424,10 @@ def generate_daily_report(
     lines.append(f"<b>📊 삼성전자 일일 리포트</b>")
     lines.append(f"<b>{date}</b>")
     lines.append("")
+
+    # 0) 종합 투자 시그널 (최상단)
+    if composite_signal is not None:
+        lines.extend(_build_composite_signal_section(composite_signal))
 
     # 1) 현재가 및 등락
     lines.append(f"<b>현재가:</b> {_format_price(price)}원 ({_format_change(change_1d)})")

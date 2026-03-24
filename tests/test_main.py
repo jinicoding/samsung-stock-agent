@@ -67,11 +67,21 @@ SAMPLE_ER = {
     "correlation_20d": -0.3,
 }
 
+SAMPLE_SIGNAL = {
+    "score": 35.0,
+    "grade": "매수우세",
+    "technical_score": 40.0,
+    "supply_score": 50.0,
+    "exchange_score": -10.0,
+    "weights": {"technical": 40, "supply": 40, "exchange": 20},
+}
+
 SAMPLE_REPORT_HTML = "<b>삼성전자 일일 분석</b>"
 
 
 @patch("src.main.send_message")
 @patch("src.main.generate_daily_report", return_value=SAMPLE_REPORT_HTML)
+@patch("src.main.compute_composite_signal", return_value=SAMPLE_SIGNAL)
 @patch("src.main.analyze_exchange_rate", return_value=SAMPLE_ER)
 @patch("src.main.analyze_supply_demand", return_value=SAMPLE_SD)
 @patch("src.main.compute_technical_indicators", return_value=SAMPLE_INDICATORS)
@@ -85,9 +95,9 @@ SAMPLE_REPORT_HTML = "<b>삼성전자 일일 분석</b>"
 def test_pipeline_full(
     mock_init, mock_bf_prices, mock_bf_sd,
     mock_prices, mock_trading, mock_ownership, mock_rates,
-    mock_tech, mock_sd, mock_er, mock_report, mock_send,
+    mock_tech, mock_sd, mock_er, mock_signal, mock_report, mock_send,
 ):
-    """전체 파이프라인: 백필→조회→분석→리포트→발송."""
+    """전체 파이프라인: 백필→조회→분석→시그널→리포트→발송."""
     from src.main import main
 
     main()
@@ -102,12 +112,14 @@ def test_pipeline_full(
     mock_tech.assert_called_once_with(SAMPLE_PRICES)
     mock_sd.assert_called_once_with(SAMPLE_TRADING, SAMPLE_OWNERSHIP)
     mock_er.assert_called_once_with(SAMPLE_RATES, SAMPLE_PRICES)
-    mock_report.assert_called_once_with(SAMPLE_INDICATORS, supply_demand=SAMPLE_SD, exchange_rate=SAMPLE_ER)
+    mock_signal.assert_called_once_with(SAMPLE_INDICATORS, SAMPLE_SD, SAMPLE_ER)
+    mock_report.assert_called_once_with(SAMPLE_INDICATORS, supply_demand=SAMPLE_SD, exchange_rate=SAMPLE_ER, composite_signal=SAMPLE_SIGNAL)
     mock_send.assert_called_once_with(SAMPLE_REPORT_HTML)
 
 
 @patch("src.main.send_message")
 @patch("src.main.generate_daily_report", return_value=SAMPLE_REPORT_HTML)
+@patch("src.main.compute_composite_signal", return_value=SAMPLE_SIGNAL)
 @patch("src.main.analyze_exchange_rate", return_value=SAMPLE_ER)
 @patch("src.main.analyze_supply_demand", return_value=SAMPLE_SD)
 @patch("src.main.compute_technical_indicators", return_value=SAMPLE_INDICATORS)
@@ -121,7 +133,7 @@ def test_pipeline_full(
 def test_pipeline_dry_run(
     mock_init, mock_bf_prices, mock_bf_sd,
     mock_prices, mock_trading, mock_ownership, mock_rates,
-    mock_tech, mock_sd, mock_er, mock_report, mock_send,
+    mock_tech, mock_sd, mock_er, mock_signal, mock_report, mock_send,
     capsys,
 ):
     """--dry-run: 리포트를 stdout에 출력하고 발송하지 않는다."""

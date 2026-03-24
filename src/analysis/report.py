@@ -93,12 +93,28 @@ def _histogram_direction(histogram: float | None) -> str:
     return "수축"
 
 
+def classify_bb_position(bb_pctb: float | None) -> str:
+    """볼린저 밴드 %B 위치를 판단한다.
+
+    Returns:
+        "상단 돌파" | "하단 이탈" | "밴드 내" | "N/A"
+    """
+    if bb_pctb is None:
+        return "N/A"
+    if bb_pctb > 1.0:
+        return "상단 돌파"
+    if bb_pctb < 0:
+        return "하단 이탈"
+    return "밴드 내"
+
+
 def assess_market_temperature(
     change_1d_pct: float | None,
     ma_alignment: str,
     volume_status: str | None,
     rsi_14: float | None = None,
     macd_cross: str | None = None,
+    bb_pctb: float | None = None,
 ) -> str:
     """종합 시장 온도를 판정한다.
 
@@ -156,6 +172,16 @@ def assess_market_temperature(
             score += 2
         elif macd_cross == "데드크로스":
             score -= 2
+
+    # 6) 볼린저 밴드 %B: 밴드 이탈 시만 반영
+    if bb_pctb is not None:
+        bb_pos = classify_bb_position(bb_pctb)
+        if bb_pos != "밴드 내":
+            count += 1
+            if bb_pos == "상단 돌파":
+                score -= 2  # 과열 → 약세 가산
+            elif bb_pos == "하단 이탈":
+                score += 2  # 침체 → 강세 가산 (반등 기대)
 
     if count == 0:
         return "중립"
@@ -296,12 +322,19 @@ def generate_daily_report(indicators: dict, supply_demand: dict | None = None) -
     macd_signal = indicators.get("macd_signal")
     macd_histogram = indicators.get("macd_histogram")
 
+    bb_upper = indicators.get("bb_upper")
+    bb_lower = indicators.get("bb_lower")
+    bb_width = indicators.get("bb_width")
+    bb_pctb = indicators.get("bb_pctb")
+
     ma_alignment = classify_ma_alignment(indicators)
     volume_status = assess_volume(indicators.get("volume_ratio_5d"))
     rsi_status = classify_rsi(rsi_14)
     macd_cross = classify_macd(macd, macd_signal, macd_histogram)
+    bb_position = classify_bb_position(bb_pctb)
     temperature = assess_market_temperature(
-        change_1d, ma_alignment, volume_status, rsi_14=rsi_14, macd_cross=macd_cross
+        change_1d, ma_alignment, volume_status, rsi_14=rsi_14, macd_cross=macd_cross,
+        bb_pctb=bb_pctb,
     )
 
     lines = []
@@ -347,7 +380,15 @@ def generate_daily_report(indicators: dict, supply_demand: dict | None = None) -
             lines.append(f"  크로스: {macd_cross} {macd_emoji} | 히스토그램: {macd_histogram:.1f} ({hist_dir})")
         lines.append("")
 
-    # 6) 종합 시장 온도
+    # 6) 볼린저 밴드
+    if bb_pctb is not None:
+        bb_emoji = "🔴" if bb_position == "상단 돌파" else "🟢" if bb_position == "하단 이탈" else ""
+        lines.append(f"<b>BB(20,2):</b> %B {bb_pctb:.2f} ({bb_position}) {bb_emoji}".rstrip())
+        if bb_width is not None:
+            lines.append(f"  밴드폭: {bb_width:.3f} | 상단: {_format_price(bb_upper)} | 하단: {_format_price(bb_lower)}")
+        lines.append("")
+
+    # 7) 종합 시장 온도
     lines.append(f"<b>시장 온도:</b> {_temp_emoji(temperature)} {temperature}")
 
     # 5) 수급 동향 (선택)

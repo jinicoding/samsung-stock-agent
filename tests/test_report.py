@@ -2,7 +2,7 @@
 
 import pytest
 
-from src.analysis.report import generate_daily_report, classify_ma_alignment, assess_volume, assess_market_temperature, classify_macd
+from src.analysis.report import generate_daily_report, classify_ma_alignment, assess_volume, assess_market_temperature, classify_macd, classify_bb_position
 
 
 class TestClassifyMaAlignment:
@@ -315,6 +315,102 @@ class TestReportContainsMACD:
         assert "확장" in report or "수축" in report
 
 
+class TestBollingerBandsInReport:
+    """볼린저 밴드가 리포트에 표시되는지 테스트."""
+
+    def test_bb_section_present(self):
+        """BB 값이 있으면 볼린저 밴드 섹션이 표시된다."""
+        indicators = _full_indicators()
+        indicators["bb_upper"] = 56000.0
+        indicators["bb_lower"] = 52000.0
+        indicators["bb_width"] = 0.075
+        indicators["bb_pctb"] = 0.75
+        report = generate_daily_report(indicators)
+        assert "볼린저" in report or "BB" in report
+
+    def test_bb_pctb_displayed(self):
+        """%B 값이 리포트에 표시된다."""
+        indicators = _full_indicators()
+        indicators["bb_upper"] = 56000.0
+        indicators["bb_lower"] = 52000.0
+        indicators["bb_width"] = 0.075
+        indicators["bb_pctb"] = 0.75
+        report = generate_daily_report(indicators)
+        assert "%B" in report
+
+    def test_bb_overheated_label(self):
+        """%B > 1.0이면 과열 관련 표현."""
+        indicators = _full_indicators()
+        indicators["bb_upper"] = 56000.0
+        indicators["bb_lower"] = 52000.0
+        indicators["bb_width"] = 0.075
+        indicators["bb_pctb"] = 1.2
+        report = generate_daily_report(indicators)
+        assert "과열" in report or "상단 돌파" in report
+
+    def test_bb_depressed_label(self):
+        """%B < 0이면 침체 관련 표현."""
+        indicators = _full_indicators()
+        indicators["bb_upper"] = 56000.0
+        indicators["bb_lower"] = 52000.0
+        indicators["bb_width"] = 0.075
+        indicators["bb_pctb"] = -0.1
+        report = generate_daily_report(indicators)
+        assert "침체" in report or "하단 이탈" in report
+
+    def test_bb_none_no_crash(self):
+        """BB가 None이면 에러 없이 동작."""
+        indicators = _full_indicators()
+        indicators["bb_upper"] = None
+        indicators["bb_lower"] = None
+        indicators["bb_width"] = None
+        indicators["bb_pctb"] = None
+        report = generate_daily_report(indicators)
+        assert isinstance(report, str)
+
+
+class TestMarketTemperatureWithBB:
+    """볼린저 밴드가 시장 온도에 반영되는지 테스트."""
+
+    def test_bb_overheated_adds_bearish(self):
+        """%B > 1.0 (밴드 상단 돌파)은 약세 가산."""
+        result = assess_market_temperature(
+            change_1d_pct=1.5, ma_alignment="혼조", volume_status="보통",
+            bb_pctb=1.2,
+        )
+        assert result != "강세"
+
+    def test_bb_depressed_adds_bullish(self):
+        """%B < 0 (밴드 하단 이탈)은 강세 가산."""
+        result = assess_market_temperature(
+            change_1d_pct=-0.5, ma_alignment="혼조", volume_status="보통",
+            bb_pctb=-0.1,
+        )
+        assert result != "약세"
+
+    def test_bb_normal_no_effect(self):
+        """%B 0~1이면 온도 판정에 영향 없음."""
+        without = assess_market_temperature(
+            change_1d_pct=0.3, ma_alignment="혼조", volume_status="보통",
+        )
+        with_bb = assess_market_temperature(
+            change_1d_pct=0.3, ma_alignment="혼조", volume_status="보통",
+            bb_pctb=0.5,
+        )
+        assert without == with_bb
+
+    def test_bb_none_same_as_without(self):
+        """%B가 None이면 기존과 동일."""
+        without = assess_market_temperature(
+            change_1d_pct=2.0, ma_alignment="정배열", volume_status="증가",
+        )
+        with_none = assess_market_temperature(
+            change_1d_pct=2.0, ma_alignment="정배열", volume_status="증가",
+            bb_pctb=None,
+        )
+        assert without == with_none
+
+
 class TestMarketTemperatureWithMACD:
     """MACD가 시장 온도 판정에 반영되는지 테스트."""
 
@@ -438,6 +534,10 @@ def _full_indicators(
         "macd": None,
         "macd_signal": None,
         "macd_histogram": None,
+        "bb_upper": None,
+        "bb_lower": None,
+        "bb_width": None,
+        "bb_pctb": None,
     }
 
 

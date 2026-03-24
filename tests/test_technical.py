@@ -235,6 +235,75 @@ class TestMACD:
         assert result["macd_histogram"] is None
 
 
+class TestBollingerBands:
+    """볼린저 밴드(20,2) 계산 테스트."""
+
+    def test_bb_keys_present(self):
+        """20일 이상 데이터면 BB 키가 모두 존재."""
+        prices = [50000 + i * 100 for i in range(25)]
+        result = compute_technical_indicators(_make_rows(prices))
+        assert "bb_upper" in result
+        assert "bb_lower" in result
+        assert "bb_width" in result
+        assert "bb_pctb" in result
+
+    def test_bb_none_insufficient_data(self):
+        """20일 미만 데이터면 BB 키는 모두 None."""
+        prices = [50000] * 10
+        result = compute_technical_indicators(_make_rows(prices))
+        assert result["bb_upper"] is None
+        assert result["bb_lower"] is None
+        assert result["bb_width"] is None
+        assert result["bb_pctb"] is None
+
+    def test_bb_upper_above_lower(self):
+        """상단 밴드는 항상 하단 밴드 위."""
+        prices = [50000 + (i % 5 - 2) * 300 for i in range(25)]
+        result = compute_technical_indicators(_make_rows(prices))
+        assert result["bb_upper"] > result["bb_lower"]
+
+    def test_bb_width_positive(self):
+        """밴드폭은 양수."""
+        prices = [50000 + (i % 5 - 2) * 300 for i in range(25)]
+        result = compute_technical_indicators(_make_rows(prices))
+        assert result["bb_width"] > 0
+
+    def test_bb_pctb_middle(self):
+        """종가가 MA20과 같으면 %B ≈ 0.5."""
+        # 모든 가격이 같으면 σ=0이라 나눗셈 에러 → 약간의 변동 필요
+        # 대신 대칭 데이터로 마지막 값이 평균에 오도록 설계
+        prices = [50000] * 20
+        result = compute_technical_indicators(_make_rows(prices))
+        # 모든 값이 같으면 σ=0 → %B=0.5 (특수 처리)
+        assert result["bb_pctb"] == 0.5
+
+    def test_bb_pctb_above_one(self):
+        """종가가 상단 밴드 위면 %B > 1.0."""
+        # 안정적인 가격 후 급등
+        prices = [50000] * 19 + [60000]
+        result = compute_technical_indicators(_make_rows(prices))
+        assert result["bb_pctb"] > 1.0
+
+    def test_bb_pctb_below_zero(self):
+        """종가가 하단 밴드 아래면 %B < 0."""
+        # 안정적인 가격 후 급락
+        prices = [50000] * 19 + [40000]
+        result = compute_technical_indicators(_make_rows(prices))
+        assert result["bb_pctb"] < 0
+
+    def test_bb_formula_correctness(self):
+        """BB 공식 검증: upper = ma20 + 2σ, lower = ma20 - 2σ."""
+        prices = [50000 + i * 100 for i in range(20)]
+        result = compute_technical_indicators(_make_rows(prices))
+        ma20 = result["ma20"]
+        # 수동 계산
+        mean = sum(prices) / 20
+        variance = sum((p - mean) ** 2 for p in prices) / 20
+        std = variance ** 0.5
+        assert abs(result["bb_upper"] - (ma20 + 2 * std)) < 0.01
+        assert abs(result["bb_lower"] - (ma20 - 2 * std)) < 0.01
+
+
 class TestEdgeCases:
     """엣지 케이스 테스트."""
 

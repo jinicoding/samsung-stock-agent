@@ -95,6 +95,37 @@ def _macd(
     return macd_line, signal_line, histogram
 
 
+def _bollinger_bands(
+    closes: list[float], window: int = 20, num_std: int = 2,
+) -> tuple[float | None, float | None, float | None, float | None]:
+    """볼린저 밴드를 계산한다.
+
+    Returns:
+        (upper, lower, width, pctb) — 데이터 부족 시 (None, None, None, None).
+        width = (upper - lower) / middle
+        pctb = (close - lower) / (upper - lower)  — 0~1이 밴드 내, >1 상단돌파, <0 하단이탈
+    """
+    if len(closes) < window:
+        return None, None, None, None
+
+    recent = closes[-window:]
+    middle = sum(recent) / window
+    variance = sum((p - middle) ** 2 for p in recent) / window
+    std = variance ** 0.5
+
+    upper = middle + num_std * std
+    lower = middle - num_std * std
+    width = (upper - lower) / middle if middle != 0 else 0.0
+
+    band_range = upper - lower
+    if band_range == 0:
+        pctb = 0.5  # σ=0일 때 (모든 값 동일) → 중앙
+    else:
+        pctb = (closes[-1] - lower) / band_range
+
+    return upper, lower, width, pctb
+
+
 def compute_technical_indicators(rows: list[dict]) -> dict:
     """OHLCV rows로부터 기초 기술적 지표를 계산한다.
 
@@ -143,6 +174,9 @@ def compute_technical_indicators(rows: list[dict]) -> dict:
     # MACD (12, 26, 9)
     macd_line, macd_signal, macd_histogram = _macd(closes)
 
+    # 볼린저 밴드 (20, 2)
+    bb_upper, bb_lower, bb_width, bb_pctb = _bollinger_bands(closes)
+
     return {
         "current_date": rows[-1]["date"],
         "current_price": current,
@@ -166,4 +200,9 @@ def compute_technical_indicators(rows: list[dict]) -> dict:
         "macd": macd_line,
         "macd_signal": macd_signal,
         "macd_histogram": macd_histogram,
+        # 볼린저 밴드 (20, 2)
+        "bb_upper": bb_upper,
+        "bb_lower": bb_lower,
+        "bb_width": bb_width,
+        "bb_pctb": bb_pctb,
     }

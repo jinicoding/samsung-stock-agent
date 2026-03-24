@@ -9,6 +9,7 @@ import argparse
 from src.data.backfill import main as backfill_prices
 from src.data.backfill_supply_demand import main as backfill_supply_demand
 from src.data.database import (
+    get_exchange_rates,
     get_foreign_ownership,
     get_foreign_trading,
     get_prices,
@@ -16,6 +17,7 @@ from src.data.database import (
 )
 from src.analysis.technical import compute_technical_indicators
 from src.analysis.supply_demand import analyze_supply_demand
+from src.analysis.exchange_rate import analyze_exchange_rate
 from src.analysis.report import generate_daily_report
 from src.delivery.telegram_bot import send_message
 
@@ -43,13 +45,15 @@ def main(dry_run: bool = False):
 
     trading = get_foreign_trading(20)
     ownership = get_foreign_ownership(20)
+    rates = get_exchange_rates(30)
 
     # 3) 분석 실행
     indicators = compute_technical_indicators(prices)
     sd = analyze_supply_demand(trading, ownership) if trading else None
+    er = analyze_exchange_rate(rates, prices) if rates else None
 
     # 4) 리포트 생성
-    report = generate_daily_report(indicators, supply_demand=sd)
+    report = generate_daily_report(indicators, supply_demand=sd, exchange_rate=er)
 
     # 5) 발송 또는 출력
     if dry_run:

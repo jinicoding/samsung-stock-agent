@@ -50,13 +50,32 @@ SAMPLE_SD = {
     "overall_judgment": "buy_dominant",
 }
 
+SAMPLE_RATES = [
+    {"date": f"2026-03-{d:02d}", "open": 1380.0, "high": 1385.0, "low": 1375.0, "close": 1380.0 + d * 0.5}
+    for d in range(1, 31)
+]
+
+SAMPLE_ER = {
+    "current_date": "2026-03-30",
+    "current_rate": 1395.0,
+    "change_1d_pct": 0.1,
+    "change_5d_pct": 0.5,
+    "change_20d_pct": 1.0,
+    "ma5": 1392.0,
+    "ma20": 1385.0,
+    "trend": "원화약세",
+    "correlation_20d": -0.3,
+}
+
 SAMPLE_REPORT_HTML = "<b>삼성전자 일일 분석</b>"
 
 
 @patch("src.main.send_message")
 @patch("src.main.generate_daily_report", return_value=SAMPLE_REPORT_HTML)
+@patch("src.main.analyze_exchange_rate", return_value=SAMPLE_ER)
 @patch("src.main.analyze_supply_demand", return_value=SAMPLE_SD)
 @patch("src.main.compute_technical_indicators", return_value=SAMPLE_INDICATORS)
+@patch("src.main.get_exchange_rates", return_value=SAMPLE_RATES)
 @patch("src.main.get_foreign_ownership", return_value=SAMPLE_OWNERSHIP)
 @patch("src.main.get_foreign_trading", return_value=SAMPLE_TRADING)
 @patch("src.main.get_prices", return_value=SAMPLE_PRICES)
@@ -65,8 +84,8 @@ SAMPLE_REPORT_HTML = "<b>삼성전자 일일 분석</b>"
 @patch("src.main.init_db")
 def test_pipeline_full(
     mock_init, mock_bf_prices, mock_bf_sd,
-    mock_prices, mock_trading, mock_ownership,
-    mock_tech, mock_sd, mock_report, mock_send,
+    mock_prices, mock_trading, mock_ownership, mock_rates,
+    mock_tech, mock_sd, mock_er, mock_report, mock_send,
 ):
     """전체 파이프라인: 백필→조회→분석→리포트→발송."""
     from src.main import main
@@ -79,16 +98,20 @@ def test_pipeline_full(
     mock_prices.assert_called_once_with(60)
     mock_trading.assert_called_once_with(20)
     mock_ownership.assert_called_once_with(20)
+    mock_rates.assert_called_once_with(30)
     mock_tech.assert_called_once_with(SAMPLE_PRICES)
     mock_sd.assert_called_once_with(SAMPLE_TRADING, SAMPLE_OWNERSHIP)
-    mock_report.assert_called_once_with(SAMPLE_INDICATORS, supply_demand=SAMPLE_SD)
+    mock_er.assert_called_once_with(SAMPLE_RATES, SAMPLE_PRICES)
+    mock_report.assert_called_once_with(SAMPLE_INDICATORS, supply_demand=SAMPLE_SD, exchange_rate=SAMPLE_ER)
     mock_send.assert_called_once_with(SAMPLE_REPORT_HTML)
 
 
 @patch("src.main.send_message")
 @patch("src.main.generate_daily_report", return_value=SAMPLE_REPORT_HTML)
+@patch("src.main.analyze_exchange_rate", return_value=SAMPLE_ER)
 @patch("src.main.analyze_supply_demand", return_value=SAMPLE_SD)
 @patch("src.main.compute_technical_indicators", return_value=SAMPLE_INDICATORS)
+@patch("src.main.get_exchange_rates", return_value=SAMPLE_RATES)
 @patch("src.main.get_foreign_ownership", return_value=SAMPLE_OWNERSHIP)
 @patch("src.main.get_foreign_trading", return_value=SAMPLE_TRADING)
 @patch("src.main.get_prices", return_value=SAMPLE_PRICES)
@@ -97,8 +120,8 @@ def test_pipeline_full(
 @patch("src.main.init_db")
 def test_pipeline_dry_run(
     mock_init, mock_bf_prices, mock_bf_sd,
-    mock_prices, mock_trading, mock_ownership,
-    mock_tech, mock_sd, mock_report, mock_send,
+    mock_prices, mock_trading, mock_ownership, mock_rates,
+    mock_tech, mock_sd, mock_er, mock_report, mock_send,
     capsys,
 ):
     """--dry-run: 리포트를 stdout에 출력하고 발송하지 않는다."""

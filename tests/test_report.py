@@ -200,6 +200,36 @@ class TestGenerateDailyReport:
         assert "중립" in report
         assert "🟡" in report
 
+    def test_exchange_rate_section_absent_by_default(self):
+        """exchange_rate=None이면 환율 섹션 없음."""
+        report = generate_daily_report(_full_indicators())
+        assert "USD/KRW" not in report
+
+    def test_exchange_rate_section_present(self):
+        """환율 분석이 주어지면 섹션이 포함된다."""
+        er = _exchange_rate_sample()
+        report = generate_daily_report(_full_indicators(), exchange_rate=er)
+        assert "USD/KRW" in report
+
+    def test_exchange_rate_trend(self):
+        """환율 추세가 리포트에 표시된다."""
+        er = _exchange_rate_sample()
+        report = generate_daily_report(_full_indicators(), exchange_rate=er)
+        assert "원화약세" in report
+
+    def test_exchange_rate_correlation(self):
+        """상관계수가 리포트에 표시된다."""
+        er = _exchange_rate_sample()
+        report = generate_daily_report(_full_indicators(), exchange_rate=er)
+        assert "상관" in report
+
+    def test_exchange_rate_no_correlation(self):
+        """상관계수 None이면 상관 라인 없음."""
+        er = _exchange_rate_sample()
+        er["correlation_20d"] = None
+        report = generate_daily_report(_full_indicators(), exchange_rate=er)
+        assert "주가 상관" not in report
+
     def test_supply_demand_no_ownership_data(self):
         """보유비율 데이터 없을 때도 에러 없이 동작."""
         sd = _supply_demand_buy_dominant()
@@ -538,6 +568,20 @@ def _full_indicators(
         "bb_lower": None,
         "bb_width": None,
         "bb_pctb": None,
+    }
+
+
+def _exchange_rate_sample() -> dict:
+    return {
+        "current_date": "2026-03-21",
+        "current_rate": 1380.5,
+        "change_1d_pct": 0.35,
+        "change_5d_pct": 1.2,
+        "change_20d_pct": 2.5,
+        "ma5": 1375.0,
+        "ma20": 1360.0,
+        "trend": "원화약세",
+        "correlation_20d": -0.65,
     }
 
 

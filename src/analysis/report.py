@@ -254,6 +254,45 @@ def _judgment_label(judgment: str) -> tuple[str, str]:
     return "중립", "🟡"
 
 
+def _trend_emoji(trend: str | None) -> str:
+    if trend == "원화약세":
+        return "📈"
+    if trend == "원화강세":
+        return "📉"
+    return "➡️"
+
+
+def _build_exchange_rate_section(er: dict) -> list[str]:
+    """환율 분석 결과를 HTML 라인 리스트로."""
+    lines = []
+    lines.append("")
+    lines.append("<b>💱 USD/KRW 환율</b>")
+
+    rate = er["current_rate"]
+    change_1d = er.get("change_1d_pct")
+    lines.append(f"  현재: {rate:,.1f}원 ({_format_change(change_1d)})")
+
+    change_5d = er.get("change_5d_pct")
+    change_20d = er.get("change_20d_pct")
+    lines.append(f"  5일: {_format_change(change_5d)} | 20일: {_format_change(change_20d)}")
+
+    trend = er.get("trend")
+    if trend:
+        lines.append(f"  추세: {_trend_emoji(trend)} {trend}")
+
+    corr = er.get("correlation_20d")
+    if corr is not None:
+        if corr > 0.5:
+            corr_label = "양의 상관"
+        elif corr < -0.5:
+            corr_label = "음의 상관"
+        else:
+            corr_label = "약한 상관"
+        lines.append(f"  주가 상관(20일): {corr:.2f} ({corr_label})")
+
+    return lines
+
+
 def _build_supply_demand_section(sd: dict) -> list[str]:
     """수급 분석 결과를 HTML 라인 리스트로."""
     lines = []
@@ -300,12 +339,17 @@ def _build_supply_demand_section(sd: dict) -> list[str]:
     return lines
 
 
-def generate_daily_report(indicators: dict, supply_demand: dict | None = None) -> str:
+def generate_daily_report(
+    indicators: dict,
+    supply_demand: dict | None = None,
+    exchange_rate: dict | None = None,
+) -> str:
     """기술적 지표 dict를 HTML 텔레그램 메시지로 변환한다.
 
     Args:
         indicators: compute_technical_indicators()의 반환값.
         supply_demand: analyze_supply_demand()의 반환값 (선택).
+        exchange_rate: analyze_exchange_rate()의 반환값 (선택).
 
     Returns:
         HTML 형식 문자열 (Telegram HTML parse_mode용).
@@ -391,7 +435,11 @@ def generate_daily_report(indicators: dict, supply_demand: dict | None = None) -
     # 7) 종합 시장 온도
     lines.append(f"<b>시장 온도:</b> {_temp_emoji(temperature)} {temperature}")
 
-    # 5) 수급 동향 (선택)
+    # 환율 동향 (선택)
+    if exchange_rate is not None:
+        lines.extend(_build_exchange_rate_section(exchange_rate))
+
+    # 수급 동향 (선택)
     if supply_demand is not None:
         lines.extend(_build_supply_demand_section(supply_demand))
 

@@ -470,3 +470,36 @@ SESSION_PLAN.md 커밋 완료.
   Phase B: Implementation...
   Total planned tasks: 2
   → Task 1: 볼린저 밴드(20,2) 지표 추가 — 변동성 분석 도입
+Task 1 완료. 변경 요약:
+
+**`src/analysis/technical.py`**
+- `_bollinger_bands(closes, window=20, num_std=2)` 함수 추가 — 모집단 표준편차 기반
+- `compute_technical_indicators` 반환에 `bb_upper`, `bb_lower`, `bb_width`, `bb_pctb` 4개 키 추가
+
+**`src/analysis/report.py`**
+- `classify_bb_position(bb_pctb)` — %B > 1.0 → "상단 돌파", %B < 0 → "하단 이탈"
+- `assess_market_temperature`에 `bb_pctb` 파라미터 추가 — 밴드 이탈 시만 스코어 반영 (상단돌파=과열→약세, 하단이탈=침체→강세)
+- `generate_daily_report`에 BB(20,2) 섹션 추가 — %B, 밴드폭, 상단/하단 가격 표시
+
+**테스트**: 172개 전체 통과 (BB 관련 20+개 신규 테스트 포함)
+........................................................................ [ 41%]
+........................................................................ [ 83%]
+............................                                             [100%]
+172 passed in 0.31s
+    Task 1: verified OK
+
+→ Final verification...
+........................................................................ [ 41%]
+........................................................................ [ 83%]
+............................                                             [100%]
+172 passed in 0.31s
+
+→ Processing issue references...
+  No issue references found in SESSION_PLAN.md
+
+→ Creating issues for incomplete tasks...
+→ Issue created: #6 — 환율(USD/KRW) 분석을 일일 리포트에 통합
+6
+  Created 1 issue(s) for incomplete tasks
+
+→ Writing journal entry...

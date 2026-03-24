@@ -1,9 +1,9 @@
 ## Session Plan
 
-### Task 1: USD/KRW 환율 분석 모듈 구축
-Files: tests/test_exchange_rate_analysis.py (신규), src/analysis/exchange_rate.py (신규)
-Description: 수집만 하고 분석에 전혀 사용하지 않던 USD/KRW 환율 데이터를 활용하는 분석 모듈을 구축한다. 삼성전자는 매출의 ~80%가 해외에서 발생하는 수출 기업이므로 환율은 실적과 직결된다. 구현 항목: (1) 환율 현재가·등락률(1일/5일/20일), (2) 환율 이동평균(5일/20일) 및 추세 판정(원화강세/원화약세/보합), (3) 주가-환율 상관관계 분석(최근 20일 종가 기준 피어슨 상관계수). 테스트를 먼저 작성하고 구현한다.
+### Task 1: 종합 투자 시그널 모듈 구축 — 모든 분석을 하나의 판정으로
+Files: src/analysis/signal.py (신규), tests/test_signal.py (신규)
+Description: 기술적 분석(시장온도), 수급 판정, 환율 추세를 하나로 종합하는 `compute_composite_signal()` 함수를 만든다. 각 축에 가중치를 부여하고(기술적 40%, 수급 40%, 환율 20%), -100~+100 점수와 5단계 판정(강력매수신호/매수우세/중립/매도우세/강력매도신호)을 반환한다. 이것이 리포트 최상단에 "오늘의 핵심 판단"으로 표시될 기반이다. 테스트를 먼저 작성한다.
 
-### Task 2: 환율 분석을 일일 리포트·파이프라인에 통합
-Files: src/analysis/report.py, tests/test_report.py, src/main.py, tests/test_main.py
-Description: Task 1에서 만든 환율 분석 결과를 리포트 HTML과 main.py 파이프라인에 연결한다. 리포트에 "💱 환율 동향" 섹션을 추가하여 USD/KRW 현재가, 추세(원화강세↓/약세↑), 주가-환율 상관계수, 투자 시사점(예: "원화 약세 구간 — 수출 실적 개선 기대")을 표시한다. main.py에서 get_exchange_rates(20)을 조회하고 분석 함수를 호출하여 generate_daily_report에 전달하는 흐름을 완성한다. 기존 테스트와의 하위 호환성을 유지한다(exchange_rate 파라미터 기본값 None).
+### Task 2: 일일 리포트에 자연어 인사이트 섹션 추가
+Files: src/analysis/insight.py (신규), src/analysis/report.py, tests/test_insight.py (신규), tests/test_report.py
+Description: 숫자 나열을 넘어 "왜 이 숫자가 중요한지" 맥락을 설명하는 `generate_insight()` 함수를 만든다. 규칙 기반으로 핵심 변화를 감지하고 자연어 문장을 생성한다: (1) 종합 시그널의 근거 요약 ("외국인 5일 연속 순매수와 정배열이 맞물리며 매수우세 판정"), (2) 주요 변화 감지 ("RSI가 과매도 진입", "MACD 골든크로스 발생", "환율 급등으로 수출주 우호적"), (3) 주의 사항 ("볼린저 밴드 상단 돌파로 과열 주의"). 리포트 상단에 종합 시그널 + 인사이트 문단을 배치하고, main.py 파이프라인에 연결한다. 테스트를 먼저 작성한다.

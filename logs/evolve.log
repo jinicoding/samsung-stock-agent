@@ -643,3 +643,70 @@ Task 1 완료.
   Created 1 issue(s) for incomplete tasks
 
 → Writing journal entry...
+저널 엔트리 작성 완료. 종합 투자 시그널 모듈 구축 세션을 기록했고, 다축 분석 가중치 통합에 대한 학습을 `learnings.jsonl`에 추가했습니다.
+
+→ Pushing changes...
+
+=== Evolution session complete (Day 3) ===
+=== Day 3 (2026-03-24 15:30) ===
+Model: claude-opus-4-6
+Plan timeout: 1200s | Impl timeout: 900s/task
+
+→ Checking tests...
+........................................................................ [ 35%]
+........................................................................ [ 70%]
+...........................................................              [100%]
+203 passed in 0.32s
+  Tests OK.
+
+→ Starting evolution session...
+
+  Phase A: Planning...
+SESSION_PLAN.md 커밋 완료. 자기평가 요약:
+
+**현재 보유 능력:**
+- 데이터 수집: KIS API (주가 OHLCV, 수급, 환율), Naver (외인 지분율)
+- 기술적 분석: MA(5/20/60), RSI(14), MACD(12,26,9), 볼린저 밴드(20,2)
+- 수급 분석: 외국인·기관 연속매매, 누적순매매, 보유비율 추이
+- 환율 분석: USD/KRW 추세, 주가 상관관계
+- 종합 시그널: 3축 가중합산 → -100~+100 점수, 5단계 판정
+- 텔레그램 리포트 발송
+
+**이번 세션 계획 (2 tasks):**
+
+1. **종합 시그널 리포트 통합** — `signal.py`를 이미 만들어 놨는데 리포트와 파이프라인에 연결하지 않았다. 투자자가 가장 먼저 봐야 할 "한 줄 판정"이 빠져있는 상태. 이걸 최우선으로 해결한다.
+
+2. **뉴스 헤드라인 수집기** — 숫자만으로는 "왜 오늘 이렇게 움직였는지" 맥락을 줄 수 없다. Naver 증권 뉴스를 수집하는 기반을 만들어서, 다음 세션에서 감정 분석·리포트 통합으로 이어간다.
+  Planning complete.
+
+  Phase B: Implementation...
+  Total planned tasks: 2
+  → Task 1: 종합 투자 시그널을 일일 리포트·파이프라인에 통합
+Task 1 완료.
+
+**변경 요약:**
+- **`src/analysis/report.py`**: `generate_daily_report()`에 `composite_signal` 파라미터 추가. 리포트 최상단(헤더 바로 아래)에 종합 판정 섹션(점수 게이지 바, 5단계 판정, 기술/수급/환율 3축 내역) 렌더링
+- **`src/main.py`**: `compute_composite_signal()` import 및 호출 추가, 결과를 리포트 생성에 전달
+- **`tests/test_report.py`**: 8개 테스트 추가 (섹션 존재, 등급/점수 표시, 3축 표시, 위치 순서, 강력매수/매도 표시)
+- **`tests/test_main.py`**: 파이프라인 테스트에 `compute_composite_signal` 모킹 추가
+........................................................................ [ 34%]
+........................................................................ [ 68%]
+...................................................................      [100%]
+211 passed in 0.33s
+    Task 1: verified OK
+
+→ Final verification...
+........................................................................ [ 34%]
+........................................................................ [ 68%]
+...................................................................      [100%]
+211 passed in 0.33s
+
+→ Processing issue references...
+  No issue references found in SESSION_PLAN.md
+
+→ Creating issues for incomplete tasks...
+→ Issue created: #9 — 삼성전자 뉴스 헤드라인 수집기 구축
+9
+  Created 1 issue(s) for incomplete tasks
+
+→ Writing journal entry...

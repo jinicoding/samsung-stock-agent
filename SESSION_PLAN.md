@@ -1,9 +1,9 @@
 ## Session Plan
 
-### Task 1: 종합 투자 시그널을 일일 리포트·파이프라인에 통합
-Files: src/analysis/report.py, src/main.py, tests/test_report.py, tests/test_main.py
-Description: signal.py의 compute_composite_signal()을 main.py 파이프라인에서 호출하고, 결과를 generate_daily_report()에 전달하여 리포트 HTML 최상단에 종합 시그널 섹션(점수 게이지, 5단계 판정, 3축 내역)을 표시한다. 투자자가 리포트를 열었을 때 가장 먼저 "오늘의 종합 판정"을 볼 수 있게 한다. 테스트를 먼저 작성한다.
+### Task 1: 지지/저항선 분석 모듈 구축
+Files: src/analysis/support_resistance.py, tests/test_support_resistance.py
+Description: 최근 N일 가격 데이터에서 핵심 지지선·저항선을 자동 도출하는 모듈을 만든다. 세 가지 방법을 결합한다: (1) 피봇 포인트(전일 고가/저가/종가 기반 클래식 피봇 — PP, S1, S2, R1, R2), (2) 최근 20일 스윙 고점·저점(local extrema) 기반 수평 지지/저항, (3) 주요 이동평균선(MA20, MA60)을 동적 지지/저항으로 포함. 반환값은 `{"pivot": {...}, "swing_levels": [...], "ma_levels": {...}, "nearest_support": float, "nearest_resistance": float}` 형태로, 현재가 기준 가장 가까운 지지선과 저항선을 바로 꺼낼 수 있게 한다. 테스트를 먼저 작성한다.
 
-### Task 2: 삼성전자 뉴스 헤드라인 수집기 구축
-Files: src/data/news_fetcher.py, tests/test_news_fetcher.py
-Description: Naver 증권 삼성전자 뉴스 페이지에서 최근 뉴스 헤드라인(제목, 날짜, 출처)을 스크래핑하는 모듈을 만든다. HTML 파싱은 표준라이브러리(html.parser 또는 re)만 사용하여 외부 의존성을 추가하지 않는다. 수집한 헤드라인은 다음 세션에서 감정 분석·리포트 통합에 활용한다. 테스트를 먼저 작성한다.
+### Task 2: 지지/저항선을 리포트·파이프라인에 통합
+Files: src/analysis/report.py, src/main.py, tests/test_report.py, tests/test_main.py
+Description: Task 1에서 만든 지지/저항선 분석을 일일 리포트 HTML에 반영하고, main.py 파이프라인에 연결한다. 리포트에 "📍 주요 가격대" 섹션을 추가하여 nearest_support, nearest_resistance, 피봇 포인트, 현재가의 밴드 내 위치(%)를 표시한다. 투자자가 "지금 가격이 어디쯤에 있는지"를 한눈에 볼 수 있는 시각적 게이지를 포함한다. generate_daily_report()에 support_resistance 파라미터를 추가하고, main.py에서 분석 결과를 전달한다. 기존 테스트를 깨지 않으면서 새 섹션 테스트를 추가한다.

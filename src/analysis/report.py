@@ -375,11 +375,44 @@ def _build_composite_signal_section(sig: dict) -> list[str]:
     return lines
 
 
+def _build_support_resistance_section(sr: dict, current_price: float) -> list[str]:
+    """지지/저항선 분석 결과를 HTML 라인 리스트로."""
+    lines = []
+    lines.append("")
+    lines.append("<b>📐 지지/저항선</b>")
+
+    pivot = sr["pivot"]
+    if pivot["pp"] is not None:
+        lines.append(
+            f"  PP: {_format_price(pivot['pp'])} | "
+            f"S1: {_format_price(pivot['s1'])} | S2: {_format_price(pivot['s2'])}"
+        )
+        lines.append(
+            f"  R1: {_format_price(pivot['r1'])} | R2: {_format_price(pivot['r2'])}"
+        )
+
+    ns = sr["nearest_support"]
+    nr = sr["nearest_resistance"]
+
+    if ns is not None:
+        dist_pct = (current_price - ns) / current_price * 100
+        lines.append(f"  가장 가까운 지지선: {_format_price(ns)}원 ({dist_pct:+.1f}%)")
+    if nr is not None:
+        dist_pct = (nr - current_price) / current_price * 100
+        lines.append(f"  가장 가까운 저항선: {_format_price(nr)}원 (+{dist_pct:.1f}%)")
+
+    if ns is None and nr is None and pivot["pp"] is None:
+        lines.append("  데이터 부족")
+
+    return lines
+
+
 def generate_daily_report(
     indicators: dict,
     supply_demand: dict | None = None,
     exchange_rate: dict | None = None,
     composite_signal: dict | None = None,
+    support_resistance: dict | None = None,
 ) -> str:
     """기술적 지표 dict를 HTML 텔레그램 메시지로 변환한다.
 
@@ -483,5 +516,9 @@ def generate_daily_report(
     # 수급 동향 (선택)
     if supply_demand is not None:
         lines.extend(_build_supply_demand_section(supply_demand))
+
+    # 지지/저항선 (선택)
+    if support_resistance is not None:
+        lines.extend(_build_support_resistance_section(support_resistance, price))
 
     return "\n".join(lines)

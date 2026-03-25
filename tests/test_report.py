@@ -689,6 +689,80 @@ def _composite_signal_bullish() -> dict:
     }
 
 
+def _support_resistance_sample() -> dict:
+    return {
+        "pivot": {"pp": 55000.0, "s1": 54000.0, "s2": 53000.0, "r1": 56000.0, "r2": 57000.0},
+        "swing_levels": [],
+        "ma_levels": {"ma20": 54500.0, "ma60": 53500.0},
+        "nearest_support": 54500.0,
+        "nearest_resistance": 56000.0,
+    }
+
+
+def _support_resistance_none_levels() -> dict:
+    return {
+        "pivot": {"pp": None, "s1": None, "s2": None, "r1": None, "r2": None},
+        "swing_levels": [],
+        "ma_levels": {"ma20": None, "ma60": None},
+        "nearest_support": None,
+        "nearest_resistance": None,
+    }
+
+
+class TestSupportResistanceInReport:
+    """지지/저항선이 리포트에 표시되는지 테스트."""
+
+    def test_sr_section_absent_by_default(self):
+        """support_resistance=None이면 지지/저항 섹션 없음."""
+        report = generate_daily_report(_full_indicators())
+        assert "지지/저항" not in report
+
+    def test_sr_section_present(self):
+        """support_resistance가 주어지면 섹션이 포함된다."""
+        sr = _support_resistance_sample()
+        report = generate_daily_report(_full_indicators(), support_resistance=sr)
+        assert "지지/저항" in report
+
+    def test_sr_pivot_points_displayed(self):
+        """피봇 포인트(PP/S1/S2/R1/R2)가 표시된다."""
+        sr = _support_resistance_sample()
+        report = generate_daily_report(_full_indicators(), support_resistance=sr)
+        assert "PP" in report
+        assert "S1" in report
+        assert "R1" in report
+
+    def test_sr_nearest_support_displayed(self):
+        """가장 가까운 지지선이 표시된다."""
+        sr = _support_resistance_sample()
+        report = generate_daily_report(_full_indicators(), support_resistance=sr)
+        assert "54,500" in report
+
+    def test_sr_nearest_resistance_displayed(self):
+        """가장 가까운 저항선이 표시된다."""
+        sr = _support_resistance_sample()
+        report = generate_daily_report(_full_indicators(), support_resistance=sr)
+        assert "56,000" in report
+
+    def test_sr_distance_pct_displayed(self):
+        """현재가 대비 거리(%)가 표시된다."""
+        sr = _support_resistance_sample()
+        report = generate_daily_report(
+            _full_indicators(current_price=55000), support_resistance=sr,
+        )
+        assert "%" in report
+
+    def test_sr_none_levels_no_crash(self):
+        """피봇 등이 None이어도 에러 없이 동작."""
+        sr = _support_resistance_none_levels()
+        report = generate_daily_report(_full_indicators(), support_resistance=sr)
+        assert isinstance(report, str)
+
+    def test_sr_backward_compatible(self):
+        """support_resistance 파라미터 없이도 기존 리포트 정상 생성."""
+        report = generate_daily_report(_full_indicators())
+        assert "삼성전자" in report
+
+
 def _supply_demand_neutral() -> dict:
     return {
         "foreign_consecutive_net_buy": 1,

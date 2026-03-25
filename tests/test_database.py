@@ -126,3 +126,74 @@ def test_foreign_ownership_crud(temp_db):
     data = db.get_foreign_ownership(10)
     assert len(data) == 1
     assert data[0]["ownership_pct"] == 50.25
+
+
+# ── signal_history ──────────────────────────────────────────────
+
+def test_init_db_creates_signal_history(temp_db):
+    db_path, db = temp_db
+    db.init_db()
+    conn = sqlite3.connect(db_path)
+    tables = conn.execute(
+        "SELECT name FROM sqlite_master WHERE type='table'"
+    ).fetchall()
+    table_names = {t[0] for t in tables}
+    assert "signal_history" in table_names
+    conn.close()
+
+
+def test_upsert_signal_history(temp_db):
+    db_path, db = temp_db
+    db.init_db()
+    db.upsert_signal_history(
+        date="2026-03-24",
+        score=35.5,
+        grade="매수우세",
+        technical_score=40.0,
+        supply_score=30.0,
+        exchange_score=20.0,
+        price=55000.0,
+    )
+    rows = db.get_signal_history(10)
+    assert len(rows) == 1
+    assert rows[0]["date"] == "2026-03-24"
+    assert rows[0]["score"] == 35.5
+    assert rows[0]["grade"] == "매수우세"
+    assert rows[0]["technical_score"] == 40.0
+    assert rows[0]["supply_score"] == 30.0
+    assert rows[0]["exchange_score"] == 20.0
+    assert rows[0]["price"] == 55000.0
+
+
+def test_upsert_signal_history_overwrites(temp_db):
+    db_path, db = temp_db
+    db.init_db()
+    db.upsert_signal_history("2026-03-24", 35.5, "매수우세", 40.0, 30.0, 20.0, 55000.0)
+    db.upsert_signal_history("2026-03-24", -10.0, "중립", -5.0, -15.0, 10.0, 54000.0)
+    rows = db.get_signal_history(10)
+    assert len(rows) == 1
+    assert rows[0]["score"] == -10.0
+    assert rows[0]["price"] == 54000.0
+
+
+def test_get_signal_history_order(temp_db):
+    db_path, db = temp_db
+    db.init_db()
+    db.upsert_signal_history("2026-03-22", 10.0, "중립", 5.0, 10.0, 20.0, 54000.0)
+    db.upsert_signal_history("2026-03-24", 35.5, "매수우세", 40.0, 30.0, 20.0, 55000.0)
+    db.upsert_signal_history("2026-03-23", -20.0, "매도우세", -30.0, -10.0, -5.0, 53000.0)
+    rows = db.get_signal_history(10)
+    assert len(rows) == 3
+    assert rows[0]["date"] == "2026-03-22"
+    assert rows[1]["date"] == "2026-03-23"
+    assert rows[2]["date"] == "2026-03-24"
+
+
+def test_get_signal_history_limits(temp_db):
+    db_path, db = temp_db
+    db.init_db()
+    for i in range(5):
+        db.upsert_signal_history(f"2026-03-{20+i}", float(i), "중립", 0.0, 0.0, 0.0, 50000.0)
+    rows = db.get_signal_history(3)
+    assert len(rows) == 3
+    assert rows[0]["date"] == "2026-03-22"

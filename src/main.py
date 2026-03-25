@@ -14,6 +14,7 @@ from src.data.database import (
     get_foreign_trading,
     get_prices,
     init_db,
+    upsert_signal_history,
 )
 from src.analysis.technical import compute_technical_indicators
 from src.analysis.supply_demand import analyze_supply_demand
@@ -59,6 +60,19 @@ def main(dry_run: bool = False):
 
     # 3.6) 종합 투자 시그널
     sig = compute_composite_signal(indicators, sd or {}, er or {})
+
+    # 3.7) 시그널 이력 저장
+    latest_price = prices[-1]["close"]
+    latest_date = prices[-1]["date"]
+    upsert_signal_history(
+        date=latest_date,
+        score=sig["score"],
+        grade=sig["grade"],
+        technical_score=sig["technical_score"],
+        supply_score=sig["supply_score"],
+        exchange_score=sig["exchange_score"],
+        price=latest_price,
+    )
 
     # 4) 리포트 생성
     report = generate_daily_report(indicators, supply_demand=sd, exchange_rate=er, composite_signal=sig, support_resistance=sr)

@@ -53,6 +53,17 @@ def init_db() -> None:
             exhaustion_pct   REAL NOT NULL
         )
     """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS signal_history (
+            date              TEXT PRIMARY KEY,
+            score             REAL NOT NULL,
+            grade             TEXT NOT NULL,
+            technical_score   REAL NOT NULL,
+            supply_score      REAL NOT NULL,
+            exchange_score    REAL NOT NULL,
+            price             REAL NOT NULL
+        )
+    """)
     conn.commit()
     conn.close()
 
@@ -229,6 +240,44 @@ def get_foreign_ownership(days: int) -> list[dict]:
         "SELECT date, listed_shares, foreign_shares, ownership_pct, "
         "limit_shares, exhaustion_pct "
         "FROM foreign_ownership ORDER BY date DESC LIMIT ?",
+        (days,),
+    )
+    rows = [dict(row) for row in cur.fetchall()]
+    conn.close()
+    rows.reverse()
+    return rows
+
+
+# ── signal_history ──────────────────────────────────────────────
+
+def upsert_signal_history(
+    date: str,
+    score: float,
+    grade: str,
+    technical_score: float,
+    supply_score: float,
+    exchange_score: float,
+    price: float,
+) -> None:
+    """시그널 이력 단건 삽입/갱신."""
+    conn = get_connection()
+    conn.execute(
+        "INSERT OR REPLACE INTO signal_history "
+        "(date, score, grade, technical_score, supply_score, exchange_score, price) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (date, score, grade, technical_score, supply_score, exchange_score, price),
+    )
+    conn.commit()
+    conn.close()
+
+
+def get_signal_history(days: int) -> list[dict]:
+    """최근 N일 시그널 이력을 날짜 오름차순으로 반환한다."""
+    conn = get_connection()
+    cur = conn.execute(
+        "SELECT date, score, grade, technical_score, supply_score, "
+        "exchange_score, price FROM signal_history "
+        "ORDER BY date DESC LIMIT ?",
         (days,),
     )
     rows = [dict(row) for row in cur.fetchall()]

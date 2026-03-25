@@ -1,9 +1,9 @@
 ## Session Plan
 
-### Task 1: 시그널 이력 저장 시스템 구축 — 정확도 추적의 기반
-Files: src/data/database.py, src/main.py, tests/test_database.py
-Description: 매일의 종합 시그널 결과(점수, 등급, 각 축 점수, 당일 종가)를 기록하는 `signal_history` 테이블을 추가한다. `upsert_signal_history(date, score, grade, technical_score, supply_score, exchange_score, price)` 함수와 `get_signal_history(days)` 조회 함수를 구현한다. init_db()에 테이블 생성 DDL을 추가하고, main.py에서 시그널 계산 후 자동 기록하도록 연결한다. 테스트를 먼저 작성한다. 이 테이블이 쌓이면 "N일 전 매수 신호 후 실제 주가가 올랐는가?"를 검증할 수 있는 기반이 된다.
+### Task 1: 시그널 정확도 추적 모듈 구축 — "내 시그널이 맞았는가?"
+Files: src/analysis/accuracy.py, tests/test_accuracy.py
+Description: signal_history 테이블에 축적된 과거 시그널을 실제 주가 변동과 대조하여 정확도를 계산하는 분석 모듈을 구축한다. 핵심 기능: (1) 시그널 발생 후 N일(1/3/5일) 수익률 계산, (2) 시그널 방향(매수/매도)과 실제 주가 방향 일치 여부 판정, (3) 전체 적중률·평균 수익률 통계 반환. get_signal_history()와 get_prices()에서 데이터를 가져와 날짜 매칭으로 forward return을 계산한다. 데이터가 충분히 쌓이면 자동으로 리포트에 포함할 수 있도록 dict 형태로 반환. 테스트를 먼저 작성한다.
 
-### Task 2: 리포트에 "오늘의 핵심" 한 줄 요약 추가
-Files: src/analysis/report.py, tests/test_report.py
-Description: generate_daily_report()의 최상단(종합 판정 바로 아래)에 "오늘의 핵심" 한 줄 요약을 추가한다. `generate_key_insight(indicators, supply_demand, exchange_rate, support_resistance)` 함수를 만들어, 당일 지표 중 가장 주목할 만한 변화(RSI 과매도/과매수 진입, 외국인 N일 연속 매수/매도, 지지선·저항선 근접/돌파, 거래량 급증, 골든/데드크로스 등)를 우선순위 규칙 기반으로 1-2개 선별하여 한 문장으로 압축한다. 테스트를 먼저 작성한다. 숫자 나열이 아닌 "왜 이 숫자가 중요한지"를 설명하는 첫 걸음이다.
+### Task 2: 규칙 기반 자연어 마켓 코멘터리 — 숫자 뒤의 이야기
+Files: src/analysis/commentary.py, tests/test_commentary.py, src/analysis/report.py, src/main.py
+Description: 분석 결과를 자연어 한국어 코멘터리로 변환하는 모듈을 구축한다. 종합 시그널, 기술적 지표, 수급 동향, 지지/저항을 조합하여 "오늘 삼성전자는 외국인 5일 연속 순매수와 MACD 골든크로스가 겹치면서 매수 우세 흐름입니다. 다만 RSI 65로 과매수 영역에 접근 중이므로 단기 조정 가능성에 유의하세요." 같은 자연어 해석을 생성한다. 규칙 기반 템플릿(LLM 호출 없이)으로 구현하여 안정성 확보. 생성된 코멘터리를 리포트 최상단에 배치하고, main.py 파이프라인에 연결한다. 테스트를 먼저 작성한다.

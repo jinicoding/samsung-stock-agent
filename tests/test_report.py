@@ -763,6 +763,86 @@ class TestSupportResistanceInReport:
         assert "삼성전자" in report
 
 
+class TestAccuracyInReport:
+    """시그널 정확도가 리포트에 표시되는지 테스트."""
+
+    def test_accuracy_section_absent_by_default(self):
+        """accuracy_summary=None이면 정확도 섹션 없음."""
+        report = generate_daily_report(_full_indicators())
+        assert "시그널 정확도" not in report
+
+    def test_accuracy_section_present(self):
+        """accuracy_summary가 충분한 데이터와 함께 주어지면 섹션이 포함된다."""
+        acc = _accuracy_summary_sufficient()
+        report = generate_daily_report(_full_indicators(), accuracy_summary=acc)
+        assert "시그널 정확도" in report
+
+    def test_accuracy_hit_rate_displayed(self):
+        """적중률이 리포트에 표시된다."""
+        acc = _accuracy_summary_sufficient()
+        report = generate_daily_report(_full_indicators(), accuracy_summary=acc)
+        assert "적중률" in report
+
+    def test_accuracy_avg_return_displayed(self):
+        """평균 수익률이 리포트에 표시된다."""
+        acc = _accuracy_summary_sufficient()
+        report = generate_daily_report(_full_indicators(), accuracy_summary=acc)
+        assert "평균 수익률" in report
+
+    def test_accuracy_insufficient_data(self):
+        """evaluated_signals < 5이면 '데이터 축적 중' 메시지 표시."""
+        acc = _accuracy_summary_insufficient()
+        report = generate_daily_report(_full_indicators(), accuracy_summary=acc)
+        assert "데이터 축적 중" in report
+
+    def test_accuracy_after_support_resistance(self):
+        """정확도 섹션이 지지/저항선 섹션 뒤에 위치한다."""
+        sr = _support_resistance_sample()
+        acc = _accuracy_summary_sufficient()
+        report = generate_daily_report(
+            _full_indicators(), support_resistance=sr, accuracy_summary=acc,
+        )
+        sr_pos = report.index("지지/저항")
+        acc_pos = report.index("시그널 정확도")
+        assert acc_pos > sr_pos
+
+    def test_accuracy_total_signals_displayed(self):
+        """총 평가 시그널 수가 표시된다."""
+        acc = _accuracy_summary_sufficient()
+        report = generate_daily_report(_full_indicators(), accuracy_summary=acc)
+        assert "20" in report  # total_signals = 20
+
+
+def _accuracy_summary_sufficient() -> dict:
+    return {
+        "total_signals": 20,
+        "hit_rate_1d": 65.0,
+        "hit_rate_3d": 60.0,
+        "hit_rate_5d": 55.0,
+        "avg_return_1d": 0.35,
+        "avg_return_3d": 0.80,
+        "avg_return_5d": 1.20,
+        "evaluated_signals_1d": 18,
+        "evaluated_signals_3d": 15,
+        "evaluated_signals_5d": 10,
+    }
+
+
+def _accuracy_summary_insufficient() -> dict:
+    return {
+        "total_signals": 3,
+        "hit_rate_1d": None,
+        "hit_rate_3d": None,
+        "hit_rate_5d": None,
+        "avg_return_1d": None,
+        "avg_return_3d": None,
+        "avg_return_5d": None,
+        "evaluated_signals_1d": 3,
+        "evaluated_signals_3d": 2,
+        "evaluated_signals_5d": 0,
+    }
+
+
 def _supply_demand_neutral() -> dict:
     return {
         "foreign_consecutive_net_buy": 1,

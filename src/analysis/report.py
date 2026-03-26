@@ -409,12 +409,40 @@ def _build_support_resistance_section(sr: dict, current_price: float) -> list[st
     return lines
 
 
+def _build_accuracy_section(acc: dict) -> list[str]:
+    """시그널 정확도 통계를 HTML 라인 리스트로."""
+    lines = []
+    lines.append("")
+    lines.append("<b>🎯 시그널 정확도</b>")
+
+    # 데이터 부족 판단: 1일 기준 evaluated_signals가 5 미만이면 축적 중
+    eval_1d = acc.get("evaluated_signals_1d", 0)
+    if eval_1d < 5:
+        lines.append(f"  📊 데이터 축적 중 (평가 시그널: {acc.get('total_signals', 0)}개)")
+        return lines
+
+    lines.append(f"  총 평가 시그널: {acc['total_signals']}개")
+    lines.append("")
+
+    for n in (1, 3, 5):
+        hit = acc.get(f"hit_rate_{n}d")
+        ret = acc.get(f"avg_return_{n}d")
+        count = acc.get(f"evaluated_signals_{n}d", 0)
+
+        hit_str = f"{hit:.1f}%" if hit is not None else "N/A"
+        ret_str = f"{ret:+.2f}%" if ret is not None else "N/A"
+        lines.append(f"  {n}일 적중률: {hit_str} | 평균 수익률: {ret_str} ({count}건)")
+
+    return lines
+
+
 def generate_daily_report(
     indicators: dict,
     supply_demand: dict | None = None,
     exchange_rate: dict | None = None,
     composite_signal: dict | None = None,
     support_resistance: dict | None = None,
+    accuracy_summary: dict | None = None,
 ) -> str:
     """기술적 지표 dict를 HTML 텔레그램 메시지로 변환한다.
 
@@ -531,5 +559,9 @@ def generate_daily_report(
     # 지지/저항선 (선택)
     if support_resistance is not None:
         lines.extend(_build_support_resistance_section(support_resistance, price))
+
+    # 시그널 정확도 (선택)
+    if accuracy_summary is not None:
+        lines.extend(_build_accuracy_section(accuracy_summary))
 
     return "\n".join(lines)

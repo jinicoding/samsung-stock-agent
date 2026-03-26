@@ -84,11 +84,25 @@ SAMPLE_SR = {
     "nearest_resistance": 58000.0,
 }
 
+SAMPLE_ACCURACY = {
+    "total_signals": 10,
+    "hit_rate_1d": 60.0,
+    "hit_rate_3d": 55.0,
+    "hit_rate_5d": 50.0,
+    "avg_return_1d": 0.2,
+    "avg_return_3d": 0.5,
+    "avg_return_5d": 0.8,
+    "evaluated_signals_1d": 8,
+    "evaluated_signals_3d": 7,
+    "evaluated_signals_5d": 5,
+}
+
 SAMPLE_REPORT_HTML = "<b>삼성전자 일일 분석</b>"
 
 
 @patch("src.main.send_message")
 @patch("src.main.generate_daily_report", return_value=SAMPLE_REPORT_HTML)
+@patch("src.main.evaluate_signals", return_value={"details": [], "summary": SAMPLE_ACCURACY})
 @patch("src.main.upsert_signal_history")
 @patch("src.main.compute_composite_signal", return_value=SAMPLE_SIGNAL)
 @patch("src.main.analyze_support_resistance", return_value=SAMPLE_SR)
@@ -105,9 +119,10 @@ SAMPLE_REPORT_HTML = "<b>삼성전자 일일 분석</b>"
 def test_pipeline_full(
     mock_init, mock_bf_prices, mock_bf_sd,
     mock_prices, mock_trading, mock_ownership, mock_rates,
-    mock_tech, mock_sd, mock_er, mock_sr, mock_signal, mock_upsert_sig, mock_report, mock_send,
+    mock_tech, mock_sd, mock_er, mock_sr, mock_signal, mock_upsert_sig,
+    mock_eval, mock_report, mock_send,
 ):
-    """전체 파이프라인: 백필→조회→분석→지지저항→시그널→기록→리포트→발송."""
+    """전체 파이프라인: 백필→조회→분석→지지저항→시그널→기록→정확도→리포트→발송."""
     from src.main import main
 
     main()
@@ -129,12 +144,18 @@ def test_pipeline_full(
         technical_score=40.0, supply_score=50.0, exchange_score=-10.0,
         price=61000,
     )
-    mock_report.assert_called_once_with(SAMPLE_INDICATORS, supply_demand=SAMPLE_SD, exchange_rate=SAMPLE_ER, composite_signal=SAMPLE_SIGNAL, support_resistance=SAMPLE_SR)
+    mock_eval.assert_called_once()
+    mock_report.assert_called_once_with(
+        SAMPLE_INDICATORS, supply_demand=SAMPLE_SD, exchange_rate=SAMPLE_ER,
+        composite_signal=SAMPLE_SIGNAL, support_resistance=SAMPLE_SR,
+        accuracy_summary=SAMPLE_ACCURACY,
+    )
     mock_send.assert_called_once_with(SAMPLE_REPORT_HTML)
 
 
 @patch("src.main.send_message")
 @patch("src.main.generate_daily_report", return_value=SAMPLE_REPORT_HTML)
+@patch("src.main.evaluate_signals", return_value={"details": [], "summary": SAMPLE_ACCURACY})
 @patch("src.main.upsert_signal_history")
 @patch("src.main.compute_composite_signal", return_value=SAMPLE_SIGNAL)
 @patch("src.main.analyze_support_resistance", return_value=SAMPLE_SR)
@@ -151,7 +172,8 @@ def test_pipeline_full(
 def test_pipeline_dry_run(
     mock_init, mock_bf_prices, mock_bf_sd,
     mock_prices, mock_trading, mock_ownership, mock_rates,
-    mock_tech, mock_sd, mock_er, mock_sr, mock_signal, mock_upsert_sig, mock_report, mock_send,
+    mock_tech, mock_sd, mock_er, mock_sr, mock_signal, mock_upsert_sig,
+    mock_eval, mock_report, mock_send,
     capsys,
 ):
     """--dry-run: 리포트를 stdout에 출력하고 발송하지 않는다."""

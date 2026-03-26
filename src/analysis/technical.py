@@ -95,6 +95,64 @@ def _macd(
     return macd_line, signal_line, histogram
 
 
+def _obv(closes: list[float], volumes: list[float]) -> list[float]:
+    """On-Balance Volume 계산. 누적 거래량 흐름을 추적한다.
+
+    상승일: +volume, 하락일: -volume, 보합: ±0.
+    """
+    if not closes:
+        return []
+    result = [0.0]
+    for i in range(1, len(closes)):
+        if closes[i] > closes[i - 1]:
+            result.append(result[-1] + volumes[i])
+        elif closes[i] < closes[i - 1]:
+            result.append(result[-1] - volumes[i])
+        else:
+            result.append(result[-1])
+    return result
+
+
+def _obv_divergence(
+    closes: list[float], obv_series: list[float], window: int = 20,
+) -> str | None:
+    """가격-OBV 다이버전스를 감지한다.
+
+    최근 window 구간의 추세(선형 기울기 부호)를 비교하여:
+    - 가격↑ OBV↓ → "bearish"
+    - 가격↓ OBV↑ → "bullish"
+    - 그 외 → None
+
+    데이터가 window 미만이면 None.
+    """
+    if len(closes) < window or len(obv_series) < window:
+        return None
+
+    recent_closes = closes[-window:]
+    recent_obv = obv_series[-window:]
+
+    # 선형 기울기 부호 판별 (단순: 후반부 평균 vs 전반부 평균)
+    half = window // 2
+
+    def trend_sign(series: list[float]) -> int:
+        first_half = sum(series[:half]) / half
+        second_half = sum(series[half:]) / (window - half)
+        if second_half > first_half:
+            return 1
+        elif second_half < first_half:
+            return -1
+        return 0
+
+    price_trend = trend_sign(recent_closes)
+    obv_trend = trend_sign(recent_obv)
+
+    if price_trend > 0 and obv_trend < 0:
+        return "bearish"
+    if price_trend < 0 and obv_trend > 0:
+        return "bullish"
+    return None
+
+
 def _bollinger_bands(
     closes: list[float], window: int = 20, num_std: int = 2,
 ) -> tuple[float | None, float | None, float | None, float | None]:
@@ -177,6 +235,14 @@ def compute_technical_indicators(rows: list[dict]) -> dict:
     # 볼린저 밴드 (20, 2)
     bb_upper, bb_lower, bb_width, bb_pctb = _bollinger_bands(closes)
 
+    # OBV (On-Balance Volume)
+    obv_series = _obv(closes, volumes)
+    obv_latest = obv_series[-1] if obv_series else None
+    obv_ma20_val: float | None = None
+    if len(obv_series) >= 20:
+        obv_ma20_val = sum(obv_series[-20:]) / 20
+    obv_div = _obv_divergence(closes, obv_series)
+
     return {
         "current_date": rows[-1]["date"],
         "current_price": current,
@@ -205,4 +271,8 @@ def compute_technical_indicators(rows: list[dict]) -> dict:
         "bb_lower": bb_lower,
         "bb_width": bb_width,
         "bb_pctb": bb_pctb,
+        # OBV (On-Balance Volume)
+        "obv": obv_latest,
+        "obv_ma20": obv_ma20_val,
+        "obv_divergence": obv_div,
     }

@@ -2,7 +2,7 @@
 
 import pytest
 
-from src.analysis.technical import compute_technical_indicators, _ema, _macd
+from src.analysis.technical import compute_technical_indicators, _ema, _macd, _obv, _obv_divergence
 
 
 def _make_rows(prices: list[float], base_volume: int = 1_000_000) -> list[dict]:
@@ -302,6 +302,123 @@ class TestBollingerBands:
         std = variance ** 0.5
         assert abs(result["bb_upper"] - (ma20 + 2 * std)) < 0.01
         assert abs(result["bb_lower"] - (ma20 - 2 * std)) < 0.01
+
+
+class TestOBV:
+    """OBV(On-Balance Volume) 계산 테스트."""
+
+    def test_obv_basic(self):
+        """상승일 +volume, 하락일 -volume, 보합 ±0."""
+        closes = [100, 110, 105, 105, 120]
+        volumes = [1000, 2000, 1500, 1000, 3000]
+        obv = _obv(closes, volumes)
+        # day0: 0 (시작)
+        # day1: 110>100 → +2000 = 2000
+        # day2: 105<110 → -1500 = 500
+        # day3: 105==105 → +0 = 500
+        # day4: 120>105 → +3000 = 3500
+        assert obv == [0, 2000, 500, 500, 3500]
+
+    def test_obv_all_up(self):
+        """매일 상승이면 OBV = 누적 거래량."""
+        closes = [100, 110, 120, 130]
+        volumes = [1000, 1000, 1000, 1000]
+        obv = _obv(closes, volumes)
+        assert obv == [0, 1000, 2000, 3000]
+
+    def test_obv_all_down(self):
+        """매일 하락이면 OBV = 음수 누적."""
+        closes = [130, 120, 110, 100]
+        volumes = [1000, 1000, 1000, 1000]
+        obv = _obv(closes, volumes)
+        assert obv == [0, -1000, -2000, -3000]
+
+    def test_obv_single_point(self):
+        """데이터 1개면 OBV = [0]."""
+        assert _obv([100], [1000]) == [0]
+
+    def test_obv_empty(self):
+        """빈 데이터면 빈 리스트."""
+        assert _obv([], []) == []
+
+
+class TestOBVDivergence:
+    """가격-OBV 다이버전스 감지 테스트."""
+
+    def test_bearish_divergence(self):
+        """가격 상승 + OBV 하락 = 약세 다이버전스."""
+        # 가격은 고점 갱신하지만 OBV는 하락
+        # 최근 구간: 가격 상승 추세, OBV 하락 추세
+        closes_rising = [100 + i for i in range(25)]
+        # OBV가 하락하려면: 상승일 거래량 < 하락일 거래량이어야 하지만
+        # 가격이 계속 오르므로 OBV도 오름 → 직접 OBV 리스트로 테스트
+        obv_falling = list(range(3000, 3000 - 25, -1))  # 3000, 2999, ...
+        result = _obv_divergence(closes_rising, obv_falling, window=20)
+        assert result == "bearish"
+
+    def test_bullish_divergence(self):
+        """가격 하락 + OBV 상승 = 강세 다이버전스."""
+        closes_falling = [200 - i for i in range(25)]
+        obv_rising = list(range(0, 25))
+        result = _obv_divergence(closes_falling, obv_rising, window=20)
+        assert result == "bullish"
+
+    def test_no_divergence_both_up(self):
+        """가격·OBV 모두 상승 = 다이버전스 없음."""
+        closes_up = [100 + i for i in range(25)]
+        obv_up = [i * 100 for i in range(25)]
+        result = _obv_divergence(closes_up, obv_up, window=20)
+        assert result is None
+
+    def test_no_divergence_both_down(self):
+        """가격·OBV 모두 하락 = 다이버전스 없음."""
+        closes_down = [200 - i for i in range(25)]
+        obv_down = [2400 - i * 100 for i in range(25)]
+        result = _obv_divergence(closes_down, obv_down, window=20)
+        assert result is None
+
+    def test_insufficient_data(self):
+        """데이터 부족 시 None."""
+        result = _obv_divergence([100, 110], [0, 1000], window=20)
+        assert result is None
+
+
+class TestOBVIntegration:
+    """compute_technical_indicators에 OBV 필드 통합 테스트."""
+
+    def test_obv_keys_present(self):
+        """충분한 데이터일 때 obv, obv_ma20, obv_divergence 키 존재."""
+        prices = [50000 + i * 100 for i in range(30)]
+        result = compute_technical_indicators(_make_rows(prices))
+        assert "obv" in result
+        assert "obv_ma20" in result
+        assert "obv_divergence" in result
+
+    def test_obv_value_is_latest(self):
+        """obv는 최신 OBV 값."""
+        prices = [50000 + i * 100 for i in range(10)]
+        rows = _make_rows(prices)
+        result = compute_technical_indicators(rows)
+        assert result["obv"] is not None
+        assert isinstance(result["obv"], (int, float))
+
+    def test_obv_ma20_none_insufficient(self):
+        """20일 미만 데이터면 obv_ma20은 None."""
+        prices = [50000] * 10
+        result = compute_technical_indicators(_make_rows(prices))
+        assert result["obv_ma20"] is None
+
+    def test_obv_ma20_present(self):
+        """20일 이상 데이터면 obv_ma20 계산됨."""
+        prices = [50000 + i * 100 for i in range(25)]
+        result = compute_technical_indicators(_make_rows(prices))
+        assert result["obv_ma20"] is not None
+
+    def test_obv_divergence_none_short_data(self):
+        """데이터 짧으면 다이버전스 None."""
+        prices = [50000] * 5
+        result = compute_technical_indicators(_make_rows(prices))
+        assert result["obv_divergence"] is None
 
 
 class TestEdgeCases:

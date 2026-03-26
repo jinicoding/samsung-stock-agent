@@ -1,9 +1,9 @@
 ## Session Plan
 
-### Task 1: 시그널 정확도 추적을 일일 파이프라인·리포트에 통합 — "내 시그널을 얼마나 믿어야 하는가"
-Files: src/main.py, src/analysis/report.py, tests/test_main.py, tests/test_report.py
-Description: accuracy.py 모듈은 이미 있지만 main.py에서 호출하지 않고, 리포트에도 표시되지 않는다. 투자자가 시그널의 신뢰도를 판단하려면 "최근 N일 적중률"과 "평균 수익률"이 리포트에 보여야 한다. (1) main.py에서 evaluate_signals()를 호출하여 정확도 통계를 산출하고, (2) report.py에 정확도 섹션(_build_accuracy_section)을 추가하여 1/3/5일 적중률, 평균 수익률, 총 평가 시그널 수를 표시한다. 데이터가 아직 부족하면(evaluated_signals < 5) "데이터 축적 중" 메시지를 표시. (3) generate_daily_report()의 시그니처에 accuracy_summary dict를 추가하고, 리포트 하단 지지/저항선 아래에 정확도 섹션을 배치한다. 테스트를 먼저 작성하고 구현한다.
+### Task 1: OBV(On-Balance Volume) + 가격-거래량 다이버전스 감지 모듈 구축
+Files: src/analysis/technical.py, tests/test_technical.py
+Description: 거래량 분석을 고도화한다. 현재는 5일 평균 대비 거래량 비율만 있어 "거래량이 많다/적다"만 알 수 있고, "거래량이 가격 추세를 확인하는가?"를 판단할 수 없다. OBV(On-Balance Volume)를 구현하여 누적 거래량 흐름을 추적하고, 가격-OBV 다이버전스(가격은 오르는데 OBV는 하락 = 약세 다이버전스, 반대 = 강세 다이버전스)를 감지하는 함수를 추가한다. compute_technical_indicators()의 반환값에 obv, obv_ma20, obv_divergence 필드를 추가한다. 테스트를 먼저 작성한다: OBV 계산 정확성, 상승일/하락일 누적, 다이버전스 감지(강세/약세/없음), 데이터 부족 시 None 처리.
 
-### Task 2: VWAP(거래량 가중 평균 가격) 지표 구축 — 기관 벤치마크 도입
-Files: src/analysis/technical.py, src/analysis/report.py, src/analysis/signal.py, tests/test_technical.py, tests/test_report.py
-Description: VWAP는 기관 투자자들이 매매 실행 품질을 평가하는 핵심 벤치마크다. 현재가가 VWAP 위면 매수세 우위, 아래면 매도세 우위로 해석한다. (1) technical.py의 compute_technical_indicators()에 N일 VWAP 계산을 추가한다. typical_price = (H+L+C)/3, VWAP = Σ(typical_price × volume) / Σ(volume)으로 20일 누적 계산. price_vs_vwap_pct(현재가 대비 VWAP 괴리율)도 함께 반환한다. (2) report.py에 VWAP 정보를 거래량 섹션에 통합하여 VWAP 값, 현재가와의 괴리율, 매수/매도 우위 판정을 표시한다. (3) signal.py의 _score_technical()에 VWAP 괴리율을 추가 스코어링 요소로 반영한다. 테스트 먼저 작성 후 구현.
+### Task 2: OBV 다이버전스를 종합 시그널·코멘터리·리포트에 통합
+Files: src/analysis/signal.py, src/analysis/commentary.py, src/analysis/report.py, src/main.py, tests/test_signal.py, tests/test_commentary.py, tests/test_report.py
+Description: Task 1에서 구축한 OBV 분석을 파이프라인 끝단까지 연결한다. (1) signal.py의 _score_technical()에 OBV 다이버전스 반영 — 약세 다이버전스면 -30점, 강세 다이버전스면 +30점 가산. (2) commentary.py에 다이버전스 경고 문장 추가 — "거래량이 가격 상승을 뒷받침하지 않아 주의가 필요합니다" / "거래량 흐름이 반등 가능성을 시사합니다". (3) report.py에 OBV 섹션 추가 — OBV 값, 20일 MA, 다이버전스 상태를 HTML로 표시. 테스트를 먼저 작성하여 각 모듈의 OBV 통합을 검증한다.

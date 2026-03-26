@@ -1,0 +1,228 @@
+"""규칙 기반 자연어 마켓 코멘터리 생성기.
+
+분석 결과를 조합하여 2~3문장의 한국어 자연어 해석을 생성한다.
+LLM 호출 없이 규칙 기반 템플릿으로 구현하여 안정성 확보.
+"""
+
+from src.analysis.report import (
+    classify_ma_alignment,
+    classify_rsi,
+    classify_macd,
+    classify_bb_position,
+)
+
+
+def generate_commentary(
+    indicators: dict,
+    supply_demand: dict | None = None,
+    exchange_rate: dict | None = None,
+    composite_signal: dict | None = None,
+    support_resistance: dict | None = None,
+) -> str:
+    """분석 결과를 2~3문장 자연어 코멘터리로 변환한다.
+
+    Args:
+        indicators: compute_technical_indicators() 반환값.
+        supply_demand: analyze_supply_demand() 반환값 (선택).
+        exchange_rate: analyze_exchange_rate() 반환값 (선택).
+        composite_signal: compute_composite_signal() 반환값 (선택).
+        support_resistance: analyze_support_resistance() 반환값 (선택).
+
+    Returns:
+        2~3문장의 한국어 자연어 코멘터리.
+    """
+    sd = supply_demand or {}
+    er = exchange_rate or {}
+    sig = composite_signal or {}
+    sr = support_resistance or {}
+
+    sentences: list[str] = []
+
+    # --- 1) 주요 흐름 문장: 수급 + 기술적 시그널 조합 ---
+    sentences.append(_build_flow_sentence(indicators, sd, sig))
+
+    # --- 2) 보조 경고/참고 문장: RSI, 볼린저, 지지/저항 ---
+    caution = _build_caution_sentence(indicators, sr)
+    if caution:
+        sentences.append(caution)
+
+    # --- 3) 환율 영향 문장 ---
+    fx_sentence = _build_fx_sentence(er)
+    if fx_sentence:
+        sentences.append(fx_sentence)
+
+    return " ".join(sentences)
+
+
+def _build_flow_sentence(indicators: dict, sd: dict, sig: dict) -> str:
+    """주요 흐름을 설명하는 핵심 문장."""
+    parts: list[str] = []
+
+    # 수급 흐름
+    supply_part = _describe_supply(sd)
+    if supply_part:
+        parts.append(supply_part)
+
+    # 기술적 시그널
+    tech_part = _describe_technical(indicators)
+    if tech_part:
+        parts.append(tech_part)
+
+    # 이평선 배열
+    ma_part = _describe_ma_alignment(indicators)
+    if ma_part:
+        parts.append(ma_part)
+
+    # 조합
+    if not parts:
+        grade = sig.get("grade", "중립")
+        return f"현재 시장은 {grade} 흐름을 보이고 있습니다."
+
+    # 종합 판정 기반 결론
+    grade = sig.get("grade", "중립")
+    score = sig.get("score", 0)
+
+    connector = _join_parts(parts)
+
+    if grade in ("강력매수신호", "매수우세"):
+        if score >= 60:
+            return f"{connector} 강한 매수 우세 흐름입니다."
+        return f"{connector} 매수 우세 흐름입니다."
+    elif grade in ("강력매도신호", "매도우세"):
+        if score <= -60:
+            return f"{connector} 강한 매도 압력이 관찰됩니다."
+        return f"{connector} 매도 우세 흐름입니다."
+    else:
+        return f"{connector} 관망세가 이어지고 있습니다."
+
+
+def _describe_supply(sd: dict) -> str:
+    """수급 동향을 자연어로."""
+    if not sd:
+        return ""
+
+    fb = sd.get("foreign_consecutive_net_buy", 0)
+    fs = sd.get("foreign_consecutive_net_sell", 0)
+    ib = sd.get("institution_consecutive_net_buy", 0)
+    is_ = sd.get("institution_consecutive_net_sell", 0)
+
+    parts = []
+    if fb >= 3:
+        parts.append(f"외국인 {fb}일 연속 순매수")
+    elif fs >= 3:
+        parts.append(f"외국인 {fs}일 연속 순매도")
+
+    if ib >= 3:
+        parts.append(f"기관 {ib}일 연속 순매수")
+    elif is_ >= 3:
+        parts.append(f"기관 {is_}일 연속 순매도")
+
+    if not parts:
+        judgment = sd.get("overall_judgment", "neutral")
+        if judgment == "buy_dominant":
+            return "수급이 매수 우위로"
+        elif judgment == "sell_dominant":
+            return "수급이 매도 우위로"
+        return ""
+
+    return "와(과) ".join(parts[:2]) + "가 이어지면서"
+
+
+def _describe_technical(indicators: dict) -> str:
+    """기술적 시그널을 자연어로."""
+    macd_hist = indicators.get("macd_histogram")
+    macd = indicators.get("macd")
+    macd_sig = indicators.get("macd_signal")
+    macd_cross = classify_macd(macd, macd_sig, macd_hist)
+
+    parts = []
+    if macd_cross == "골든크로스":
+        parts.append("MACD 골든크로스")
+    elif macd_cross == "데드크로스":
+        parts.append("MACD 데드크로스")
+
+    return "가 ".join(parts[:1]) if parts else ""
+
+
+def _describe_ma_alignment(indicators: dict) -> str:
+    """이평선 배열을 자연어로."""
+    alignment = classify_ma_alignment(indicators)
+    if alignment == "정배열":
+        return "이동평균선 정배열 구간에서"
+    elif alignment == "역배열":
+        return "이동평균선 역배열 구간에서"
+    return ""
+
+
+def _build_caution_sentence(indicators: dict, sr: dict) -> str:
+    """보조 경고/참고 문장."""
+    warnings: list[str] = []
+
+    # RSI 경고
+    rsi = indicators.get("rsi_14")
+    rsi_status = classify_rsi(rsi)
+    if rsi_status == "과매수" and rsi is not None:
+        warnings.append(f"RSI {rsi:.0f}으로 과매수 영역에 접근 중이므로 단기 조정 가능성에 유의하세요")
+    elif rsi_status == "과매도" and rsi is not None:
+        warnings.append(f"RSI {rsi:.0f}으로 과매도 영역이므로 반등 가능성을 주시하세요")
+
+    # 볼린저 밴드
+    bb_pctb = indicators.get("bb_pctb")
+    bb_pos = classify_bb_position(bb_pctb)
+    if bb_pos == "상단 돌파":
+        warnings.append("볼린저 밴드 상단 돌파로 과열 신호가 감지됩니다")
+    elif bb_pos == "하단 이탈":
+        warnings.append("볼린저 밴드 하단 이탈로 반등 구간 진입 가능성이 있습니다")
+
+    # 지지/저항선 근접
+    if sr:
+        price = indicators.get("current_price", 0)
+        sr_warning = _check_support_resistance(price, sr)
+        if sr_warning:
+            warnings.append(sr_warning)
+
+    if not warnings:
+        return ""
+
+    # 최대 2개 경고만
+    return "다만 " + ", ".join(warnings[:2]) + "."
+
+
+def _check_support_resistance(price: float, sr: dict) -> str:
+    """지지/저항선 근접 여부를 확인."""
+    ns = sr.get("nearest_support")
+    nr = sr.get("nearest_resistance")
+
+    if price and ns and price > 0:
+        dist_pct = (price - ns) / price * 100
+        if dist_pct < 2.0:
+            return f"지지선({int(ns):,}원)에 근접해 있어 이탈 시 추가 하락에 유의하세요"
+
+    if price and nr and price > 0:
+        dist_pct = (nr - price) / price * 100
+        if dist_pct < 2.0:
+            return f"저항선({int(nr):,}원)에 근접해 있어 돌파 여부가 관건입니다"
+
+    return ""
+
+
+def _build_fx_sentence(er: dict) -> str:
+    """환율 영향 문장."""
+    if not er:
+        return ""
+
+    trend = er.get("trend")
+    if trend == "원화약세":
+        return "원화약세 흐름이 수출 비중이 높은 삼성전자에 우호적 환경을 조성하고 있습니다."
+    elif trend == "원화강세":
+        return "원화강세 흐름이 수출 실적에 부담 요인으로 작용할 수 있습니다."
+    return ""
+
+
+def _join_parts(parts: list[str]) -> str:
+    """여러 파트를 자연스럽게 연결."""
+    if len(parts) == 1:
+        return parts[0]
+    if len(parts) == 2:
+        return f"{parts[0]} {parts[1]}"
+    return f"{parts[0]} {parts[1]} {parts[2]}"

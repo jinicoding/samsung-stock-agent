@@ -4,6 +4,8 @@ compute_technical_indicators 결과를 투자자가 읽기 좋은
 HTML 텔레그램 메시지로 변환한다.
 """
 
+from __future__ import annotations
+
 
 def classify_ma_alignment(indicators: dict) -> str:
     """이동평균선 배열 상태를 판단한다.
@@ -461,6 +463,15 @@ def generate_daily_report(
     # 0) 종합 투자 시그널 (최상단)
     if composite_signal is not None:
         lines.extend(_build_composite_signal_section(composite_signal))
+
+    # 0.5) 자연어 마켓 코멘터리 (종합 판정 바로 아래)
+    from src.analysis.commentary import generate_commentary
+    commentary = generate_commentary(
+        indicators, supply_demand, exchange_rate, composite_signal, support_resistance,
+    )
+    if commentary:
+        lines.append(f"💬 {commentary}")
+        lines.append("")
 
     # 1) 현재가 및 등락
     lines.append(f"<b>현재가:</b> {_format_price(price)}원 ({_format_change(change_1d)})")

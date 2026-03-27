@@ -97,6 +97,26 @@ SAMPLE_ACCURACY = {
     "evaluated_signals_5d": 5,
 }
 
+SAMPLE_RS = {
+    "samsung_return_1d": 0.5,
+    "samsung_return_5d": 2.0,
+    "samsung_return_20d": 5.0,
+    "kospi_return_1d": 0.3,
+    "kospi_return_5d": 1.5,
+    "kospi_return_20d": 4.0,
+    "alpha_1d": 0.2,
+    "alpha_5d": 0.5,
+    "alpha_20d": 1.0,
+    "rs_current": 21.5,
+    "rs_ma20": 21.0,
+    "rs_trend": "outperform",
+}
+
+SAMPLE_KOSPI = [
+    {"date": f"2026-03-{d:02d}", "open": 2500.0, "high": 2520.0, "low": 2480.0, "close": 2500.0 + d * 1.0, "volume": 500000}
+    for d in range(1, 61)
+]
+
 SAMPLE_REPORT_HTML = "<b>삼성전자 일일 분석</b>"
 
 
@@ -105,6 +125,7 @@ SAMPLE_REPORT_HTML = "<b>삼성전자 일일 분석</b>"
 @patch("src.main.evaluate_signals", return_value={"details": [], "summary": SAMPLE_ACCURACY})
 @patch("src.main.upsert_signal_history")
 @patch("src.main.compute_composite_signal", return_value=SAMPLE_SIGNAL)
+@patch("src.main.compute_relative_strength", return_value=SAMPLE_RS)
 @patch("src.main.analyze_support_resistance", return_value=SAMPLE_SR)
 @patch("src.main.analyze_exchange_rate", return_value=SAMPLE_ER)
 @patch("src.main.analyze_supply_demand", return_value=SAMPLE_SD)
@@ -113,16 +134,17 @@ SAMPLE_REPORT_HTML = "<b>삼성전자 일일 분석</b>"
 @patch("src.main.get_foreign_ownership", return_value=SAMPLE_OWNERSHIP)
 @patch("src.main.get_foreign_trading", return_value=SAMPLE_TRADING)
 @patch("src.main.get_prices", return_value=SAMPLE_PRICES)
+@patch("src.main.fetch_kospi_ohlcv", return_value=SAMPLE_KOSPI)
 @patch("src.main.backfill_supply_demand")
 @patch("src.main.backfill_prices")
 @patch("src.main.init_db")
 def test_pipeline_full(
     mock_init, mock_bf_prices, mock_bf_sd,
-    mock_prices, mock_trading, mock_ownership, mock_rates,
-    mock_tech, mock_sd, mock_er, mock_sr, mock_signal, mock_upsert_sig,
+    mock_kospi, mock_prices, mock_trading, mock_ownership, mock_rates,
+    mock_tech, mock_sd, mock_er, mock_sr, mock_rs, mock_signal, mock_upsert_sig,
     mock_eval, mock_report, mock_send,
 ):
-    """전체 파이프라인: 백필→조회→분석→지지저항→시그널→기록→정확도→리포트→발송."""
+    """전체 파이프라인: 백필→조회→분석→지지저항→RS→시그널→기록→정확도→리포트→발송."""
     from src.main import main
 
     main()
@@ -130,6 +152,7 @@ def test_pipeline_full(
     mock_init.assert_called_once()
     mock_bf_prices.assert_called_once()
     mock_bf_sd.assert_called_once()
+    mock_kospi.assert_called_once()
     mock_prices.assert_called_once_with(60)
     mock_trading.assert_called_once_with(20)
     mock_ownership.assert_called_once_with(20)
@@ -138,7 +161,7 @@ def test_pipeline_full(
     mock_sd.assert_called_once_with(SAMPLE_TRADING, SAMPLE_OWNERSHIP)
     mock_er.assert_called_once_with(SAMPLE_RATES, SAMPLE_PRICES)
     mock_sr.assert_called_once_with(SAMPLE_PRICES)
-    mock_signal.assert_called_once_with(SAMPLE_INDICATORS, SAMPLE_SD, SAMPLE_ER)
+    mock_signal.assert_called_once_with(SAMPLE_INDICATORS, SAMPLE_SD, SAMPLE_ER, relative_strength=SAMPLE_RS)
     mock_upsert_sig.assert_called_once_with(
         date="2026-03-60", score=35.0, grade="매수우세",
         technical_score=40.0, supply_score=50.0, exchange_score=-10.0,
@@ -148,7 +171,7 @@ def test_pipeline_full(
     mock_report.assert_called_once_with(
         SAMPLE_INDICATORS, supply_demand=SAMPLE_SD, exchange_rate=SAMPLE_ER,
         composite_signal=SAMPLE_SIGNAL, support_resistance=SAMPLE_SR,
-        accuracy_summary=SAMPLE_ACCURACY,
+        accuracy_summary=SAMPLE_ACCURACY, relative_strength=SAMPLE_RS,
     )
     mock_send.assert_called_once_with(SAMPLE_REPORT_HTML)
 
@@ -158,6 +181,7 @@ def test_pipeline_full(
 @patch("src.main.evaluate_signals", return_value={"details": [], "summary": SAMPLE_ACCURACY})
 @patch("src.main.upsert_signal_history")
 @patch("src.main.compute_composite_signal", return_value=SAMPLE_SIGNAL)
+@patch("src.main.compute_relative_strength", return_value=SAMPLE_RS)
 @patch("src.main.analyze_support_resistance", return_value=SAMPLE_SR)
 @patch("src.main.analyze_exchange_rate", return_value=SAMPLE_ER)
 @patch("src.main.analyze_supply_demand", return_value=SAMPLE_SD)
@@ -166,13 +190,14 @@ def test_pipeline_full(
 @patch("src.main.get_foreign_ownership", return_value=SAMPLE_OWNERSHIP)
 @patch("src.main.get_foreign_trading", return_value=SAMPLE_TRADING)
 @patch("src.main.get_prices", return_value=SAMPLE_PRICES)
+@patch("src.main.fetch_kospi_ohlcv", return_value=SAMPLE_KOSPI)
 @patch("src.main.backfill_supply_demand")
 @patch("src.main.backfill_prices")
 @patch("src.main.init_db")
 def test_pipeline_dry_run(
     mock_init, mock_bf_prices, mock_bf_sd,
-    mock_prices, mock_trading, mock_ownership, mock_rates,
-    mock_tech, mock_sd, mock_er, mock_sr, mock_signal, mock_upsert_sig,
+    mock_kospi, mock_prices, mock_trading, mock_ownership, mock_rates,
+    mock_tech, mock_sd, mock_er, mock_sr, mock_rs, mock_signal, mock_upsert_sig,
     mock_eval, mock_report, mock_send,
     capsys,
 ):
@@ -185,6 +210,91 @@ def test_pipeline_dry_run(
     mock_send.assert_not_called()
     captured = capsys.readouterr()
     assert SAMPLE_REPORT_HTML in captured.out
+
+
+@patch("src.main.send_message")
+@patch("src.main.generate_daily_report", return_value=SAMPLE_REPORT_HTML)
+@patch("src.main.evaluate_signals", return_value={"details": [], "summary": SAMPLE_ACCURACY})
+@patch("src.main.upsert_signal_history")
+@patch("src.main.compute_composite_signal", return_value=SAMPLE_SIGNAL)
+@patch("src.main.compute_relative_strength", return_value=SAMPLE_RS)
+@patch("src.main.analyze_support_resistance", return_value=SAMPLE_SR)
+@patch("src.main.analyze_exchange_rate", return_value=SAMPLE_ER)
+@patch("src.main.analyze_supply_demand", return_value=SAMPLE_SD)
+@patch("src.main.compute_technical_indicators", return_value=SAMPLE_INDICATORS)
+@patch("src.main.get_exchange_rates", return_value=SAMPLE_RATES)
+@patch("src.main.get_foreign_ownership", return_value=SAMPLE_OWNERSHIP)
+@patch("src.main.get_foreign_trading", return_value=SAMPLE_TRADING)
+@patch("src.main.get_prices", return_value=SAMPLE_PRICES)
+@patch("src.main.fetch_kospi_ohlcv", return_value=SAMPLE_KOSPI)
+@patch("src.main.backfill_supply_demand")
+@patch("src.main.backfill_prices")
+@patch("src.main.init_db")
+def test_pipeline_with_rs(
+    mock_init, mock_bf_prices, mock_bf_sd,
+    mock_kospi, mock_prices, mock_trading, mock_ownership, mock_rates,
+    mock_tech, mock_sd, mock_er, mock_sr, mock_rs, mock_signal, mock_upsert_sig,
+    mock_eval, mock_report, mock_send,
+):
+    """RS 분석이 파이프라인에 통합되어 composite_signal과 report에 전달된다."""
+    from src.main import main
+
+    main()
+
+    # KOSPI 수집 호출 확인
+    mock_kospi.assert_called_once()
+    # RS 분석 호출 확인
+    mock_rs.assert_called_once()
+    # composite_signal에 RS가 전달됨
+    mock_signal.assert_called_once_with(
+        SAMPLE_INDICATORS, SAMPLE_SD, SAMPLE_ER, relative_strength=SAMPLE_RS,
+    )
+    # report에 RS가 전달됨
+    mock_report.assert_called_once()
+    report_kwargs = mock_report.call_args
+    assert report_kwargs[1].get("relative_strength") == SAMPLE_RS
+
+
+@patch("src.main.send_message")
+@patch("src.main.generate_daily_report", return_value=SAMPLE_REPORT_HTML)
+@patch("src.main.evaluate_signals", return_value={"details": [], "summary": SAMPLE_ACCURACY})
+@patch("src.main.upsert_signal_history")
+@patch("src.main.compute_composite_signal", return_value=SAMPLE_SIGNAL)
+@patch("src.main.compute_relative_strength", return_value=SAMPLE_RS)
+@patch("src.main.analyze_support_resistance", return_value=SAMPLE_SR)
+@patch("src.main.analyze_exchange_rate", return_value=SAMPLE_ER)
+@patch("src.main.analyze_supply_demand", return_value=SAMPLE_SD)
+@patch("src.main.compute_technical_indicators", return_value=SAMPLE_INDICATORS)
+@patch("src.main.get_exchange_rates", return_value=SAMPLE_RATES)
+@patch("src.main.get_foreign_ownership", return_value=SAMPLE_OWNERSHIP)
+@patch("src.main.get_foreign_trading", return_value=SAMPLE_TRADING)
+@patch("src.main.get_prices", return_value=SAMPLE_PRICES)
+@patch("src.main.fetch_kospi_ohlcv", side_effect=Exception("KOSPI API 실패"))
+@patch("src.main.backfill_supply_demand")
+@patch("src.main.backfill_prices")
+@patch("src.main.init_db")
+def test_pipeline_kospi_failure_fallback(
+    mock_init, mock_bf_prices, mock_bf_sd,
+    mock_kospi, mock_prices, mock_trading, mock_ownership, mock_rates,
+    mock_tech, mock_sd, mock_er, mock_sr, mock_rs, mock_signal, mock_upsert_sig,
+    mock_eval, mock_report, mock_send,
+):
+    """KOSPI 수집 실패 시 RS=None으로 폴백하여 파이프라인이 정상 동작한다."""
+    from src.main import main
+
+    main()
+
+    # KOSPI 수집 시도했지만 실패
+    mock_kospi.assert_called_once()
+    # RS 분석은 호출되지 않아야 함
+    mock_rs.assert_not_called()
+    # composite_signal에 RS=None 전달
+    mock_signal.assert_called_once_with(
+        SAMPLE_INDICATORS, SAMPLE_SD, SAMPLE_ER, relative_strength=None,
+    )
+    # report에 RS=None 전달
+    report_kwargs = mock_report.call_args
+    assert report_kwargs[1].get("relative_strength") is None
 
 
 @patch("src.main.generate_daily_report")

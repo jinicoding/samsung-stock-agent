@@ -545,7 +545,16 @@ def generate_daily_report(
             lines.append(f"  밴드폭: {bb_width:.3f} | 상단: {_format_price(bb_upper)} | 하단: {_format_price(bb_lower)}")
         lines.append("")
 
-    # 7) 종합 시장 온도
+    # 7) OBV 다이버전스 경고
+    obv_div = indicators.get("obv_divergence")
+    if obv_div == "bearish":
+        lines.append("<b>⚠️ 가격-거래량 괴리:</b> 가격은 상승 중이나 거래량이 동반되지 않음 (OBV 하락)")
+        lines.append("")
+    elif obv_div == "bullish":
+        lines.append("<b>💡 거래량 선행 신호:</b> 가격은 하락 중이나 거래량 흐름은 반등 조짐 (OBV 상승)")
+        lines.append("")
+
+    # 8) 종합 시장 온도
     lines.append(f"<b>시장 온도:</b> {_temp_emoji(temperature)} {temperature}")
 
     # 환율 동향 (선택)

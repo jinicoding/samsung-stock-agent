@@ -152,3 +152,37 @@ class TestCompositeSignal:
         tech["volume_ratio_5d"] = None
         result = compute_composite_signal(tech, _supply(), _fx())
         assert -100 <= result["score"] <= 100
+
+    def test_obv_bearish_divergence_lowers_score(self):
+        """OBV bearish divergence(가격↑+OBV↓)면 기술적 점수가 감소."""
+        tech_no_div = _tech()
+        tech_no_div["obv_divergence"] = None
+        score_no_div = compute_composite_signal(tech_no_div, _supply(), _fx())
+
+        tech_bearish = _tech()
+        tech_bearish["obv_divergence"] = "bearish"
+        score_bearish = compute_composite_signal(tech_bearish, _supply(), _fx())
+
+        assert score_bearish["technical_score"] < score_no_div["technical_score"]
+
+    def test_obv_bullish_divergence_raises_score(self):
+        """OBV bullish divergence(가격↓+OBV↑)면 기술적 점수가 증가."""
+        tech_no_div = _tech()
+        tech_no_div["obv_divergence"] = None
+        score_no_div = compute_composite_signal(tech_no_div, _supply(), _fx())
+
+        tech_bullish = _tech()
+        tech_bullish["obv_divergence"] = "bullish"
+        score_bullish = compute_composite_signal(tech_bullish, _supply(), _fx())
+
+        assert score_bullish["technical_score"] > score_no_div["technical_score"]
+
+    def test_obv_divergence_none_no_effect(self):
+        """OBV divergence가 None이면 점수에 영향 없음."""
+        tech1 = _tech()
+        tech1["obv_divergence"] = None
+        tech2 = _tech()
+        # obv_divergence 키가 없는 경우도 동일
+        result1 = compute_composite_signal(tech1, _supply(), _fx())
+        result2 = compute_composite_signal(tech2, _supply(), _fx())
+        assert result1["technical_score"] == pytest.approx(result2["technical_score"])

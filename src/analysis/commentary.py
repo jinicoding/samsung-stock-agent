@@ -41,6 +41,11 @@ def generate_commentary(
     # --- 1) 주요 흐름 문장: 수급 + 기술적 시그널 조합 ---
     sentences.append(_build_flow_sentence(indicators, sd, sig))
 
+    # --- 1.5) OBV 다이버전스 문장 ---
+    obv_sentence = _build_obv_divergence_sentence(indicators)
+    if obv_sentence:
+        sentences.append(obv_sentence)
+
     # --- 2) 보조 경고/참고 문장: RSI, 볼린저, 지지/저항 ---
     caution = _build_caution_sentence(indicators, sr)
     if caution:
@@ -203,6 +208,16 @@ def _check_support_resistance(price: float, sr: dict) -> str:
         if dist_pct < 2.0:
             return f"저항선({int(nr):,}원)에 근접해 있어 돌파 여부가 관건입니다"
 
+    return ""
+
+
+def _build_obv_divergence_sentence(indicators: dict) -> str:
+    """OBV 다이버전스 관련 자연어 문장."""
+    obv_div = indicators.get("obv_divergence")
+    if obv_div == "bearish":
+        return "가격 상승에도 거래량이 뒷받침되지 않는 OBV 괴리가 감지되어 추세 지속에 주의가 필요합니다."
+    if obv_div == "bullish":
+        return "가격은 하락세이나 거래량 흐름이 선행 반등 신호를 보이고 있어 OBV 다이버전스에 주목할 필요가 있습니다."
     return ""
 
 

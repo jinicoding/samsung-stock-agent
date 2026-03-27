@@ -813,6 +813,35 @@ class TestAccuracyInReport:
         assert "20" in report  # total_signals = 20
 
 
+class TestOBVDivergenceInReport:
+    """OBV 다이버전스 리포트 표시 테스트."""
+
+    def test_bearish_divergence_warning_in_report(self):
+        """bearish divergence → 가격-거래량 괴리 경고 표시."""
+        ind = _full_indicators()
+        ind["obv_divergence"] = "bearish"
+        ind["obv"] = 1000000
+        ind["obv_ma20"] = 900000
+        report = generate_daily_report(ind)
+        assert "가격-거래량 괴리" in report or "OBV" in report
+
+    def test_bullish_divergence_in_report(self):
+        """bullish divergence → 거래량 선행 반등 표시."""
+        ind = _full_indicators()
+        ind["obv_divergence"] = "bullish"
+        ind["obv"] = 1000000
+        ind["obv_ma20"] = 900000
+        report = generate_daily_report(ind)
+        assert "거래량" in report or "OBV" in report
+
+    def test_no_divergence_no_obv_section(self):
+        """divergence 없으면 OBV 경고 섹션 없음."""
+        ind = _full_indicators()
+        ind["obv_divergence"] = None
+        report = generate_daily_report(ind)
+        assert "가격-거래량 괴리" not in report
+
+
 def _accuracy_summary_sufficient() -> dict:
     return {
         "total_signals": 20,

@@ -234,3 +234,37 @@ class TestGenerateCommentary:
             self._base_support_resistance(),
         )
         assert "볼린저" in result or "밴드" in result or "반등" in result or "과매도" in result
+
+    def test_obv_bearish_divergence_mentioned(self):
+        """OBV bearish divergence → 가격-거래량 괴리 경고 문장."""
+        result = generate_commentary(
+            self._base_indicators(obv_divergence="bearish"),
+            self._base_supply_demand(),
+            self._base_exchange_rate(),
+            self._base_composite_signal(),
+            self._base_support_resistance(),
+        )
+        assert "거래량" in result or "OBV" in result or "괴리" in result
+
+    def test_obv_bullish_divergence_mentioned(self):
+        """OBV bullish divergence → 거래량 선행 반등 신호 문장."""
+        result = generate_commentary(
+            self._base_indicators(obv_divergence="bullish"),
+            self._base_supply_demand(),
+            self._base_exchange_rate(),
+            self._base_composite_signal(),
+            self._base_support_resistance(),
+        )
+        assert "거래량" in result or "OBV" in result or "선행" in result
+
+    def test_obv_divergence_none_no_mention(self):
+        """OBV divergence가 None이면 관련 문장 없음."""
+        result = generate_commentary(
+            self._base_indicators(obv_divergence=None),
+            self._base_supply_demand(),
+            self._base_exchange_rate(),
+            self._base_composite_signal(),
+            self._base_support_resistance(),
+        )
+        assert "괴리" not in result
+        assert "OBV" not in result

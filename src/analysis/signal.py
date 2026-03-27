@@ -45,6 +45,13 @@ def _score_technical(tech: dict) -> float:
         ma_score = _clamp(vs_ma5 * 20)  # ±5% → ±100
         scores.append(ma_score)
 
+    # OBV 다이버전스 — bearish(가격↑+OBV↓) 감점, bullish(가격↓+OBV↑) 가점
+    obv_div = tech.get("obv_divergence")
+    if obv_div == "bearish":
+        scores.append(-60.0)
+    elif obv_div == "bullish":
+        scores.append(60.0)
+
     if not scores:
         return 0.0
     return _clamp(sum(scores) / len(scores))

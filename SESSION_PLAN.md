@@ -1,9 +1,9 @@
 ## Session Plan
 
-### Task 1: KOSPI 지수 데이터 수집 및 시장 상대강도(RS) 분석 모듈 구축
-Files: src/data/kospi_index.py (신규), src/analysis/relative_strength.py (신규), tests/test_relative_strength.py (신규)
-Description: KIS API를 사용하여 KOSPI 지수 일봉 데이터를 수집하는 fetcher를 만들고, 삼성전자 vs KOSPI 상대강도를 분석하는 모듈을 구축한다. (1) src/data/kospi_index.py — KIS API 국내주식 업종기간별시세 엔드포인트(/uapi/domestic-stock/v1/quotations/inquire-daily-indexchartprice, tr_id: FHKUP03500100)로 KOSPI(업종코드 0001) 일봉을 조회. stock_price.py와 동일한 패턴으로 페이지네이션, 중복 제거, 날짜 오름차순 정렬. (2) src/analysis/relative_strength.py — 삼성전자 종가 배열과 KOSPI 종가 배열을 받아 분석: N일(1/5/20) 수익률 비교(삼성전자 vs KOSPI), 상대강도선(RS = 삼성전자/KOSPI) 20일 이동평균 대비 위치로 추세 판정(outperform/underperform/neutral), 초과수익률(alpha) 계산. (3) 테스트를 먼저 작성 — RS 계산 정확성, 추세 판정 로직, 데이터 부족 시 처리를 검증한다.
+### Task 1: 상대강도(RS) 분석을 일일 파이프라인(main.py)에 통합
+Files: src/main.py, tests/test_main.py
+Description: kospi_index.py와 relative_strength.py 모듈이 존재하지만 main.py에서 전혀 사용되지 않는다. KOSPI 지수 데이터를 수집하고, compute_relative_strength()를 호출하여 RS 결과를 compute_composite_signal()과 generate_daily_report()에 전달하도록 main.py를 수정한다. 기존 테스트가 깨지지 않도록 방어적으로 구현하고(KOSPI 수집 실패 시 RS=None으로 폴백), test_main.py에 RS 통합 테스트를 추가한다.
 
-### Task 2: 상대강도 분석을 종합 시그널·리포트·코멘터리에 통합
-Files: src/analysis/signal.py, src/analysis/report.py, src/analysis/commentary.py, src/main.py, tests/test_signal.py, tests/test_report.py, tests/test_commentary.py, tests/test_main.py
-Description: Task 1에서 구축한 상대강도 분석을 파이프라인 끝단까지 통합한다. (1) signal.py: compute_composite_signal()에 relative_strength 파라미터 추가(선택적, 하위호환). 상대강도가 outperform이면 종합 점수에 +10~15점, underperform이면 -10~15점 가감. (2) report.py: generate_daily_report()에 relative_strength 파라미터 추가. "📈 시장 대비" 섹션 — KOSPI 등락률(1일/5일/20일), 삼성전자 초과수익률, RS 추세(시장 대비 강세/약세/중립)를 표시. (3) commentary.py: generate_commentary()에 relative_strength 파라미터 추가. "KOSPI 대비 N일 연속 아웃퍼폼" 또는 "시장 대비 약세 전환" 코멘터리 규칙 추가. (4) main.py: KOSPI 데이터 수집→상대강도 분석→리포트 전달 파이프라인 연결. 기존 테스트 호환성 유지하면서 새 테스트 추가.
+### Task 2: KIS API 기반 기본적 분석(PER/PBR/시가총액/배당수익률) 모듈 구축
+Files: src/data/fundamental.py (신규), src/analysis/fundamental.py (신규), tests/test_fundamental.py (신규)
+Description: 삼성전자 투자 분석에서 가장 큰 공백은 펀더멘탈(가치평가) 지표다. KIS API의 주식현재가 시세 엔드포인트(/uapi/domestic-stock/v1/quotations/inquire-price)에서 PER, PBR, 시가총액, 배당수익률을 조회하는 데이터 수집 모듈과, 이를 해석하는 분석 모듈을 구축한다. 분석 모듈은 PER/PBR의 과대/적정/저평가 판정, 시가총액 변동 추세를 포함한다. 테스트를 먼저 작성하고 구현한다. 이번 세션에서는 데이터 수집 + 분석까지만 구현하고, 리포트·시그널 통합은 다음 세션으로 넘긴다.

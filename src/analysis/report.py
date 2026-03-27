@@ -395,6 +395,9 @@ def _build_composite_signal_section(sig: dict) -> list[str]:
     lines.append(f"  기술적: {sig['technical_score']:+.0f} (가중치 {sig['weights']['technical']}%)")
     lines.append(f"  수급: {sig['supply_score']:+.0f} (가중치 {sig['weights']['supply']}%)")
     lines.append(f"  환율: {sig['exchange_score']:+.0f} (가중치 {sig['weights']['exchange']}%)")
+    if "rs_score" in sig:
+        rs_w = sig["weights"].get("relative_strength", 15)
+        lines.append(f"  상대강도: {sig['rs_score']:+.0f} (가중치 {rs_w}%)")
     lines.append("")
     return lines
 
@@ -458,6 +461,43 @@ def _build_accuracy_section(acc: dict) -> list[str]:
     return lines
 
 
+def _rs_trend_label(trend: str) -> tuple[str, str]:
+    """RS 추세를 (라벨, 이모지) 튜플로."""
+    if trend == "outperform":
+        return "시장 대비 강세", "💪"
+    if trend == "underperform":
+        return "시장 대비 약세", "📉"
+    return "시장 동행", "➡️"
+
+
+def _build_relative_strength_section(rs: dict) -> list[str]:
+    """상대강도 분석 결과를 HTML 라인 리스트로."""
+    lines = []
+    lines.append("")
+    lines.append("<b>📊 시장 상대강도 (vs KOSPI)</b>")
+
+    trend_label, trend_emoji = _rs_trend_label(rs.get("rs_trend", "neutral"))
+    lines.append(f"  추세: {trend_emoji} {trend_label}")
+
+    # N일 수익률 비교
+    for n in (1, 5, 20):
+        s_ret = rs.get(f"samsung_return_{n}d")
+        k_ret = rs.get(f"kospi_return_{n}d")
+        alpha = rs.get(f"alpha_{n}d")
+        if s_ret is not None and k_ret is not None and alpha is not None:
+            sign = "+" if alpha > 0 else ""
+            lines.append(f"  {n}일: 삼성 {s_ret:+.2f}% vs KOSPI {k_ret:+.2f}% (α {sign}{alpha:.2f}%)")
+
+    # RS 수치
+    rs_cur = rs.get("rs_current")
+    rs_ma = rs.get("rs_ma20")
+    if rs_cur is not None:
+        ma_str = f" / MA20: {rs_ma:.2f}" if rs_ma is not None else ""
+        lines.append(f"  RS: {rs_cur:.2f}{ma_str}")
+
+    return lines
+
+
 def generate_daily_report(
     indicators: dict,
     supply_demand: dict | None = None,
@@ -465,6 +505,7 @@ def generate_daily_report(
     composite_signal: dict | None = None,
     support_resistance: dict | None = None,
     accuracy_summary: dict | None = None,
+    relative_strength: dict | None = None,
 ) -> str:
     """기술적 지표 dict를 HTML 텔레그램 메시지로 변환한다.
 
@@ -518,6 +559,7 @@ def generate_daily_report(
     from src.analysis.commentary import generate_commentary
     commentary = generate_commentary(
         indicators, supply_demand, exchange_rate, composite_signal, support_resistance,
+        relative_strength,
     )
     if commentary:
         lines.append(f"💬 {commentary}")
@@ -596,6 +638,10 @@ def generate_daily_report(
     # 수급 동향 (선택)
     if supply_demand is not None:
         lines.extend(_build_supply_demand_section(supply_demand))
+
+    # 상대강도 (선택)
+    if relative_strength is not None:
+        lines.extend(_build_relative_strength_section(relative_strength))
 
     # 지지/저항선 (선택)
     if support_resistance is not None:

@@ -18,6 +18,7 @@ def generate_commentary(
     exchange_rate: dict | None = None,
     composite_signal: dict | None = None,
     support_resistance: dict | None = None,
+    relative_strength: dict | None = None,
 ) -> str:
     """분석 결과를 2~3문장 자연어 코멘터리로 변환한다.
 
@@ -51,7 +52,12 @@ def generate_commentary(
     if caution:
         sentences.append(caution)
 
-    # --- 3) 환율 영향 문장 ---
+    # --- 3) 상대강도 문장 ---
+    rs_sentence = _build_rs_sentence(relative_strength or {})
+    if rs_sentence:
+        sentences.append(rs_sentence)
+
+    # --- 4) 환율 영향 문장 ---
     fx_sentence = _build_fx_sentence(er)
     if fx_sentence:
         sentences.append(fx_sentence)
@@ -226,6 +232,26 @@ def _build_obv_divergence_sentence(indicators: dict) -> str:
         return "가격 상승에도 거래량이 뒷받침되지 않는 OBV 괴리가 감지되어 추세 지속에 주의가 필요합니다."
     if obv_div == "bullish":
         return "가격은 하락세이나 거래량 흐름이 선행 반등 신호를 보이고 있어 OBV 다이버전스에 주목할 필요가 있습니다."
+    return ""
+
+
+def _build_rs_sentence(rs: dict) -> str:
+    """상대강도 관련 자연어 문장."""
+    if not rs:
+        return ""
+
+    trend = rs.get("rs_trend")
+    alpha_5d = rs.get("alpha_5d")
+
+    if trend == "outperform":
+        if alpha_5d is not None and alpha_5d > 2:
+            return f"KOSPI 대비 5일 초과수익률 {alpha_5d:+.1f}%로 시장을 크게 상회하고 있어 개별 종목 모멘텀이 강합니다."
+        return "삼성전자가 KOSPI 대비 상대적으로 강한 흐름을 보이고 있습니다."
+    elif trend == "underperform":
+        if alpha_5d is not None and alpha_5d < -2:
+            return f"KOSPI 대비 5일 초과수익률 {alpha_5d:+.1f}%로 시장 대비 부진한 흐름이 이어지고 있습니다."
+        return "삼성전자가 시장 대비 소폭 약세를 보이고 있습니다."
+
     return ""
 
 

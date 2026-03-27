@@ -118,10 +118,27 @@ def _grade_from_score(score: float) -> str:
         return "강력매도신호"
 
 
+def _score_relative_strength(rs: dict) -> float:
+    """상대강도 분석 → -100~+100 점수.
+
+    삼성전자가 KOSPI를 상회하면 양수, 하회하면 음수.
+    """
+    trend = rs.get("rs_trend")
+    base = {"outperform": 50, "underperform": -50, "neutral": 0}.get(trend, 0)
+
+    # 1일 alpha로 강도 조절
+    alpha_1d = rs.get("alpha_1d")
+    if alpha_1d is not None:
+        base += _clamp(alpha_1d * 10, -50, 50)
+
+    return _clamp(base)
+
+
 def compute_composite_signal(
     technical: dict,
     supply_demand: dict,
     exchange_rate: dict,
+    relative_strength: dict | None = None,
 ) -> dict:
     """종합 투자 시그널을 계산한다.
 
@@ -129,6 +146,7 @@ def compute_composite_signal(
         technical: compute_technical_indicators() 결과
         supply_demand: analyze_supply_demand() 결과
         exchange_rate: analyze_exchange_rate() 결과
+        relative_strength: compute_relative_strength() 결과 (선택)
 
     Returns:
         dict with:
@@ -137,21 +155,34 @@ def compute_composite_signal(
             technical_score: 기술적 축 점수 (-100~+100)
             supply_score: 수급 축 점수 (-100~+100)
             exchange_score: 환율 축 점수 (-100~+100)
+            rs_score: 상대강도 축 점수 (-100~+100) (선택)
             weights: 각 축 가중치 (%)
     """
     tech_score = _score_technical(technical)
     sup_score = _score_supply(supply_demand)
     fx_score = _score_exchange(exchange_rate)
 
-    # 가중 합산: 기술 40%, 수급 40%, 환율 20%
-    composite = tech_score * 0.4 + sup_score * 0.4 + fx_score * 0.2
+    if relative_strength is not None:
+        rs_score = _score_relative_strength(relative_strength)
+        # 가중 합산: 기술 35%, 수급 35%, 환율 15%, 상대강도 15%
+        composite = tech_score * 0.35 + sup_score * 0.35 + fx_score * 0.15 + rs_score * 0.15
+        weights = {"technical": 35, "supply": 35, "exchange": 15, "relative_strength": 15}
+    else:
+        rs_score = None
+        # RS 없으면 기존 가중치 유지
+        composite = tech_score * 0.4 + sup_score * 0.4 + fx_score * 0.2
+        weights = {"technical": 40, "supply": 40, "exchange": 20}
+
     composite = _clamp(composite)
 
-    return {
+    result = {
         "score": composite,
         "grade": _grade_from_score(composite),
         "technical_score": tech_score,
         "supply_score": sup_score,
         "exchange_score": fx_score,
-        "weights": {"technical": 40, "supply": 40, "exchange": 20},
+        "weights": weights,
     }
+    if rs_score is not None:
+        result["rs_score"] = rs_score
+    return result

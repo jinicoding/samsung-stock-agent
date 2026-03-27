@@ -268,3 +268,36 @@ class TestGenerateCommentary:
         )
         assert "괴리" not in result
         assert "OBV" not in result
+
+    def test_stochastic_overbought_warning(self):
+        """스토캐스틱 %K >= 80 → 과매수 경고 문구."""
+        result = generate_commentary(
+            self._base_indicators(stoch_k=85.0, stoch_d=82.0),
+            self._base_supply_demand(),
+            self._base_exchange_rate(),
+            self._base_composite_signal(),
+            self._base_support_resistance(),
+        )
+        assert "스토캐스틱" in result or "과매수" in result
+
+    def test_stochastic_oversold_mention(self):
+        """스토캐스틱 %K <= 20 → 과매도 반등 기대 문구."""
+        result = generate_commentary(
+            self._base_indicators(stoch_k=15.0, stoch_d=18.0),
+            self._base_supply_demand(),
+            self._base_exchange_rate(),
+            self._base_composite_signal(),
+            self._base_support_resistance(),
+        )
+        assert "스토캐스틱" in result or "과매도" in result
+
+    def test_stochastic_none_no_mention(self):
+        """스토캐스틱이 None이면 관련 문장 없음."""
+        result = generate_commentary(
+            self._base_indicators(stoch_k=None, stoch_d=None),
+            self._base_supply_demand(),
+            self._base_exchange_rate(),
+            self._base_composite_signal(),
+            self._base_support_resistance(),
+        )
+        assert "스토캐스틱" not in result

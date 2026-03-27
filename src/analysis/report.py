@@ -95,6 +95,28 @@ def _histogram_direction(histogram: float | None) -> str:
     return "수축"
 
 
+def classify_stochastic(
+    stoch_k: float | None, stoch_d: float | None,
+) -> str:
+    """스토캐스틱 오실레이터 상태를 판단한다.
+
+    Returns:
+        "과매수" | "과매도" | "골든크로스" | "데드크로스" | "N/A"
+    """
+    if stoch_k is None:
+        return "N/A"
+    if stoch_k >= 80:
+        return "과매수"
+    if stoch_k <= 20:
+        return "과매도"
+    if stoch_d is not None:
+        if stoch_k > stoch_d:
+            return "골든크로스"
+        if stoch_k < stoch_d:
+            return "데드크로스"
+    return "N/A"
+
+
 def classify_bb_position(bb_pctb: float | None) -> str:
     """볼린저 밴드 %B 위치를 판단한다.
 
@@ -526,6 +548,16 @@ def generate_daily_report(
     if rsi_14 is not None:
         rsi_emoji = "🔴" if rsi_status == "과매수" else "🟢" if rsi_status == "과매도" else ""
         lines.append(f"<b>RSI(14):</b> {rsi_14:.1f} ({rsi_status}) {rsi_emoji}".rstrip())
+        lines.append("")
+
+    # 4.5) 스토캐스틱 오실레이터
+    stoch_k = indicators.get("stoch_k")
+    stoch_d = indicators.get("stoch_d")
+    if stoch_k is not None:
+        stoch_status = classify_stochastic(stoch_k, stoch_d)
+        stoch_emoji = "🔴" if stoch_status == "과매수" else "🟢" if stoch_status == "과매도" else ""
+        d_str = f" / %D: {stoch_d:.1f}" if stoch_d is not None else ""
+        lines.append(f"<b>Stoch(14,3):</b> %K {stoch_k:.1f}{d_str} ({stoch_status}) {stoch_emoji}".rstrip())
         lines.append("")
 
     # 5) MACD

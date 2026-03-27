@@ -171,6 +171,14 @@ def _build_caution_sentence(indicators: dict, sr: dict) -> str:
     elif rsi_status == "과매도" and rsi is not None:
         warnings.append(f"RSI {rsi:.0f}으로 과매도 영역이므로 반등 가능성을 주시하세요")
 
+    # 스토캐스틱 과매수/과매도
+    stoch_k = indicators.get("stoch_k")
+    if stoch_k is not None:
+        if stoch_k >= 80:
+            warnings.append(f"스토캐스틱 %K {stoch_k:.0f}으로 과매수 영역이므로 단기 되돌림에 유의하세요")
+        elif stoch_k <= 20:
+            warnings.append(f"스토캐스틱 %K {stoch_k:.0f}으로 과매도 영역이므로 반등 가능성을 주시하세요")
+
     # 볼린저 밴드
     bb_pctb = indicators.get("bb_pctb")
     bb_pos = classify_bb_position(bb_pctb)

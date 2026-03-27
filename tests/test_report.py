@@ -2,7 +2,7 @@
 
 import pytest
 
-from src.analysis.report import generate_daily_report, classify_ma_alignment, assess_volume, assess_market_temperature, classify_macd, classify_bb_position
+from src.analysis.report import generate_daily_report, classify_ma_alignment, assess_volume, assess_market_temperature, classify_macd, classify_bb_position, classify_stochastic
 
 
 class TestClassifyMaAlignment:
@@ -811,6 +811,72 @@ class TestAccuracyInReport:
         acc = _accuracy_summary_sufficient()
         report = generate_daily_report(_full_indicators(), accuracy_summary=acc)
         assert "20" in report  # total_signals = 20
+
+
+class TestClassifyStochastic:
+    """스토캐스틱 상태 판단 테스트."""
+
+    def test_overbought(self):
+        """%K >= 80 → 과매수."""
+        assert classify_stochastic(85.0, 82.0) == "과매수"
+
+    def test_oversold(self):
+        """%K <= 20 → 과매도."""
+        assert classify_stochastic(15.0, 18.0) == "과매도"
+
+    def test_golden_cross(self):
+        """%K > %D이고 20~80 → 골든크로스."""
+        assert classify_stochastic(55.0, 50.0) == "골든크로스"
+
+    def test_dead_cross(self):
+        """%K < %D이고 20~80 → 데드크로스."""
+        assert classify_stochastic(45.0, 50.0) == "데드크로스"
+
+    def test_none_k(self):
+        """%K가 None → N/A."""
+        assert classify_stochastic(None, None) == "N/A"
+
+    def test_none_d_only_k(self):
+        """%D가 None이면 과매수/과매도만 판단."""
+        assert classify_stochastic(85.0, None) == "과매수"
+        assert classify_stochastic(15.0, None) == "과매도"
+        assert classify_stochastic(50.0, None) == "N/A"
+
+
+class TestStochasticInReport:
+    """스토캐스틱이 리포트에 표시되는지 테스트."""
+
+    def test_stochastic_section_present(self):
+        """stoch_k/stoch_d가 있으면 스토캐스틱 섹션 포함."""
+        ind = _full_indicators()
+        ind["stoch_k"] = 45.0
+        ind["stoch_d"] = 40.0
+        report = generate_daily_report(ind)
+        assert "Stoch" in report or "스토캐스틱" in report
+
+    def test_stochastic_overbought_emoji(self):
+        """과매수 시 이모지 표시."""
+        ind = _full_indicators()
+        ind["stoch_k"] = 85.0
+        ind["stoch_d"] = 82.0
+        report = generate_daily_report(ind)
+        assert "과매수" in report
+
+    def test_stochastic_oversold_emoji(self):
+        """과매도 시 이모지 표시."""
+        ind = _full_indicators()
+        ind["stoch_k"] = 15.0
+        ind["stoch_d"] = 18.0
+        report = generate_daily_report(ind)
+        assert "과매도" in report
+
+    def test_stochastic_absent_when_none(self):
+        """stoch_k가 None이면 섹션 없음."""
+        ind = _full_indicators()
+        ind["stoch_k"] = None
+        ind["stoch_d"] = None
+        report = generate_daily_report(ind)
+        assert "Stoch(14,3)" not in report
 
 
 class TestOBVDivergenceInReport:

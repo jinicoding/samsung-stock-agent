@@ -153,6 +153,53 @@ def _obv_divergence(
     return None
 
 
+def _stochastic(
+    highs: list[float],
+    lows: list[float],
+    closes: list[float],
+    k_period: int = 14,
+    d_period: int = 3,
+) -> tuple[float | None, float | None]:
+    """스토캐스틱 오실레이터 %K, %D를 계산한다.
+
+    %K = (현재가 - N일 최저가) / (N일 최고가 - N일 최저가) × 100
+    %D = %K의 M일 SMA
+
+    데이터가 k_period 미만이면 (None, None).
+    """
+    if len(closes) < k_period:
+        return None, None
+
+    # %K 시리즈 계산 (d_period개 필요)
+    k_values: list[float] = []
+    need = min(k_period + d_period - 1, len(closes))
+    for i in range(need, 0, -1):
+        end = len(closes) - (i - 1) if i > 1 else len(closes)
+        start = end - k_period
+        if start < 0:
+            continue
+        highest = max(highs[start:end])
+        lowest = min(lows[start:end])
+        close = closes[end - 1]
+        if highest == lowest:
+            k_values.append(50.0)
+        else:
+            k_values.append((close - lowest) / (highest - lowest) * 100)
+
+    if not k_values:
+        return None, None
+
+    k = k_values[-1]
+
+    # %D = %K의 d_period일 SMA
+    if len(k_values) >= d_period:
+        d = sum(k_values[-d_period:]) / d_period
+    else:
+        d = None
+
+    return k, d
+
+
 def _bollinger_bands(
     closes: list[float], window: int = 20, num_std: int = 2,
 ) -> tuple[float | None, float | None, float | None, float | None]:
@@ -201,6 +248,8 @@ def compute_technical_indicators(rows: list[dict]) -> dict:
         raise ValueError("OHLCV 데이터가 비어있습니다.")
 
     closes = [r["close"] for r in rows]
+    highs = [r["high"] for r in rows]
+    lows = [r["low"] for r in rows]
     volumes = [r["volume"] for r in rows]
     current = closes[-1]
     n = len(closes)
@@ -243,6 +292,9 @@ def compute_technical_indicators(rows: list[dict]) -> dict:
         obv_ma20_val = sum(obv_series[-20:]) / 20
     obv_div = _obv_divergence(closes, obv_series)
 
+    # 스토캐스틱 오실레이터 (14, 3)
+    stoch_k, stoch_d = _stochastic(highs, lows, closes)
+
     return {
         "current_date": rows[-1]["date"],
         "current_price": current,
@@ -275,4 +327,7 @@ def compute_technical_indicators(rows: list[dict]) -> dict:
         "obv": obv_latest,
         "obv_ma20": obv_ma20_val,
         "obv_divergence": obv_div,
+        # 스토캐스틱 오실레이터 (14, 3)
+        "stoch_k": stoch_k,
+        "stoch_d": stoch_d,
     }

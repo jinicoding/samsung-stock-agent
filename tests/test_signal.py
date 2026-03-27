@@ -186,3 +186,37 @@ class TestCompositeSignal:
         result1 = compute_composite_signal(tech1, _supply(), _fx())
         result2 = compute_composite_signal(tech2, _supply(), _fx())
         assert result1["technical_score"] == pytest.approx(result2["technical_score"])
+
+    def test_stochastic_oversold_raises_score(self):
+        """스토캐스틱 %K ≤ 20이면 기술적 점수가 상승."""
+        tech_neutral = _tech()
+        tech_neutral["stoch_k"] = 50.0
+        score_neutral = compute_composite_signal(tech_neutral, _supply(), _fx())
+
+        tech_oversold = _tech()
+        tech_oversold["stoch_k"] = 15.0
+        score_oversold = compute_composite_signal(tech_oversold, _supply(), _fx())
+
+        assert score_oversold["technical_score"] > score_neutral["technical_score"]
+
+    def test_stochastic_overbought_lowers_score(self):
+        """스토캐스틱 %K ≥ 80이면 기술적 점수가 하락."""
+        tech_neutral = _tech()
+        tech_neutral["stoch_k"] = 50.0
+        score_neutral = compute_composite_signal(tech_neutral, _supply(), _fx())
+
+        tech_overbought = _tech()
+        tech_overbought["stoch_k"] = 85.0
+        score_overbought = compute_composite_signal(tech_overbought, _supply(), _fx())
+
+        assert score_overbought["technical_score"] < score_neutral["technical_score"]
+
+    def test_stochastic_none_no_effect(self):
+        """스토캐스틱이 None이면 점수에 영향 없음."""
+        tech1 = _tech()
+        tech1["stoch_k"] = None
+        tech2 = _tech()
+        # stoch_k 키가 없는 경우
+        result1 = compute_composite_signal(tech1, _supply(), _fx())
+        result2 = compute_composite_signal(tech2, _supply(), _fx())
+        assert result1["technical_score"] == pytest.approx(result2["technical_score"])

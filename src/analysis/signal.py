@@ -45,6 +45,13 @@ def _score_technical(tech: dict) -> float:
         ma_score = _clamp(vs_ma5 * 20)  # ±5% → ±100
         scores.append(ma_score)
 
+    # 스토캐스틱 %K — 20 이하 매수, 80 이상 매도
+    stoch_k = tech.get("stoch_k")
+    if stoch_k is not None:
+        # 50이 중립, 20→+100, 80→-100 (선형)
+        stoch_score = _clamp((50 - stoch_k) * (100 / 30))
+        scores.append(stoch_score)
+
     # OBV 다이버전스 — bearish(가격↑+OBV↓) 감점, bullish(가격↓+OBV↑) 가점
     obv_div = tech.get("obv_divergence")
     if obv_div == "bearish":

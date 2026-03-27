@@ -2,7 +2,7 @@
 
 import pytest
 
-from src.analysis.technical import compute_technical_indicators, _ema, _macd, _obv, _obv_divergence
+from src.analysis.technical import compute_technical_indicators, _ema, _macd, _obv, _obv_divergence, _stochastic
 
 
 def _make_rows(prices: list[float], base_volume: int = 1_000_000) -> list[dict]:
@@ -419,6 +419,107 @@ class TestOBVIntegration:
         prices = [50000] * 5
         result = compute_technical_indicators(_make_rows(prices))
         assert result["obv_divergence"] is None
+
+
+class TestStochastic:
+    """스토캐스틱 오실레이터(%K, %D) 계산 테스트."""
+
+    def test_stochastic_basic(self):
+        """기본 %K 계산: (close - lowest) / (highest - lowest) * 100."""
+        highs = [110, 115, 120, 125, 130, 128, 126, 124, 122, 120,
+                 118, 116, 114, 112, 110]
+        lows = [90, 95, 100, 105, 110, 108, 106, 104, 102, 100,
+                98, 96, 94, 92, 90]
+        closes = [100, 105, 110, 115, 120, 118, 116, 114, 112, 110,
+                  108, 106, 104, 102, 100]
+        k, d = _stochastic(highs, lows, closes, k_period=14, d_period=3)
+        assert k is not None
+        # %K = (100 - 90) / (130 - 90) * 100 = 25.0
+        assert abs(k - 25.0) < 0.01
+
+    def test_stochastic_d_is_sma_of_k(self):
+        """%D는 %K의 M일 SMA."""
+        # 16일 데이터로 %K 3개 → %D = 3개의 %K 평균
+        highs = [110 + i for i in range(16)]
+        lows = [90 + i for i in range(16)]
+        closes = [100 + i for i in range(16)]
+        k, d = _stochastic(highs, lows, closes, k_period=14, d_period=3)
+        assert k is not None
+        assert d is not None
+
+    def test_stochastic_insufficient_data(self):
+        """데이터 부족 시 (None, None)."""
+        highs = [110] * 10
+        lows = [90] * 10
+        closes = [100] * 10
+        k, d = _stochastic(highs, lows, closes, k_period=14, d_period=3)
+        assert k is None
+        assert d is None
+
+    def test_stochastic_flat_price(self):
+        """모든 가격이 동일하면 %K = 50 (특수 처리)."""
+        highs = [100] * 14
+        lows = [100] * 14
+        closes = [100] * 14
+        k, d = _stochastic(highs, lows, closes, k_period=14, d_period=3)
+        assert k is not None
+        assert k == 50.0
+
+    def test_stochastic_at_high(self):
+        """종가가 기간 최고가이면 %K = 100."""
+        highs = [100, 100, 100, 100, 100, 100, 100, 100, 100, 100,
+                 100, 100, 100, 130]
+        lows = [80, 80, 80, 80, 80, 80, 80, 80, 80, 80,
+                80, 80, 80, 80]
+        closes = [90, 90, 90, 90, 90, 90, 90, 90, 90, 90,
+                  90, 90, 90, 130]
+        k, d = _stochastic(highs, lows, closes, k_period=14, d_period=3)
+        assert k is not None
+        assert abs(k - 100.0) < 0.01
+
+    def test_stochastic_at_low(self):
+        """종가가 기간 최저가이면 %K = 0."""
+        highs = [120] * 14
+        lows = [100, 100, 100, 100, 100, 100, 100, 100, 100, 100,
+                100, 100, 100, 80]
+        closes = [110, 110, 110, 110, 110, 110, 110, 110, 110, 110,
+                  110, 110, 110, 80]
+        k, d = _stochastic(highs, lows, closes, k_period=14, d_period=3)
+        assert k is not None
+        assert abs(k - 0.0) < 0.01
+
+    def test_stochastic_range_0_to_100(self):
+        """%K는 0~100 범위."""
+        highs = [50000 + i * 100 + 500 for i in range(20)]
+        lows = [50000 + i * 100 - 500 for i in range(20)]
+        closes = [50000 + i * 100 for i in range(20)]
+        k, d = _stochastic(highs, lows, closes, k_period=14, d_period=3)
+        assert k is not None
+        assert 0 <= k <= 100
+
+    def test_compute_indicators_includes_stochastic(self):
+        """compute_technical_indicators에 stoch_k, stoch_d 키 포함."""
+        prices = [50000 + i * 100 for i in range(20)]
+        rows = []
+        for i, p in enumerate(prices):
+            rows.append({
+                "date": f"2026-01-{i + 1:02d}",
+                "open": p,
+                "high": p + 500,
+                "low": p - 500,
+                "close": p,
+                "volume": 1_000_000,
+            })
+        result = compute_technical_indicators(rows)
+        assert "stoch_k" in result
+        assert "stoch_d" in result
+
+    def test_compute_indicators_stochastic_none_insufficient(self):
+        """14일 미만 데이터면 stoch_k, stoch_d는 None."""
+        prices = [50000] * 10
+        result = compute_technical_indicators(_make_rows(prices))
+        assert result["stoch_k"] is None
+        assert result["stoch_d"] is None
 
 
 class TestEdgeCases:

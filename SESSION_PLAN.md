@@ -1,9 +1,9 @@
 ## Session Plan
 
-### Task 1: 스토캐스틱 오실레이터(%K, %D) 추가 및 시그널·리포트 통합
-Files: src/analysis/technical.py, src/analysis/signal.py, src/analysis/report.py, src/analysis/commentary.py, tests/test_technical.py, tests/test_signal.py, tests/test_report.py, tests/test_commentary.py
-Description: Stochastic Oscillator(%K 14일, %D 3일)를 기술적 분석 모듈에 추가한다. RSI와 함께 과매수/과매도 판단의 이중 확인 역할을 하며, 한국 투자자들이 가장 많이 참고하는 보조지표 중 하나다. (1) technical.py에 _stochastic() 함수 구현 — %K = (현재가 - N일 최저가) / (N일 최고가 - N일 최저가) × 100, %D = %K의 M일 SMA. (2) compute_technical_indicators()에 stoch_k, stoch_d 키 추가. (3) signal.py의 _score_technical()에 스토캐스틱 점수 반영 — %K 20 이하 매수, 80 이상 매도. (4) report.py에 스토캐스틱 섹션 추가 — %K/%D 값, 과매수/과매도/골든크로스/데드크로스 표시. (5) commentary.py에 스토캐스틱 과매수/과매도 경고 문구 추가. 테스트를 먼저 작성하고 구현한다.
+### Task 1: KOSPI 지수 데이터 수집 및 시장 상대강도(RS) 분석 모듈 구축
+Files: src/data/kospi_index.py (신규), src/analysis/relative_strength.py (신규), tests/test_relative_strength.py (신규)
+Description: KIS API를 사용하여 KOSPI 지수 일봉 데이터를 수집하는 fetcher를 만들고, 삼성전자 vs KOSPI 상대강도를 분석하는 모듈을 구축한다. (1) src/data/kospi_index.py — KIS API 국내주식 업종기간별시세 엔드포인트(/uapi/domestic-stock/v1/quotations/inquire-daily-indexchartprice, tr_id: FHKUP03500100)로 KOSPI(업종코드 0001) 일봉을 조회. stock_price.py와 동일한 패턴으로 페이지네이션, 중복 제거, 날짜 오름차순 정렬. (2) src/analysis/relative_strength.py — 삼성전자 종가 배열과 KOSPI 종가 배열을 받아 분석: N일(1/5/20) 수익률 비교(삼성전자 vs KOSPI), 상대강도선(RS = 삼성전자/KOSPI) 20일 이동평균 대비 위치로 추세 판정(outperform/underperform/neutral), 초과수익률(alpha) 계산. (3) 테스트를 먼저 작성 — RS 계산 정확성, 추세 판정 로직, 데이터 부족 시 처리를 검증한다.
 
-### Task 2: 네이버 금융 뉴스 헤드라인 수집 및 키워드 감정 분석 모듈 구축
-Files: src/data/news_fetcher.py (신규), src/analysis/news_sentiment.py (신규), tests/test_news_sentiment.py (신규), tests/test_news_fetcher.py (신규)
-Description: 삼성전자 관련 뉴스 헤드라인을 수집하고 키워드 기반 감정을 분석하는 모듈을 구축한다. (1) src/data/news_fetcher.py — Naver 모바일 증권 API(https://m.stock.naver.com/api/news/stock/005930?pageSize=20)에서 최근 뉴스 헤드라인을 JSON으로 가져온다. 제목, 언론사, 날짜를 파싱하여 list[dict] 반환. (2) src/analysis/news_sentiment.py — 한국어 주식 뉴스에 특화된 긍정/부정 키워드 사전(예: 긍정=['실적 호조', '상향', '매수', '신고가', '수주'], 부정=['하락', '하향', '매도', '적자', '리스크'])으로 각 헤드라인의 감정 점수(-1~+1)를 산출하고, 전체 뉴스의 종합 감정 점수를 계산한다. LLM 호출 없이 규칙 기반으로 안정성 확보. (3) 테스트를 먼저 작성 — 키워드 매칭, 점수 계산, API 응답 파싱을 검증한다. 이 세션에서는 리포트/시그널 통합은 하지 않고 모듈 구축까지만 진행. 통합은 다음 세션에서.
+### Task 2: 상대강도 분석을 종합 시그널·리포트·코멘터리에 통합
+Files: src/analysis/signal.py, src/analysis/report.py, src/analysis/commentary.py, src/main.py, tests/test_signal.py, tests/test_report.py, tests/test_commentary.py, tests/test_main.py
+Description: Task 1에서 구축한 상대강도 분석을 파이프라인 끝단까지 통합한다. (1) signal.py: compute_composite_signal()에 relative_strength 파라미터 추가(선택적, 하위호환). 상대강도가 outperform이면 종합 점수에 +10~15점, underperform이면 -10~15점 가감. (2) report.py: generate_daily_report()에 relative_strength 파라미터 추가. "📈 시장 대비" 섹션 — KOSPI 등락률(1일/5일/20일), 삼성전자 초과수익률, RS 추세(시장 대비 강세/약세/중립)를 표시. (3) commentary.py: generate_commentary()에 relative_strength 파라미터 추가. "KOSPI 대비 N일 연속 아웃퍼폼" 또는 "시장 대비 약세 전환" 코멘터리 규칙 추가. (4) main.py: KOSPI 데이터 수집→상대강도 분석→리포트 전달 파이프라인 연결. 기존 테스트 호환성 유지하면서 새 테스트 추가.

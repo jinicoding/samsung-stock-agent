@@ -1,9 +1,9 @@
 ## Session Plan
 
-### Task 1: 상대강도(RS) 분석을 일일 파이프라인(main.py)에 통합
-Files: src/main.py, tests/test_main.py
-Description: kospi_index.py와 relative_strength.py 모듈이 존재하지만 main.py에서 전혀 사용되지 않는다. KOSPI 지수 데이터를 수집하고, compute_relative_strength()를 호출하여 RS 결과를 compute_composite_signal()과 generate_daily_report()에 전달하도록 main.py를 수정한다. 기존 테스트가 깨지지 않도록 방어적으로 구현하고(KOSPI 수집 실패 시 RS=None으로 폴백), test_main.py에 RS 통합 테스트를 추가한다.
+### Task 1: 추세 전환 감지 모듈 구축 — 시그널 컨버전스(convergence) 엔진
+Files: src/analysis/trend_reversal.py, tests/test_trend_reversal.py
+Description: 기존 기술적 지표(RSI, MACD, 스토캐스틱, 볼린저밴드, OBV, MA괴리율)와 지지/저항선을 5개 카테고리(모멘텀/추세/변동성/거래량/구조)로 분류하여, 각 카테고리별 강세/약세 반전 신호를 감지하고 가중 점수(0~100)로 합산하는 모듈. 핵심은 단일 지표가 아닌 "몇 개 카테고리에서 동시에 신호가 나오는가"로 컨버전스 등급(strong/moderate/weak/none)을 판정하는 것. detect_reversal_signals(tech_indicators, support_resistance) → dict 형태. 테스트를 먼저 작성한다: 강한 강세 반전(4+카테고리), 중간 약세 반전(3카테고리), 혼합 신호, 신호 없음, 데이터 부족 등 최소 10개 케이스.
 
-### Task 2: KIS API 기반 기본적 분석(PER/PBR/시가총액/배당수익률) 모듈 구축
-Files: src/data/fundamental.py (신규), src/analysis/fundamental.py (신규), tests/test_fundamental.py (신규)
-Description: 삼성전자 투자 분석에서 가장 큰 공백은 펀더멘탈(가치평가) 지표다. KIS API의 주식현재가 시세 엔드포인트(/uapi/domestic-stock/v1/quotations/inquire-price)에서 PER, PBR, 시가총액, 배당수익률을 조회하는 데이터 수집 모듈과, 이를 해석하는 분석 모듈을 구축한다. 분석 모듈은 PER/PBR의 과대/적정/저평가 판정, 시가총액 변동 추세를 포함한다. 테스트를 먼저 작성하고 구현한다. 이번 세션에서는 데이터 수집 + 분석까지만 구현하고, 리포트·시그널 통합은 다음 세션으로 넘긴다.
+### Task 2: 추세 전환 감지를 종합 시그널·리포트·코멘터리·파이프라인에 통합
+Files: src/analysis/signal.py, src/analysis/report.py, src/analysis/commentary.py, src/main.py, tests/test_signal.py, tests/test_report.py, tests/test_commentary.py
+Description: Task 1에서 만든 추세 전환 감지 결과를 파이프라인 끝단까지 연결한다. (1) signal.py: 컨버전스 등급이 strong/moderate일 때 종합 시그널 점수에 보너스/패널티 반영. (2) report.py: "⚡ 추세 전환 감지" 섹션을 종합 시그널 바로 아래에 추가 — 방향(강세/약세), 등급, 감지된 신호 목록을 표시. strong일 때만 별도 강조. (3) commentary.py: strong 컨버전스 시 "다수 지표가 동시에 [강세/약세] 전환을 시사하고 있어 주목할 필요가 있습니다" 같은 자연어 문장 추가. (4) main.py: analyze_support_resistance 결과와 tech indicators를 detect_reversal_signals에 전달. 기존 테스트가 깨지지 않도록 하위 호환성 유지.

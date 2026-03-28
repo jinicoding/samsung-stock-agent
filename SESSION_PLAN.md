@@ -1,9 +1,9 @@
 ## Session Plan
 
-### Task 1: 추세 전환 감지 모듈 구축 — 시그널 컨버전스(convergence) 엔진
-Files: src/analysis/trend_reversal.py, tests/test_trend_reversal.py
-Description: 기존 기술적 지표(RSI, MACD, 스토캐스틱, 볼린저밴드, OBV, MA괴리율)와 지지/저항선을 5개 카테고리(모멘텀/추세/변동성/거래량/구조)로 분류하여, 각 카테고리별 강세/약세 반전 신호를 감지하고 가중 점수(0~100)로 합산하는 모듈. 핵심은 단일 지표가 아닌 "몇 개 카테고리에서 동시에 신호가 나오는가"로 컨버전스 등급(strong/moderate/weak/none)을 판정하는 것. detect_reversal_signals(tech_indicators, support_resistance) → dict 형태. 테스트를 먼저 작성한다: 강한 강세 반전(4+카테고리), 중간 약세 반전(3카테고리), 혼합 신호, 신호 없음, 데이터 부족 등 최소 10개 케이스.
+### Task 1: 추세 전환 감지를 종합 시그널·리포트·코멘터리·파이프라인에 통합
+Files: src/main.py, src/analysis/signal.py, src/analysis/report.py, src/analysis/commentary.py, tests/test_signal.py, tests/test_report.py, tests/test_commentary.py, tests/test_main.py
+Description: Day 7 이전 세션에서 구축한 `trend_reversal.py`의 `detect_reversal_signals()`를 일일 파이프라인에 통합한다. 구체적으로: (1) `main.py`에서 `detect_reversal_signals(indicators, sr)`를 호출하고 결과를 리포트에 전달, (2) `signal.py`의 `compute_composite_signal()`에 trend_reversal 결과를 반영하여 컨버전스 등급이 strong/moderate일 때 종합 점수에 보너스/페널티 가산, (3) `report.py`에 `_build_trend_reversal_section()` 추가하여 컨버전스 등급·방향·활성 카테고리를 HTML로 표시, (4) `commentary.py`에 `_build_reversal_sentence()` 추가하여 strong/moderate 컨버전스 감지 시 자연어 경고 문장 생성. 각 통합 지점별 테스트를 먼저 작성한다.
 
-### Task 2: 추세 전환 감지를 종합 시그널·리포트·코멘터리·파이프라인에 통합
-Files: src/analysis/signal.py, src/analysis/report.py, src/analysis/commentary.py, src/main.py, tests/test_signal.py, tests/test_report.py, tests/test_commentary.py
-Description: Task 1에서 만든 추세 전환 감지 결과를 파이프라인 끝단까지 연결한다. (1) signal.py: 컨버전스 등급이 strong/moderate일 때 종합 시그널 점수에 보너스/패널티 반영. (2) report.py: "⚡ 추세 전환 감지" 섹션을 종합 시그널 바로 아래에 추가 — 방향(강세/약세), 등급, 감지된 신호 목록을 표시. strong일 때만 별도 강조. (3) commentary.py: strong 컨버전스 시 "다수 지표가 동시에 [강세/약세] 전환을 시사하고 있어 주목할 필요가 있습니다" 같은 자연어 문장 추가. (4) main.py: analyze_support_resistance 결과와 tech indicators를 detect_reversal_signals에 전달. 기존 테스트가 깨지지 않도록 하위 호환성 유지.
+### Task 2: 뉴스 헤드라인 수집 모듈 구축 — Naver 모바일 API 기반
+Files: src/data/news_fetcher.py, tests/test_news_fetcher.py
+Description: Naver 모바일 주식 API(`m.stock.naver.com/api/news/stock/005930`)에서 삼성전자 관련 최신 뉴스 헤드라인을 수집하는 모듈을 구축한다. (1) `fetch_samsung_news(count=10)` 함수: API 호출 → JSON 파싱 → `[{"title": str, "source": str, "datetime": str, "url": str}]` 리스트 반환, (2) 에러 핸들링: 네트워크 실패 시 빈 리스트 반환, (3) 테스트: mock 응답으로 파싱 로직 검증, 에러 케이스 검증. 이 모듈은 다음 세션에서 감정 분석과 리포트 통합의 기반이 된다. 뉴스 헤드라인은 기술적·수급 분석으로 포착하지 못하는 이벤트(실적 발표, 규제 변화, 경쟁사 동향)를 투자자에게 전달하는 핵심 채널이다.

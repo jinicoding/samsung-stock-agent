@@ -25,6 +25,7 @@ from src.analysis.support_resistance import analyze_support_resistance
 from src.analysis.trend_reversal import detect_reversal_signals
 from src.analysis.accuracy import evaluate_signals
 from src.analysis.relative_strength import compute_relative_strength
+from src.analysis.signal_trend import analyze_signal_trend
 from src.data.kospi_index import fetch_kospi_ohlcv
 from src.delivery.telegram_bot import send_message
 
@@ -101,8 +102,11 @@ def main(dry_run: bool = False):
     accuracy_result = evaluate_signals(db_module)
     accuracy_summary = accuracy_result["summary"]
 
+    # 3.11) 시그널 추이 분석
+    sig_trend = analyze_signal_trend(db_module, days=5)
+
     # 4) 리포트 생성
-    report = generate_daily_report(indicators, supply_demand=sd, exchange_rate=er, composite_signal=sig, support_resistance=sr, accuracy_summary=accuracy_summary, relative_strength=rs, trend_reversal=reversal)
+    report = generate_daily_report(indicators, supply_demand=sd, exchange_rate=er, composite_signal=sig, support_resistance=sr, accuracy_summary=accuracy_summary, relative_strength=rs, trend_reversal=reversal, signal_trend=sig_trend)
 
     # 5) 발송 또는 출력
     if dry_run:

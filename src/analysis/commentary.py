@@ -20,6 +20,7 @@ def generate_commentary(
     support_resistance: dict | None = None,
     relative_strength: dict | None = None,
     trend_reversal: dict | None = None,
+    signal_trend: dict | None = None,
 ) -> str:
     """분석 결과를 2~3문장 자연어 코멘터리로 변환한다.
 
@@ -68,6 +69,11 @@ def generate_commentary(
     fx_sentence = _build_fx_sentence(er)
     if fx_sentence:
         sentences.append(fx_sentence)
+
+    # --- 5) 시그널 추이 문장 ---
+    trend_sentence = _build_signal_trend_sentence(signal_trend or {})
+    if trend_sentence:
+        sentences.append(trend_sentence)
 
     return " ".join(sentences)
 
@@ -293,6 +299,38 @@ def _build_fx_sentence(er: dict) -> str:
     elif trend == "원화강세":
         return "원화강세 흐름이 수출 실적에 부담 요인으로 작용할 수 있습니다."
     return ""
+
+
+def _build_signal_trend_sentence(st: dict) -> str:
+    """시그널 추이 기반 자연어 문장."""
+    if not st:
+        return ""
+
+    direction = st.get("direction", "횡보")
+    consec = st.get("consecutive_same_grade", 0)
+    latest_grade = st.get("latest_grade", "")
+    score_change = st.get("score_change", 0)
+
+    parts = []
+
+    # 연속 동일 등급 3일 이상
+    if consec >= 3:
+        parts.append(f"시그널이 {consec}일 연속 {latest_grade}을 유지하고 있습니다")
+
+    # 추세 방향
+    if direction == "개선" and score_change > 15:
+        parts.append(f"최근 시그널이 {score_change:+.0f}p 개선되며 긍정적 흐름이 강화되고 있습니다")
+    elif direction == "개선":
+        parts.append("시그널이 점진적으로 개선되는 추세입니다")
+    elif direction == "악화" and score_change < -15:
+        parts.append(f"최근 시그널이 {score_change:+.0f}p 하락하며 약세 신호가 확대되고 있습니다")
+    elif direction == "악화":
+        parts.append("시그널이 소폭 약화되는 추세입니다")
+
+    if not parts:
+        return ""
+
+    return parts[0] + "."
 
 
 def _join_parts(parts: list[str]) -> str:

@@ -543,6 +543,37 @@ def _build_relative_strength_section(rs: dict) -> list[str]:
     return lines
 
 
+def _build_signal_trend_section(trend: dict) -> list[str]:
+    """시그널 추이 섹션을 생성한다."""
+    lines = [""]
+    direction = trend.get("direction", "횡보")
+    dir_emoji = "📈" if direction == "개선" else "📉" if direction == "악화" else "➡️"
+    sparkline = trend.get("sparkline", "")
+    days = trend.get("days_available", 0)
+    consec = trend.get("consecutive_same_grade", 0)
+    latest_grade = trend.get("latest_grade", "")
+    score_change = trend.get("score_change", 0)
+    scores = trend.get("scores", [])
+
+    lines.append(f"<b>{dir_emoji} 시그널 추이 ({days}일)</b>")
+
+    # 스파크라인 + 점수 범위
+    if scores:
+        score_strs = [f"{s:+.0f}" for s in scores]
+        lines.append(f"  {sparkline}  ({' → '.join(score_strs)})")
+
+    # 추세 방향 + 변동폭
+    change_str = f"{score_change:+.1f}p" if score_change != 0 else "변동없음"
+    lines.append(f"  추세: {direction} ({change_str})")
+
+    # 연속 동일 등급
+    if consec >= 2:
+        lines.append(f"  {latest_grade} {consec}일 연속 유지")
+
+    lines.append("")
+    return lines
+
+
 def generate_daily_report(
     indicators: dict,
     supply_demand: dict | None = None,
@@ -552,6 +583,7 @@ def generate_daily_report(
     accuracy_summary: dict | None = None,
     relative_strength: dict | None = None,
     trend_reversal: dict | None = None,
+    signal_trend: dict | None = None,
 ) -> str:
     """기술적 지표 dict를 HTML 텔레그램 메시지로 변환한다.
 
@@ -601,11 +633,15 @@ def generate_daily_report(
     if composite_signal is not None:
         lines.extend(_build_composite_signal_section(composite_signal))
 
+    # 0.3) 시그널 추이 (종합 시그널 바로 아래)
+    if signal_trend is not None:
+        lines.extend(_build_signal_trend_section(signal_trend))
+
     # 0.5) 자연어 마켓 코멘터리 (종합 판정 바로 아래)
     from src.analysis.commentary import generate_commentary
     commentary = generate_commentary(
         indicators, supply_demand, exchange_rate, composite_signal, support_resistance,
-        relative_strength, trend_reversal=trend_reversal,
+        relative_strength, trend_reversal=trend_reversal, signal_trend=signal_trend,
     )
     if commentary:
         lines.append(f"💬 {commentary}")

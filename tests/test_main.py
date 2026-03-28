@@ -138,6 +138,7 @@ SAMPLE_REVERSAL = {
 @patch("src.main.send_message")
 @patch("src.main.generate_daily_report", return_value=SAMPLE_REPORT_HTML)
 @patch("src.main.evaluate_signals", return_value={"details": [], "summary": SAMPLE_ACCURACY})
+@patch("src.main.analyze_signal_trend", return_value=None)
 @patch("src.main.upsert_signal_history")
 @patch("src.main.compute_composite_signal", return_value=SAMPLE_SIGNAL)
 @patch("src.main.detect_reversal_signals", return_value=SAMPLE_REVERSAL)
@@ -158,7 +159,7 @@ def test_pipeline_full(
     mock_init, mock_bf_prices, mock_bf_sd,
     mock_kospi, mock_prices, mock_trading, mock_ownership, mock_rates,
     mock_tech, mock_sd, mock_er, mock_sr, mock_rs, mock_reversal, mock_signal, mock_upsert_sig,
-    mock_eval, mock_report, mock_send,
+    mock_sig_trend, mock_eval, mock_report, mock_send,
 ):
     """전체 파이프라인: 백필→조회→분석→지지저항→추세전환→RS→시그널→기록→정확도→리포트→발송."""
     from src.main import main
@@ -192,7 +193,7 @@ def test_pipeline_full(
         SAMPLE_INDICATORS, supply_demand=SAMPLE_SD, exchange_rate=SAMPLE_ER,
         composite_signal=SAMPLE_SIGNAL, support_resistance=SAMPLE_SR,
         accuracy_summary=SAMPLE_ACCURACY, relative_strength=SAMPLE_RS,
-        trend_reversal=SAMPLE_REVERSAL,
+        trend_reversal=SAMPLE_REVERSAL, signal_trend=None,
     )
     mock_send.assert_called_once_with(SAMPLE_REPORT_HTML)
 
@@ -200,6 +201,7 @@ def test_pipeline_full(
 @patch("src.main.send_message")
 @patch("src.main.generate_daily_report", return_value=SAMPLE_REPORT_HTML)
 @patch("src.main.evaluate_signals", return_value={"details": [], "summary": SAMPLE_ACCURACY})
+@patch("src.main.analyze_signal_trend", return_value=None)
 @patch("src.main.upsert_signal_history")
 @patch("src.main.compute_composite_signal", return_value=SAMPLE_SIGNAL)
 @patch("src.main.detect_reversal_signals", return_value=SAMPLE_REVERSAL)
@@ -220,7 +222,7 @@ def test_pipeline_dry_run(
     mock_init, mock_bf_prices, mock_bf_sd,
     mock_kospi, mock_prices, mock_trading, mock_ownership, mock_rates,
     mock_tech, mock_sd, mock_er, mock_sr, mock_rs, mock_reversal, mock_signal, mock_upsert_sig,
-    mock_eval, mock_report, mock_send,
+    mock_sig_trend, mock_eval, mock_report, mock_send,
     capsys,
 ):
     """--dry-run: 리포트를 stdout에 출력하고 발송하지 않는다."""
@@ -237,6 +239,7 @@ def test_pipeline_dry_run(
 @patch("src.main.send_message")
 @patch("src.main.generate_daily_report", return_value=SAMPLE_REPORT_HTML)
 @patch("src.main.evaluate_signals", return_value={"details": [], "summary": SAMPLE_ACCURACY})
+@patch("src.main.analyze_signal_trend", return_value=None)
 @patch("src.main.upsert_signal_history")
 @patch("src.main.compute_composite_signal", return_value=SAMPLE_SIGNAL)
 @patch("src.main.detect_reversal_signals", return_value=SAMPLE_REVERSAL)
@@ -257,7 +260,7 @@ def test_pipeline_with_rs(
     mock_init, mock_bf_prices, mock_bf_sd,
     mock_kospi, mock_prices, mock_trading, mock_ownership, mock_rates,
     mock_tech, mock_sd, mock_er, mock_sr, mock_rs, mock_reversal, mock_signal, mock_upsert_sig,
-    mock_eval, mock_report, mock_send,
+    mock_sig_trend, mock_eval, mock_report, mock_send,
 ):
     """RS 분석이 파이프라인에 통합되어 composite_signal과 report에 전달된다."""
     from src.main import main
@@ -283,6 +286,7 @@ def test_pipeline_with_rs(
 @patch("src.main.send_message")
 @patch("src.main.generate_daily_report", return_value=SAMPLE_REPORT_HTML)
 @patch("src.main.evaluate_signals", return_value={"details": [], "summary": SAMPLE_ACCURACY})
+@patch("src.main.analyze_signal_trend", return_value=None)
 @patch("src.main.upsert_signal_history")
 @patch("src.main.compute_composite_signal", return_value=SAMPLE_SIGNAL)
 @patch("src.main.detect_reversal_signals", return_value=SAMPLE_REVERSAL)
@@ -303,7 +307,7 @@ def test_pipeline_kospi_failure_fallback(
     mock_init, mock_bf_prices, mock_bf_sd,
     mock_kospi, mock_prices, mock_trading, mock_ownership, mock_rates,
     mock_tech, mock_sd, mock_er, mock_sr, mock_rs, mock_reversal, mock_signal, mock_upsert_sig,
-    mock_eval, mock_report, mock_send,
+    mock_sig_trend, mock_eval, mock_report, mock_send,
 ):
     """KOSPI 수집 실패 시 RS=None으로 폴백하여 파이프라인이 정상 동작한다."""
     from src.main import main

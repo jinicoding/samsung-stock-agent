@@ -134,11 +134,35 @@ def _score_relative_strength(rs: dict) -> float:
     return _clamp(base)
 
 
+def _reversal_bonus(trend_reversal: dict) -> float:
+    """추세 전환 컨버전스에 따른 보너스/페널티 점수.
+
+    strong → ±15, moderate → ±8, weak/none → 0.
+    방향이 bullish면 양수(매수 보너스), bearish면 음수(매도 페널티).
+    """
+    convergence = trend_reversal.get("convergence", "none")
+    direction = trend_reversal.get("direction", "neutral")
+
+    if convergence == "strong":
+        magnitude = 15.0
+    elif convergence == "moderate":
+        magnitude = 8.0
+    else:
+        return 0.0
+
+    if direction == "bullish":
+        return magnitude
+    elif direction == "bearish":
+        return -magnitude
+    return 0.0
+
+
 def compute_composite_signal(
     technical: dict,
     supply_demand: dict,
     exchange_rate: dict,
     relative_strength: dict | None = None,
+    trend_reversal: dict | None = None,
 ) -> dict:
     """종합 투자 시그널을 계산한다.
 
@@ -147,6 +171,7 @@ def compute_composite_signal(
         supply_demand: analyze_supply_demand() 결과
         exchange_rate: analyze_exchange_rate() 결과
         relative_strength: compute_relative_strength() 결과 (선택)
+        trend_reversal: detect_reversal_signals() 결과 (선택)
 
     Returns:
         dict with:
@@ -172,6 +197,10 @@ def compute_composite_signal(
         # RS 없으면 기존 가중치 유지
         composite = tech_score * 0.4 + sup_score * 0.4 + fx_score * 0.2
         weights = {"technical": 40, "supply": 40, "exchange": 20}
+
+    # 추세 전환 컨버전스 보너스/페널티
+    if trend_reversal is not None:
+        composite += _reversal_bonus(trend_reversal)
 
     composite = _clamp(composite)
 

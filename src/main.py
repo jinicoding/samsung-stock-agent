@@ -22,6 +22,7 @@ from src.analysis.exchange_rate import analyze_exchange_rate
 from src.analysis.report import generate_daily_report
 from src.analysis.signal import compute_composite_signal
 from src.analysis.support_resistance import analyze_support_resistance
+from src.analysis.trend_reversal import detect_reversal_signals
 from src.analysis.accuracy import evaluate_signals
 from src.analysis.relative_strength import compute_relative_strength
 from src.data.kospi_index import fetch_kospi_ohlcv
@@ -76,10 +77,13 @@ def main(dry_run: bool = False):
     except Exception as e:
         print(f"[경고] KOSPI/RS 분석 실패: {e}")
 
-    # 3.7) 종합 투자 시그널
-    sig = compute_composite_signal(indicators, sd or {}, er or {}, relative_strength=rs)
+    # 3.7) 추세 전환 감지
+    reversal = detect_reversal_signals(indicators, sr)
 
-    # 3.8) 시그널 이력 저장
+    # 3.8) 종합 투자 시그널
+    sig = compute_composite_signal(indicators, sd or {}, er or {}, relative_strength=rs, trend_reversal=reversal)
+
+    # 3.9) 시그널 이력 저장
     latest_price = prices[-1]["close"]
     latest_date = prices[-1]["date"]
     upsert_signal_history(
@@ -92,13 +96,13 @@ def main(dry_run: bool = False):
         price=latest_price,
     )
 
-    # 3.9) 시그널 정확도 평가
+    # 3.10) 시그널 정확도 평가
     from src.data import database as db_module
     accuracy_result = evaluate_signals(db_module)
     accuracy_summary = accuracy_result["summary"]
 
     # 4) 리포트 생성
-    report = generate_daily_report(indicators, supply_demand=sd, exchange_rate=er, composite_signal=sig, support_resistance=sr, accuracy_summary=accuracy_summary, relative_strength=rs)
+    report = generate_daily_report(indicators, supply_demand=sd, exchange_rate=er, composite_signal=sig, support_resistance=sr, accuracy_summary=accuracy_summary, relative_strength=rs, trend_reversal=reversal)
 
     # 5) 발송 또는 출력
     if dry_run:

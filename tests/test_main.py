@@ -119,12 +119,28 @@ SAMPLE_KOSPI = [
 
 SAMPLE_REPORT_HTML = "<b>삼성전자 일일 분석</b>"
 
+SAMPLE_REVERSAL = {
+    "direction": "bullish",
+    "convergence": "moderate",
+    "score": 60.0,
+    "active_categories": 3,
+    "category_signals": {
+        "momentum": {"direction": "bullish", "strength": 80.0},
+        "trend": {"direction": "bullish", "strength": 70.0},
+        "volatility": {"direction": "bullish", "strength": 60.0},
+        "volume": {"direction": "neutral", "strength": 0.0},
+        "structure": {"direction": "neutral", "strength": 0.0},
+    },
+    "summary": "중간 강세 반전 신호 감지",
+}
+
 
 @patch("src.main.send_message")
 @patch("src.main.generate_daily_report", return_value=SAMPLE_REPORT_HTML)
 @patch("src.main.evaluate_signals", return_value={"details": [], "summary": SAMPLE_ACCURACY})
 @patch("src.main.upsert_signal_history")
 @patch("src.main.compute_composite_signal", return_value=SAMPLE_SIGNAL)
+@patch("src.main.detect_reversal_signals", return_value=SAMPLE_REVERSAL)
 @patch("src.main.compute_relative_strength", return_value=SAMPLE_RS)
 @patch("src.main.analyze_support_resistance", return_value=SAMPLE_SR)
 @patch("src.main.analyze_exchange_rate", return_value=SAMPLE_ER)
@@ -141,10 +157,10 @@ SAMPLE_REPORT_HTML = "<b>삼성전자 일일 분석</b>"
 def test_pipeline_full(
     mock_init, mock_bf_prices, mock_bf_sd,
     mock_kospi, mock_prices, mock_trading, mock_ownership, mock_rates,
-    mock_tech, mock_sd, mock_er, mock_sr, mock_rs, mock_signal, mock_upsert_sig,
+    mock_tech, mock_sd, mock_er, mock_sr, mock_rs, mock_reversal, mock_signal, mock_upsert_sig,
     mock_eval, mock_report, mock_send,
 ):
-    """전체 파이프라인: 백필→조회→분석→지지저항→RS→시그널→기록→정확도→리포트→발송."""
+    """전체 파이프라인: 백필→조회→분석→지지저항→추세전환→RS→시그널→기록→정확도→리포트→발송."""
     from src.main import main
 
     main()
@@ -161,7 +177,11 @@ def test_pipeline_full(
     mock_sd.assert_called_once_with(SAMPLE_TRADING, SAMPLE_OWNERSHIP)
     mock_er.assert_called_once_with(SAMPLE_RATES, SAMPLE_PRICES)
     mock_sr.assert_called_once_with(SAMPLE_PRICES)
-    mock_signal.assert_called_once_with(SAMPLE_INDICATORS, SAMPLE_SD, SAMPLE_ER, relative_strength=SAMPLE_RS)
+    mock_reversal.assert_called_once_with(SAMPLE_INDICATORS, SAMPLE_SR)
+    mock_signal.assert_called_once_with(
+        SAMPLE_INDICATORS, SAMPLE_SD, SAMPLE_ER,
+        relative_strength=SAMPLE_RS, trend_reversal=SAMPLE_REVERSAL,
+    )
     mock_upsert_sig.assert_called_once_with(
         date="2026-03-60", score=35.0, grade="매수우세",
         technical_score=40.0, supply_score=50.0, exchange_score=-10.0,
@@ -172,6 +192,7 @@ def test_pipeline_full(
         SAMPLE_INDICATORS, supply_demand=SAMPLE_SD, exchange_rate=SAMPLE_ER,
         composite_signal=SAMPLE_SIGNAL, support_resistance=SAMPLE_SR,
         accuracy_summary=SAMPLE_ACCURACY, relative_strength=SAMPLE_RS,
+        trend_reversal=SAMPLE_REVERSAL,
     )
     mock_send.assert_called_once_with(SAMPLE_REPORT_HTML)
 
@@ -181,6 +202,7 @@ def test_pipeline_full(
 @patch("src.main.evaluate_signals", return_value={"details": [], "summary": SAMPLE_ACCURACY})
 @patch("src.main.upsert_signal_history")
 @patch("src.main.compute_composite_signal", return_value=SAMPLE_SIGNAL)
+@patch("src.main.detect_reversal_signals", return_value=SAMPLE_REVERSAL)
 @patch("src.main.compute_relative_strength", return_value=SAMPLE_RS)
 @patch("src.main.analyze_support_resistance", return_value=SAMPLE_SR)
 @patch("src.main.analyze_exchange_rate", return_value=SAMPLE_ER)
@@ -197,7 +219,7 @@ def test_pipeline_full(
 def test_pipeline_dry_run(
     mock_init, mock_bf_prices, mock_bf_sd,
     mock_kospi, mock_prices, mock_trading, mock_ownership, mock_rates,
-    mock_tech, mock_sd, mock_er, mock_sr, mock_rs, mock_signal, mock_upsert_sig,
+    mock_tech, mock_sd, mock_er, mock_sr, mock_rs, mock_reversal, mock_signal, mock_upsert_sig,
     mock_eval, mock_report, mock_send,
     capsys,
 ):
@@ -217,6 +239,7 @@ def test_pipeline_dry_run(
 @patch("src.main.evaluate_signals", return_value={"details": [], "summary": SAMPLE_ACCURACY})
 @patch("src.main.upsert_signal_history")
 @patch("src.main.compute_composite_signal", return_value=SAMPLE_SIGNAL)
+@patch("src.main.detect_reversal_signals", return_value=SAMPLE_REVERSAL)
 @patch("src.main.compute_relative_strength", return_value=SAMPLE_RS)
 @patch("src.main.analyze_support_resistance", return_value=SAMPLE_SR)
 @patch("src.main.analyze_exchange_rate", return_value=SAMPLE_ER)
@@ -233,7 +256,7 @@ def test_pipeline_dry_run(
 def test_pipeline_with_rs(
     mock_init, mock_bf_prices, mock_bf_sd,
     mock_kospi, mock_prices, mock_trading, mock_ownership, mock_rates,
-    mock_tech, mock_sd, mock_er, mock_sr, mock_rs, mock_signal, mock_upsert_sig,
+    mock_tech, mock_sd, mock_er, mock_sr, mock_rs, mock_reversal, mock_signal, mock_upsert_sig,
     mock_eval, mock_report, mock_send,
 ):
     """RS 분석이 파이프라인에 통합되어 composite_signal과 report에 전달된다."""
@@ -245,14 +268,16 @@ def test_pipeline_with_rs(
     mock_kospi.assert_called_once()
     # RS 분석 호출 확인
     mock_rs.assert_called_once()
-    # composite_signal에 RS가 전달됨
+    # composite_signal에 RS와 reversal이 전달됨
     mock_signal.assert_called_once_with(
-        SAMPLE_INDICATORS, SAMPLE_SD, SAMPLE_ER, relative_strength=SAMPLE_RS,
+        SAMPLE_INDICATORS, SAMPLE_SD, SAMPLE_ER,
+        relative_strength=SAMPLE_RS, trend_reversal=SAMPLE_REVERSAL,
     )
-    # report에 RS가 전달됨
+    # report에 RS와 reversal이 전달됨
     mock_report.assert_called_once()
     report_kwargs = mock_report.call_args
     assert report_kwargs[1].get("relative_strength") == SAMPLE_RS
+    assert report_kwargs[1].get("trend_reversal") == SAMPLE_REVERSAL
 
 
 @patch("src.main.send_message")
@@ -260,6 +285,7 @@ def test_pipeline_with_rs(
 @patch("src.main.evaluate_signals", return_value={"details": [], "summary": SAMPLE_ACCURACY})
 @patch("src.main.upsert_signal_history")
 @patch("src.main.compute_composite_signal", return_value=SAMPLE_SIGNAL)
+@patch("src.main.detect_reversal_signals", return_value=SAMPLE_REVERSAL)
 @patch("src.main.compute_relative_strength", return_value=SAMPLE_RS)
 @patch("src.main.analyze_support_resistance", return_value=SAMPLE_SR)
 @patch("src.main.analyze_exchange_rate", return_value=SAMPLE_ER)
@@ -276,7 +302,7 @@ def test_pipeline_with_rs(
 def test_pipeline_kospi_failure_fallback(
     mock_init, mock_bf_prices, mock_bf_sd,
     mock_kospi, mock_prices, mock_trading, mock_ownership, mock_rates,
-    mock_tech, mock_sd, mock_er, mock_sr, mock_rs, mock_signal, mock_upsert_sig,
+    mock_tech, mock_sd, mock_er, mock_sr, mock_rs, mock_reversal, mock_signal, mock_upsert_sig,
     mock_eval, mock_report, mock_send,
 ):
     """KOSPI 수집 실패 시 RS=None으로 폴백하여 파이프라인이 정상 동작한다."""
@@ -288,13 +314,17 @@ def test_pipeline_kospi_failure_fallback(
     mock_kospi.assert_called_once()
     # RS 분석은 호출되지 않아야 함
     mock_rs.assert_not_called()
-    # composite_signal에 RS=None 전달
+    # reversal은 여전히 호출됨 (KOSPI와 무관)
+    mock_reversal.assert_called_once()
+    # composite_signal에 RS=None 전달, reversal은 전달
     mock_signal.assert_called_once_with(
-        SAMPLE_INDICATORS, SAMPLE_SD, SAMPLE_ER, relative_strength=None,
+        SAMPLE_INDICATORS, SAMPLE_SD, SAMPLE_ER,
+        relative_strength=None, trend_reversal=SAMPLE_REVERSAL,
     )
-    # report에 RS=None 전달
+    # report에 RS=None, reversal 전달
     report_kwargs = mock_report.call_args
     assert report_kwargs[1].get("relative_strength") is None
+    assert report_kwargs[1].get("trend_reversal") == SAMPLE_REVERSAL
 
 
 @patch("src.main.generate_daily_report")

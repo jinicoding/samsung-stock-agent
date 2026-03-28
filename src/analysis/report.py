@@ -470,6 +470,51 @@ def _rs_trend_label(trend: str) -> tuple[str, str]:
     return "시장 동행", "➡️"
 
 
+def _convergence_emoji(convergence: str) -> str:
+    if convergence == "strong":
+        return "🔴"
+    if convergence == "moderate":
+        return "🟡"
+    return ""
+
+
+def _build_trend_reversal_section(tr: dict) -> list[str]:
+    """추세 전환 감지 결과를 HTML 라인 리스트로.
+
+    convergence가 weak/none이면 빈 리스트 반환(섹션 생략).
+    """
+    convergence = tr.get("convergence", "none")
+    if convergence in ("weak", "none"):
+        return []
+
+    lines = []
+    lines.append("")
+    lines.append("<b>🔄 추세 전환 감지</b>")
+
+    direction = tr.get("direction", "neutral")
+    dir_kr = "강세" if direction == "bullish" else "약세"
+    grade_kr = "강한" if convergence == "strong" else "중간"
+
+    lines.append(f"  {_convergence_emoji(convergence)} {grade_kr} {dir_kr} 반전 컨버전스")
+    lines.append(f"  점수: {tr.get('score', 0):.0f}/100 | 활성 카테고리: {tr.get('active_categories', 0)}개")
+
+    # 활성 카테고리 상세
+    cat_kr = {
+        "momentum": "모멘텀", "trend": "추세", "volatility": "변동성",
+        "volume": "거래량", "structure": "구조",
+    }
+    cat_signals = tr.get("category_signals", {})
+    active = [
+        cat_kr.get(cat, cat)
+        for cat, sig in cat_signals.items()
+        if sig.get("direction") == direction
+    ]
+    if active:
+        lines.append(f"  활성: {', '.join(active)}")
+
+    return lines
+
+
 def _build_relative_strength_section(rs: dict) -> list[str]:
     """상대강도 분석 결과를 HTML 라인 리스트로."""
     lines = []
@@ -506,6 +551,7 @@ def generate_daily_report(
     support_resistance: dict | None = None,
     accuracy_summary: dict | None = None,
     relative_strength: dict | None = None,
+    trend_reversal: dict | None = None,
 ) -> str:
     """기술적 지표 dict를 HTML 텔레그램 메시지로 변환한다.
 
@@ -559,7 +605,7 @@ def generate_daily_report(
     from src.analysis.commentary import generate_commentary
     commentary = generate_commentary(
         indicators, supply_demand, exchange_rate, composite_signal, support_resistance,
-        relative_strength,
+        relative_strength, trend_reversal=trend_reversal,
     )
     if commentary:
         lines.append(f"💬 {commentary}")
@@ -642,6 +688,10 @@ def generate_daily_report(
     # 상대강도 (선택)
     if relative_strength is not None:
         lines.extend(_build_relative_strength_section(relative_strength))
+
+    # 추세 전환 감지 (선택)
+    if trend_reversal is not None:
+        lines.extend(_build_trend_reversal_section(trend_reversal))
 
     # 지지/저항선 (선택)
     if support_resistance is not None:

@@ -220,3 +220,94 @@ class TestCompositeSignal:
         result1 = compute_composite_signal(tech1, _supply(), _fx())
         result2 = compute_composite_signal(tech2, _supply(), _fx())
         assert result1["technical_score"] == pytest.approx(result2["technical_score"])
+
+
+class TestTrendReversalIntegration:
+    """추세 전환 감지 결과가 종합 시그널에 반영되는지 테스트."""
+
+    def test_strong_bullish_reversal_boosts_score(self):
+        """strong bullish 컨버전스 → 종합 점수가 상승."""
+        reversal = {
+            "direction": "bullish",
+            "convergence": "strong",
+            "score": 80.0,
+            "active_categories": 4,
+            "category_signals": {},
+            "summary": "강한 강세 반전 신호",
+        }
+        base = compute_composite_signal(_tech(), _supply(), _fx())
+        boosted = compute_composite_signal(
+            _tech(), _supply(), _fx(), trend_reversal=reversal,
+        )
+        assert boosted["score"] > base["score"]
+
+    def test_strong_bearish_reversal_lowers_score(self):
+        """strong bearish 컨버전스 → 종합 점수가 하락."""
+        reversal = {
+            "direction": "bearish",
+            "convergence": "strong",
+            "score": 80.0,
+            "active_categories": 4,
+            "category_signals": {},
+            "summary": "강한 약세 반전 신호",
+        }
+        base = compute_composite_signal(_tech(), _supply(), _fx())
+        lowered = compute_composite_signal(
+            _tech(), _supply(), _fx(), trend_reversal=reversal,
+        )
+        assert lowered["score"] < base["score"]
+
+    def test_moderate_reversal_has_smaller_effect(self):
+        """moderate 컨버전스 효과가 strong보다 작다."""
+        strong = {
+            "direction": "bullish", "convergence": "strong",
+            "score": 80.0, "active_categories": 4,
+            "category_signals": {}, "summary": "",
+        }
+        moderate = {
+            "direction": "bullish", "convergence": "moderate",
+            "score": 60.0, "active_categories": 3,
+            "category_signals": {}, "summary": "",
+        }
+        r_strong = compute_composite_signal(
+            _tech(), _supply(), _fx(), trend_reversal=strong,
+        )
+        r_moderate = compute_composite_signal(
+            _tech(), _supply(), _fx(), trend_reversal=moderate,
+        )
+        assert r_strong["score"] > r_moderate["score"]
+
+    def test_weak_reversal_no_effect(self):
+        """weak/none 컨버전스 → 점수 변화 없음."""
+        weak = {
+            "direction": "bullish", "convergence": "weak",
+            "score": 30.0, "active_categories": 1,
+            "category_signals": {}, "summary": "",
+        }
+        base = compute_composite_signal(_tech(), _supply(), _fx())
+        result = compute_composite_signal(
+            _tech(), _supply(), _fx(), trend_reversal=weak,
+        )
+        assert result["score"] == pytest.approx(base["score"])
+
+    def test_none_reversal_no_effect(self):
+        """trend_reversal=None이면 기존 동작과 동일."""
+        base = compute_composite_signal(_tech(), _supply(), _fx())
+        result = compute_composite_signal(
+            _tech(), _supply(), _fx(), trend_reversal=None,
+        )
+        assert result["score"] == pytest.approx(base["score"])
+
+    def test_score_still_clamped(self):
+        """보너스 적용 후에도 -100~+100 범위."""
+        reversal = {
+            "direction": "bullish", "convergence": "strong",
+            "score": 100.0, "active_categories": 5,
+            "category_signals": {}, "summary": "",
+        }
+        tech = _tech(rsi=10, macd_histogram=1000, bb_pctb=0.0, price_vs_ma5_pct=5.0)
+        result = compute_composite_signal(
+            tech, _supply("buy_dominant"), _fx("원화약세", 2.0),
+            trend_reversal=reversal,
+        )
+        assert -100 <= result["score"] <= 100

@@ -19,6 +19,7 @@ def generate_commentary(
     composite_signal: dict | None = None,
     support_resistance: dict | None = None,
     relative_strength: dict | None = None,
+    trend_reversal: dict | None = None,
 ) -> str:
     """분석 결과를 2~3문장 자연어 코멘터리로 변환한다.
 
@@ -28,6 +29,7 @@ def generate_commentary(
         exchange_rate: analyze_exchange_rate() 반환값 (선택).
         composite_signal: compute_composite_signal() 반환값 (선택).
         support_resistance: analyze_support_resistance() 반환값 (선택).
+        trend_reversal: detect_reversal_signals() 반환값 (선택).
 
     Returns:
         2~3문장의 한국어 자연어 코멘터리.
@@ -46,6 +48,11 @@ def generate_commentary(
     obv_sentence = _build_obv_divergence_sentence(indicators)
     if obv_sentence:
         sentences.append(obv_sentence)
+
+    # --- 1.7) 추세 전환 감지 문장 ---
+    reversal_sentence = _build_reversal_sentence(trend_reversal or {})
+    if reversal_sentence:
+        sentences.append(reversal_sentence)
 
     # --- 2) 보조 경고/참고 문장: RSI, 볼린저, 지지/저항 ---
     caution = _build_caution_sentence(indicators, sr)
@@ -253,6 +260,26 @@ def _build_rs_sentence(rs: dict) -> str:
         return "삼성전자가 시장 대비 소폭 약세를 보이고 있습니다."
 
     return ""
+
+
+def _build_reversal_sentence(tr: dict) -> str:
+    """추세 전환 컨버전스 감지 시 자연어 경고 문장."""
+    if not tr:
+        return ""
+
+    convergence = tr.get("convergence", "none")
+    direction = tr.get("direction", "neutral")
+
+    if convergence not in ("strong", "moderate"):
+        return ""
+
+    dir_kr = "강세" if direction == "bullish" else "약세"
+    active = tr.get("active_categories", 0)
+
+    if convergence == "strong":
+        return f"다수의 기술적 지표({active}개 카테고리)가 동시에 {dir_kr} 반전 신호를 보이고 있어 추세 전환 가능성에 주목할 필요가 있습니다."
+    else:  # moderate
+        return f"{active}개 카테고리에서 {dir_kr} 반전 신호가 감지되어 추세 전환 여부를 주시할 필요가 있습니다."
 
 
 def _build_fx_sentence(er: dict) -> str:

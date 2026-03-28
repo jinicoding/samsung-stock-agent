@@ -301,3 +301,75 @@ class TestGenerateCommentary:
             self._base_support_resistance(),
         )
         assert "스토캐스틱" not in result
+
+    def test_strong_bullish_reversal_sentence(self):
+        """strong bullish 컨버전스 → 강세 반전 경고 문장 생성."""
+        reversal = {
+            "direction": "bullish",
+            "convergence": "strong",
+            "score": 80.0,
+            "active_categories": 4,
+            "category_signals": {},
+            "summary": "강한 강세 반전 신호",
+        }
+        result = generate_commentary(
+            self._base_indicators(),
+            self._base_supply_demand(),
+            self._base_exchange_rate(),
+            self._base_composite_signal(),
+            self._base_support_resistance(),
+            trend_reversal=reversal,
+        )
+        assert "반전" in result or "전환" in result
+
+    def test_moderate_bearish_reversal_sentence(self):
+        """moderate bearish 컨버전스 → 약세 전환 경고 문장 생성."""
+        reversal = {
+            "direction": "bearish",
+            "convergence": "moderate",
+            "score": 60.0,
+            "active_categories": 3,
+            "category_signals": {},
+            "summary": "중간 약세 반전 신호",
+        }
+        result = generate_commentary(
+            self._base_indicators(),
+            self._base_supply_demand(),
+            self._base_exchange_rate(),
+            self._base_composite_signal(),
+            self._base_support_resistance(),
+            trend_reversal=reversal,
+        )
+        assert "반전" in result or "전환" in result
+
+    def test_weak_reversal_no_sentence(self):
+        """weak 컨버전스 → 반전 문장 없음."""
+        reversal = {
+            "direction": "bullish",
+            "convergence": "weak",
+            "score": 30.0,
+            "active_categories": 1,
+            "category_signals": {},
+            "summary": "",
+        }
+        result = generate_commentary(
+            self._base_indicators(),
+            self._base_supply_demand(),
+            self._base_exchange_rate(),
+            self._base_composite_signal(),
+            self._base_support_resistance(),
+            trend_reversal=reversal,
+        )
+        # weak일 때는 반전 문장이 추가되지 않아야 함
+        assert "추세 전환" not in result
+
+    def test_no_reversal_param_backward_compat(self):
+        """trend_reversal 미전달 시 기존 동작과 동일."""
+        result = generate_commentary(
+            self._base_indicators(),
+            self._base_supply_demand(),
+            self._base_exchange_rate(),
+            self._base_composite_signal(),
+            self._base_support_resistance(),
+        )
+        assert "추세 전환" not in result

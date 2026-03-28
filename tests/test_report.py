@@ -952,3 +952,92 @@ def _supply_demand_neutral() -> dict:
         "ownership_change_pct": 0.02,
         "overall_judgment": "neutral",
     }
+
+
+class TestTrendReversalInReport:
+    """추세 전환 감지 섹션이 리포트에 표시되는지 테스트."""
+
+    def _reversal_strong_bullish(self) -> dict:
+        return {
+            "direction": "bullish",
+            "convergence": "strong",
+            "score": 85.0,
+            "active_categories": 4,
+            "category_signals": {
+                "momentum": {"direction": "bullish", "strength": 90.0},
+                "trend": {"direction": "bullish", "strength": 80.0},
+                "volatility": {"direction": "bullish", "strength": 70.0},
+                "volume": {"direction": "bullish", "strength": 60.0},
+                "structure": {"direction": "neutral", "strength": 0.0},
+            },
+            "summary": "강한 강세 반전 신호 감지",
+        }
+
+    def _reversal_none_convergence(self) -> dict:
+        return {
+            "direction": "neutral",
+            "convergence": "none",
+            "score": 0.0,
+            "active_categories": 0,
+            "category_signals": {
+                "momentum": {"direction": "neutral", "strength": 0.0},
+                "trend": {"direction": "neutral", "strength": 0.0},
+                "volatility": {"direction": "neutral", "strength": 0.0},
+                "volume": {"direction": "neutral", "strength": 0.0},
+                "structure": {"direction": "neutral", "strength": 0.0},
+            },
+            "summary": "현재 뚜렷한 추세 전환 신호가 감지되지 않습니다.",
+        }
+
+    def test_strong_reversal_section_present(self):
+        """strong 컨버전스 시 추세 전환 섹션이 포함된다."""
+        report = generate_daily_report(
+            _full_indicators(),
+            trend_reversal=self._reversal_strong_bullish(),
+        )
+        assert "추세 전환" in report
+        assert "강세" in report
+        assert "컨버전스" in report
+
+    def test_none_convergence_no_section(self):
+        """none 컨버전스 시 추세 전환 섹션이 생략된다."""
+        report = generate_daily_report(
+            _full_indicators(),
+            trend_reversal=self._reversal_none_convergence(),
+        )
+        assert "추세 전환" not in report
+
+    def test_no_reversal_param_backward_compat(self):
+        """trend_reversal 미전달 시 기존 리포트와 동일하게 동작."""
+        report = generate_daily_report(_full_indicators())
+        assert "추세 전환" not in report
+
+    def test_active_categories_shown(self):
+        """활성 카테고리 정보가 표시된다."""
+        report = generate_daily_report(
+            _full_indicators(),
+            trend_reversal=self._reversal_strong_bullish(),
+        )
+        assert "모멘텀" in report or "활성" in report
+
+    def test_moderate_bearish_reversal(self):
+        """moderate bearish 컨버전스도 섹션이 표시된다."""
+        reversal = {
+            "direction": "bearish",
+            "convergence": "moderate",
+            "score": 55.0,
+            "active_categories": 3,
+            "category_signals": {
+                "momentum": {"direction": "bearish", "strength": 70.0},
+                "trend": {"direction": "bearish", "strength": 60.0},
+                "volatility": {"direction": "bearish", "strength": 50.0},
+                "volume": {"direction": "neutral", "strength": 0.0},
+                "structure": {"direction": "neutral", "strength": 0.0},
+            },
+            "summary": "중간 약세 반전 신호 감지",
+        }
+        report = generate_daily_report(
+            _full_indicators(), trend_reversal=reversal,
+        )
+        assert "추세 전환" in report
+        assert "약세" in report

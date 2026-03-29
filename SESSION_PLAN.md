@@ -1,16 +1,9 @@
 ## Session Plan
 
-### Task 1: 펀더멘털 분석을 종합 시그널·리포트·코멘터리·파이프라인에 통합
-Files: src/analysis/signal.py, src/analysis/report.py, src/analysis/commentary.py, src/main.py, tests/test_signal.py, tests/test_report.py, tests/test_commentary.py, tests/test_main.py
-Description: Day 7에서 구축한 기본적 분석 모듈(src/data/fundamentals.py, src/analysis/fundamentals.py)이 아직 파이프라인에 연결되지 않았다. 다음을 수행한다:
-1) main.py에서 fetch_fundamentals() → analyze_fundamentals() 호출 추가, 결과를 시그널·리포트에 전달
-2) signal.py의 compute_composite_signal()에 fundamentals 파라미터 추가, 5축 가중치 재배분 (기술 30%, 수급 30%, 환율 15%, 상대강도 10%, 펀더멘털 15%)
-3) report.py에 펀더멘털 섹션 추가 (PER/PBR 밸류에이션, 배당수익률, 실적 전망)
-4) commentary.py에 펀더멘털 기반 자연어 문장 추가 (저평가/고평가 언급)
-5) 각 모듈의 기존 테스트 업데이트 + 새 테스트 추가
+### Task 1: 뉴스 헤드라인 수집기 구축 (src/data/news.py)
+Files: src/data/news.py, tests/test_news.py
+Description: Naver 모바일 증권 API (`m.stock.naver.com/api/news/stock/005930`)를 활용하여 삼성전자 관련 뉴스 헤드라인을 수집하는 모듈을 구축한다. 최근 20개 뉴스의 제목, 출처, 날짜를 파싱하고, 키워드 기반 간이 감정 분류(positive/negative/neutral)를 수행한다. 긍정 키워드(실적개선, 상승, 반등, 목표가상향 등)와 부정 키워드(하락, 매도, 적자, 리스크, 전쟁 등)를 사전 정의하여 각 헤드라인에 점수를 부여하고, 전체 감정 요약(bullish/bearish/neutral + 점수)을 반환한다. HTML 엔티티(&quot; 등) 디코딩 포함. 테스트는 API 모킹으로 작성하여 오프라인 실행 보장.
 
-### Task 2: 전체 파이프라인 dry-run 검증 스크립트 구축
-Files: scripts/dry_run_test.sh, tests/test_pipeline_integration.py
-Description: 저널에서 매 세션 "실제 시장 데이터로 전체 파이프라인 dry-run 검증이 필요"라고 반복 언급했으나 한 번도 수행되지 않았다. mock 없이 실제 API를 호출하여 전체 파이프라인이 end-to-end로 동작하는지 검증하는 통합 테스트를 만든다:
-1) scripts/dry_run_test.sh — `python3 -m src.main --dry-run`을 실행하고 출력에 핵심 섹션(종합 판정, 기술적, 수급, 환율, 펀더멘털)이 모두 포함되는지 grep으로 확인
-2) tests/test_pipeline_integration.py — 실제 DB 데이터(또는 fixture)로 main() 흐름을 end-to-end 테스트하되, 텔레그램 발송만 mock하는 통합 테스트
+### Task 2: 뉴스 감정을 종합 시그널·리포트·코멘터리에 통합
+Files: src/analysis/signal.py, src/analysis/report.py, src/analysis/commentary.py, src/main.py, tests/test_signal.py, tests/test_report.py, tests/test_commentary.py
+Description: Task 1의 뉴스 감정 결과를 파이프라인에 통합한다. (1) signal.py에 `_score_news_sentiment()` 함수를 추가하고, 6축 가중치 체계로 확장한다 (기술 25%, 수급 25%, 환율 15%, RS 10%, 펀더멘털 15%, 뉴스 10%). (2) report.py에 `_build_news_section()` 함수를 추가하여 주요 헤드라인 3개와 감정 요약을 표시한다. (3) commentary.py에 `_build_news_sentence()` 함수를 추가하여 뉴스 감정이 강할 때 자연어 문장을 생성한다. (4) main.py의 파이프라인에 뉴스 수집 단계를 추가한다. 기존 테스트가 깨지지 않도록 뉴스 데이터는 optional 파라미터로 처리한다.

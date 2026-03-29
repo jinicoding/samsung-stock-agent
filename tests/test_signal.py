@@ -311,3 +311,91 @@ class TestTrendReversalIntegration:
             trend_reversal=reversal,
         )
         assert -100 <= result["score"] <= 100
+
+
+def _fund(per_val="적정", pbr_val="적정", outlook="유지", div_attr="보통") -> dict:
+    """펀더멘털 분석 결과 stub."""
+    return {
+        "per": 12.0, "eps": 5000, "estimated_per": 11.0, "estimated_eps": 5500,
+        "pbr": 1.2, "bps": 45000, "dividend_yield": 2.0,
+        "per_valuation": per_val,
+        "pbr_valuation": pbr_val,
+        "earnings_outlook": outlook,
+        "dividend_attractiveness": div_attr,
+    }
+
+
+class TestFundamentalsIntegration:
+    """펀더멘털 분석 결과가 종합 시그널에 반영되는지 테스트."""
+
+    def test_undervalued_boosts_score(self):
+        """PER/PBR 저평가 → 종합 점수가 상승."""
+        base = compute_composite_signal(_tech(), _supply(), _fx())
+        boosted = compute_composite_signal(
+            _tech(), _supply(), _fx(),
+            fundamentals=_fund(per_val="저평가", pbr_val="저평가", outlook="개선", div_attr="매력적"),
+        )
+        assert boosted["score"] > base["score"]
+
+    def test_overvalued_lowers_score(self):
+        """PER/PBR 고평가 → 종합 점수가 하락."""
+        base = compute_composite_signal(_tech(), _supply(), _fx())
+        lowered = compute_composite_signal(
+            _tech(), _supply(), _fx(),
+            fundamentals=_fund(per_val="고평가", pbr_val="고평가", outlook="악화", div_attr="낮음"),
+        )
+        assert lowered["score"] < base["score"]
+
+    def test_fundamentals_score_in_result(self):
+        """결과에 fundamentals_score가 포함."""
+        result = compute_composite_signal(
+            _tech(), _supply(), _fx(), fundamentals=_fund(),
+        )
+        assert "fundamentals_score" in result
+
+    def test_none_fundamentals_no_score(self):
+        """fundamentals=None이면 fundamentals_score 없음."""
+        result = compute_composite_signal(_tech(), _supply(), _fx())
+        assert "fundamentals_score" not in result
+
+    def test_5axis_weights_with_rs_and_fund(self):
+        """RS + 펀더멘털 모두 있으면 5축 가중치 합 100%."""
+        rs = {"rs_trend": "neutral", "alpha_1d": 0.0}
+        result = compute_composite_signal(
+            _tech(), _supply(), _fx(),
+            relative_strength=rs, fundamentals=_fund(),
+        )
+        w = result["weights"]
+        assert w == {"technical": 30, "supply": 30, "exchange": 15,
+                     "relative_strength": 10, "fundamentals": 15}
+        assert sum(w.values()) == 100
+
+    def test_4axis_fund_only_weights(self):
+        """펀더멘털만 있고 RS 없으면 4축 가중치."""
+        result = compute_composite_signal(
+            _tech(), _supply(), _fx(), fundamentals=_fund(),
+        )
+        w = result["weights"]
+        assert w == {"technical": 35, "supply": 30, "exchange": 15, "fundamentals": 20}
+        assert sum(w.values()) == 100
+
+    def test_earnings_improvement_positive(self):
+        """실적 개선 전망 → 양수 점수 기여."""
+        neutral = compute_composite_signal(
+            _tech(), _supply(), _fx(),
+            fundamentals=_fund(outlook="유지"),
+        )
+        improved = compute_composite_signal(
+            _tech(), _supply(), _fx(),
+            fundamentals=_fund(outlook="개선"),
+        )
+        assert improved["fundamentals_score"] > neutral["fundamentals_score"]
+
+    def test_score_clamped_with_fundamentals(self):
+        """펀더멘털 포함 시에도 -100~+100 범위."""
+        tech = _tech(rsi=10, macd_histogram=1000, bb_pctb=0.0, price_vs_ma5_pct=5.0)
+        result = compute_composite_signal(
+            tech, _supply("buy_dominant"), _fx("원화약세", 2.0),
+            fundamentals=_fund(per_val="저평가", pbr_val="저평가", outlook="개선", div_attr="매력적"),
+        )
+        assert -100 <= result["score"] <= 100

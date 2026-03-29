@@ -373,3 +373,101 @@ class TestGenerateCommentary:
             self._base_support_resistance(),
         )
         assert "추세 전환" not in result
+
+    # --- 펀더멘털 문장 테스트 ---
+
+    def _base_fundamentals(self, **overrides):
+        base = {
+            "per": 12.5, "eps": 4800, "estimated_per": 10.0, "estimated_eps": 6000,
+            "pbr": 1.2, "bps": 45000, "dividend_yield": 2.0,
+            "per_valuation": "적정", "pbr_valuation": "적정",
+            "earnings_outlook": "유지", "dividend_attractiveness": "보통",
+        }
+        base.update(overrides)
+        return base
+
+    def test_undervalued_per_mentioned(self):
+        """PER 저평가 → 저평가 언급."""
+        result = generate_commentary(
+            self._base_indicators(),
+            self._base_supply_demand(),
+            self._base_exchange_rate(),
+            self._base_composite_signal(),
+            self._base_support_resistance(),
+            fundamentals=self._base_fundamentals(per_valuation="저평가", per=8.5),
+        )
+        assert "저평가" in result
+
+    def test_overvalued_pbr_mentioned(self):
+        """PBR 고평가 → 고평가 언급."""
+        result = generate_commentary(
+            self._base_indicators(),
+            self._base_supply_demand(),
+            self._base_exchange_rate(),
+            self._base_composite_signal(),
+            self._base_support_resistance(),
+            fundamentals=self._base_fundamentals(pbr_valuation="고평가", pbr=1.8),
+        )
+        assert "고평가" in result
+
+    def test_earnings_improvement_mentioned(self):
+        """실적 개선 전망 → 실적 개선 언급."""
+        result = generate_commentary(
+            self._base_indicators(),
+            self._base_supply_demand(),
+            self._base_exchange_rate(),
+            self._base_composite_signal(),
+            self._base_support_resistance(),
+            fundamentals=self._base_fundamentals(earnings_outlook="개선"),
+        )
+        assert "실적" in result and "개선" in result
+
+    def test_earnings_deterioration_mentioned(self):
+        """실적 악화 전망 → 실적 둔화 언급."""
+        result = generate_commentary(
+            self._base_indicators(),
+            self._base_supply_demand(),
+            self._base_exchange_rate(),
+            self._base_composite_signal(),
+            self._base_support_resistance(),
+            fundamentals=self._base_fundamentals(earnings_outlook="악화"),
+        )
+        assert "실적" in result and "둔화" in result
+
+    def test_attractive_dividend_mentioned(self):
+        """배당수익률 매력적 → 배당 언급."""
+        result = generate_commentary(
+            self._base_indicators(),
+            self._base_supply_demand(),
+            self._base_exchange_rate(),
+            self._base_composite_signal(),
+            self._base_support_resistance(),
+            fundamentals=self._base_fundamentals(dividend_attractiveness="매력적", dividend_yield=3.5),
+        )
+        assert "배당" in result
+
+    def test_no_fundamentals_no_mention(self):
+        """fundamentals=None이면 관련 문장 없음."""
+        result = generate_commentary(
+            self._base_indicators(),
+            self._base_supply_demand(),
+            self._base_exchange_rate(),
+            self._base_composite_signal(),
+            self._base_support_resistance(),
+        )
+        assert "저평가" not in result
+        assert "고평가" not in result
+        assert "배당" not in result
+
+    def test_fair_value_no_mention(self):
+        """적정 밸류에이션이면 저평가/고평가 언급 없음."""
+        result = generate_commentary(
+            self._base_indicators(),
+            self._base_supply_demand(),
+            self._base_exchange_rate(),
+            self._base_composite_signal(),
+            self._base_support_resistance(),
+            fundamentals=self._base_fundamentals(),
+        )
+        assert "저평가" not in result
+        assert "고평가" not in result

@@ -134,6 +134,54 @@ def _score_relative_strength(rs: dict) -> float:
     return _clamp(base)
 
 
+def _score_fundamentals(fund: dict) -> float:
+    """펀더멘털 분석 → -100~+100 점수.
+
+    PER/PBR 밸류에이션, 배당수익률, 실적 전망을 종합.
+    """
+    scores: list[float] = []
+
+    # PER 밸류에이션
+    per_val = fund.get("per_valuation")
+    if per_val == "저평가":
+        scores.append(60.0)
+    elif per_val == "고평가":
+        scores.append(-60.0)
+    elif per_val == "적정":
+        scores.append(0.0)
+
+    # PBR 밸류에이션
+    pbr_val = fund.get("pbr_valuation")
+    if pbr_val == "저평가":
+        scores.append(60.0)
+    elif pbr_val == "고평가":
+        scores.append(-60.0)
+    elif pbr_val == "적정":
+        scores.append(0.0)
+
+    # 배당수익률 매력도
+    div_attr = fund.get("dividend_attractiveness")
+    if div_attr == "매력적":
+        scores.append(40.0)
+    elif div_attr == "낮음":
+        scores.append(-20.0)
+    elif div_attr == "보통":
+        scores.append(10.0)
+
+    # 실적 전망
+    outlook = fund.get("earnings_outlook")
+    if outlook == "개선":
+        scores.append(50.0)
+    elif outlook == "악화":
+        scores.append(-50.0)
+    elif outlook == "유지":
+        scores.append(0.0)
+
+    if not scores:
+        return 0.0
+    return _clamp(sum(scores) / len(scores))
+
+
 def _reversal_bonus(trend_reversal: dict) -> float:
     """추세 전환 컨버전스에 따른 보너스/페널티 점수.
 
@@ -163,6 +211,7 @@ def compute_composite_signal(
     exchange_rate: dict,
     relative_strength: dict | None = None,
     trend_reversal: dict | None = None,
+    fundamentals: dict | None = None,
 ) -> dict:
     """종합 투자 시그널을 계산한다.
 
@@ -172,6 +221,7 @@ def compute_composite_signal(
         exchange_rate: analyze_exchange_rate() 결과
         relative_strength: compute_relative_strength() 결과 (선택)
         trend_reversal: detect_reversal_signals() 결과 (선택)
+        fundamentals: analyze_fundamentals() 결과 (선택)
 
     Returns:
         dict with:
@@ -181,20 +231,35 @@ def compute_composite_signal(
             supply_score: 수급 축 점수 (-100~+100)
             exchange_score: 환율 축 점수 (-100~+100)
             rs_score: 상대강도 축 점수 (-100~+100) (선택)
+            fundamentals_score: 펀더멘털 축 점수 (-100~+100) (선택)
             weights: 각 축 가중치 (%)
     """
     tech_score = _score_technical(technical)
     sup_score = _score_supply(supply_demand)
     fx_score = _score_exchange(exchange_rate)
 
-    if relative_strength is not None:
-        rs_score = _score_relative_strength(relative_strength)
-        # 가중 합산: 기술 35%, 수급 35%, 환율 15%, 상대강도 15%
+    has_rs = relative_strength is not None
+    has_fund = fundamentals is not None
+
+    rs_score = _score_relative_strength(relative_strength) if has_rs else None
+    fund_score = _score_fundamentals(fundamentals) if has_fund else None
+
+    if has_rs and has_fund:
+        # 5축: 기술 30%, 수급 30%, 환율 15%, 상대강도 10%, 펀더멘털 15%
+        composite = (tech_score * 0.30 + sup_score * 0.30 + fx_score * 0.15
+                     + rs_score * 0.10 + fund_score * 0.15)
+        weights = {"technical": 30, "supply": 30, "exchange": 15,
+                   "relative_strength": 10, "fundamentals": 15}
+    elif has_rs:
+        # 4축 (RS만): 기술 35%, 수급 35%, 환율 15%, 상대강도 15%
         composite = tech_score * 0.35 + sup_score * 0.35 + fx_score * 0.15 + rs_score * 0.15
         weights = {"technical": 35, "supply": 35, "exchange": 15, "relative_strength": 15}
+    elif has_fund:
+        # 4축 (펀더멘털만): 기술 35%, 수급 30%, 환율 15%, 펀더멘털 20%
+        composite = tech_score * 0.35 + sup_score * 0.30 + fx_score * 0.15 + fund_score * 0.20
+        weights = {"technical": 35, "supply": 30, "exchange": 15, "fundamentals": 20}
     else:
-        rs_score = None
-        # RS 없으면 기존 가중치 유지
+        # 3축: 기술 40%, 수급 40%, 환율 20%
         composite = tech_score * 0.4 + sup_score * 0.4 + fx_score * 0.2
         weights = {"technical": 40, "supply": 40, "exchange": 20}
 
@@ -214,4 +279,6 @@ def compute_composite_signal(
     }
     if rs_score is not None:
         result["rs_score"] = rs_score
+    if fund_score is not None:
+        result["fundamentals_score"] = fund_score
     return result

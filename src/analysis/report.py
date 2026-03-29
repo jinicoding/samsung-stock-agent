@@ -398,6 +398,9 @@ def _build_composite_signal_section(sig: dict) -> list[str]:
     if "rs_score" in sig:
         rs_w = sig["weights"].get("relative_strength", 15)
         lines.append(f"  상대강도: {sig['rs_score']:+.0f} (가중치 {rs_w}%)")
+    if "fundamentals_score" in sig:
+        fund_w = sig["weights"].get("fundamentals", 15)
+        lines.append(f"  펀더멘털: {sig['fundamentals_score']:+.0f} (가중치 {fund_w}%)")
     lines.append("")
     return lines
 
@@ -543,6 +546,50 @@ def _build_relative_strength_section(rs: dict) -> list[str]:
     return lines
 
 
+def _valuation_emoji(val: str) -> str:
+    if val == "저평가":
+        return "🟢"
+    if val == "고평가":
+        return "🔴"
+    if val == "적정":
+        return "🟡"
+    return ""
+
+
+def _build_fundamentals_section(fund: dict) -> list[str]:
+    """펀더멘털 분석 결과를 HTML 라인 리스트로."""
+    lines = []
+    lines.append("")
+    lines.append("<b>📋 펀더멘털 분석</b>")
+
+    per = fund.get("per")
+    per_val = fund.get("per_valuation", "판정불가")
+    per_str = f"{per:.1f}" if per is not None else "N/A"
+    lines.append(f"  PER: {per_str} ({_valuation_emoji(per_val)} {per_val})")
+
+    pbr = fund.get("pbr")
+    pbr_val = fund.get("pbr_valuation", "판정불가")
+    pbr_str = f"{pbr:.2f}" if pbr is not None else "N/A"
+    lines.append(f"  PBR: {pbr_str} ({_valuation_emoji(pbr_val)} {pbr_val})")
+
+    div_yield = fund.get("dividend_yield")
+    div_attr = fund.get("dividend_attractiveness", "판정불가")
+    div_str = f"{div_yield:.2f}%" if div_yield is not None else "N/A"
+    lines.append(f"  배당수익률: {div_str} ({div_attr})")
+
+    eps = fund.get("eps")
+    est_eps = fund.get("estimated_eps")
+    eps_str = f"{eps:,}" if eps is not None else "N/A"
+    est_eps_str = f"{est_eps:,}" if est_eps is not None else "N/A"
+    lines.append(f"  EPS: {eps_str}원 | 추정EPS: {est_eps_str}원")
+
+    outlook = fund.get("earnings_outlook", "판정불가")
+    outlook_emoji = "📈" if outlook == "개선" else "📉" if outlook == "악화" else "➡️"
+    lines.append(f"  실적 전망: {outlook_emoji} {outlook}")
+
+    return lines
+
+
 def _build_signal_trend_section(trend: dict) -> list[str]:
     """시그널 추이 섹션을 생성한다."""
     lines = [""]
@@ -584,6 +631,7 @@ def generate_daily_report(
     relative_strength: dict | None = None,
     trend_reversal: dict | None = None,
     signal_trend: dict | None = None,
+    fundamentals: dict | None = None,
 ) -> str:
     """기술적 지표 dict를 HTML 텔레그램 메시지로 변환한다.
 
@@ -642,6 +690,7 @@ def generate_daily_report(
     commentary = generate_commentary(
         indicators, supply_demand, exchange_rate, composite_signal, support_resistance,
         relative_strength, trend_reversal=trend_reversal, signal_trend=signal_trend,
+        fundamentals=fundamentals,
     )
     if commentary:
         lines.append(f"💬 {commentary}")
@@ -728,6 +777,10 @@ def generate_daily_report(
     # 추세 전환 감지 (선택)
     if trend_reversal is not None:
         lines.extend(_build_trend_reversal_section(trend_reversal))
+
+    # 펀더멘털 분석 (선택)
+    if fundamentals is not None:
+        lines.extend(_build_fundamentals_section(fundamentals))
 
     # 지지/저항선 (선택)
     if support_resistance is not None:

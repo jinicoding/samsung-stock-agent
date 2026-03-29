@@ -1041,3 +1041,76 @@ class TestTrendReversalInReport:
         )
         assert "추세 전환" in report
         assert "약세" in report
+
+
+class TestFundamentalsSection:
+    """펀더멘털 분석 섹션 테스트."""
+
+    def _fund(self, **overrides):
+        base = {
+            "per": 12.5, "eps": 4800, "estimated_per": 10.0, "estimated_eps": 6000,
+            "pbr": 1.2, "bps": 45000, "dividend_yield": 2.0,
+            "per_valuation": "적정", "pbr_valuation": "적정",
+            "earnings_outlook": "개선", "dividend_attractiveness": "보통",
+        }
+        base.update(overrides)
+        return base
+
+    def test_no_fundamentals_no_section(self):
+        """fundamentals=None이면 펀더멘털 섹션 없음."""
+        report = generate_daily_report(_full_indicators())
+        assert "펀더멘털" not in report
+
+    def test_fundamentals_section_present(self):
+        """fundamentals가 있으면 섹션이 포함됨."""
+        report = generate_daily_report(_full_indicators(), fundamentals=self._fund())
+        assert "펀더멘털 분석" in report
+
+    def test_per_displayed(self):
+        """PER 값이 리포트에 표시됨."""
+        report = generate_daily_report(_full_indicators(), fundamentals=self._fund(per=12.5))
+        assert "PER" in report
+        assert "12.5" in report
+
+    def test_pbr_displayed(self):
+        """PBR 값이 리포트에 표시됨."""
+        report = generate_daily_report(_full_indicators(), fundamentals=self._fund(pbr=1.20))
+        assert "PBR" in report
+        assert "1.20" in report
+
+    def test_dividend_yield_displayed(self):
+        """배당수익률이 리포트에 표시됨."""
+        report = generate_daily_report(_full_indicators(), fundamentals=self._fund(dividend_yield=2.5))
+        assert "배당수익률" in report
+        assert "2.50%" in report
+
+    def test_earnings_outlook_displayed(self):
+        """실적 전망이 리포트에 표시됨."""
+        report = generate_daily_report(_full_indicators(), fundamentals=self._fund(earnings_outlook="개선"))
+        assert "실적 전망" in report
+        assert "개선" in report
+
+    def test_undervalued_emoji(self):
+        """저평가 시 녹색 이모지."""
+        report = generate_daily_report(_full_indicators(), fundamentals=self._fund(per_valuation="저평가"))
+        assert "🟢" in report
+        assert "저평가" in report
+
+    def test_overvalued_emoji(self):
+        """고평가 시 빨간 이모지."""
+        report = generate_daily_report(_full_indicators(), fundamentals=self._fund(per_valuation="고평가"))
+        assert "🔴" in report
+        assert "고평가" in report
+
+    def test_composite_signal_shows_fundamentals_score(self):
+        """종합 시그널에 펀더멘털 점수가 표시됨."""
+        sig = {
+            "score": 30.0, "grade": "매수우세",
+            "technical_score": 40.0, "supply_score": 30.0, "exchange_score": 10.0,
+            "fundamentals_score": 25.0,
+            "weights": {"technical": 30, "supply": 30, "exchange": 15,
+                        "relative_strength": 10, "fundamentals": 15},
+        }
+        report = generate_daily_report(_full_indicators(), composite_signal=sig)
+        assert "펀더멘털" in report
+        assert "15%" in report

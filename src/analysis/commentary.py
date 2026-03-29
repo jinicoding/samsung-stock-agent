@@ -21,6 +21,7 @@ def generate_commentary(
     relative_strength: dict | None = None,
     trend_reversal: dict | None = None,
     signal_trend: dict | None = None,
+    fundamentals: dict | None = None,
 ) -> str:
     """분석 결과를 2~3문장 자연어 코멘터리로 변환한다.
 
@@ -69,6 +70,11 @@ def generate_commentary(
     fx_sentence = _build_fx_sentence(er)
     if fx_sentence:
         sentences.append(fx_sentence)
+
+    # --- 4.5) 펀더멘털 문장 ---
+    fund_sentence = _build_fundamentals_sentence(fundamentals or {})
+    if fund_sentence:
+        sentences.append(fund_sentence)
 
     # --- 5) 시그널 추이 문장 ---
     trend_sentence = _build_signal_trend_sentence(signal_trend or {})
@@ -299,6 +305,59 @@ def _build_fx_sentence(er: dict) -> str:
     elif trend == "원화강세":
         return "원화강세 흐름이 수출 실적에 부담 요인으로 작용할 수 있습니다."
     return ""
+
+
+def _build_fundamentals_sentence(fund: dict) -> str:
+    """펀더멘털 분석 기반 자연어 문장."""
+    if not fund:
+        return ""
+
+    per_val = fund.get("per_valuation")
+    pbr_val = fund.get("pbr_valuation")
+    div_attr = fund.get("dividend_attractiveness")
+    outlook = fund.get("earnings_outlook")
+
+    parts: list[str] = []
+
+    # PER/PBR 저평가 또는 고평가 언급
+    undervalued = (per_val == "저평가") or (pbr_val == "저평가")
+    overvalued = (per_val == "고평가") or (pbr_val == "고평가")
+
+    if undervalued and not overvalued:
+        metrics = []
+        if per_val == "저평가":
+            per = fund.get("per")
+            metrics.append(f"PER {per:.1f}배" if per is not None else "PER")
+        if pbr_val == "저평가":
+            pbr = fund.get("pbr")
+            metrics.append(f"PBR {pbr:.2f}배" if pbr is not None else "PBR")
+        parts.append(f"{'·'.join(metrics)} 기준 저평가 영역에 위치해 있습니다")
+    elif overvalued and not undervalued:
+        metrics = []
+        if per_val == "고평가":
+            per = fund.get("per")
+            metrics.append(f"PER {per:.1f}배" if per is not None else "PER")
+        if pbr_val == "고평가":
+            pbr = fund.get("pbr")
+            metrics.append(f"PBR {pbr:.2f}배" if pbr is not None else "PBR")
+        parts.append(f"{'·'.join(metrics)} 기준 고평가 영역으로 밸류에이션 부담이 있습니다")
+
+    # 배당 매력
+    if div_attr == "매력적":
+        div_yield = fund.get("dividend_yield")
+        if div_yield is not None:
+            parts.append(f"배당수익률 {div_yield:.1f}%로 배당 매력이 높습니다")
+
+    # 실적 전망
+    if outlook == "개선":
+        parts.append("컨센서스 기준 실적 개선이 기대됩니다")
+    elif outlook == "악화":
+        parts.append("컨센서스 기준 실적 둔화가 우려됩니다")
+
+    if not parts:
+        return ""
+
+    return parts[0] + "."
 
 
 def _build_signal_trend_sentence(st: dict) -> str:

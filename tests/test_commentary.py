@@ -471,3 +471,64 @@ class TestGenerateCommentary:
         )
         assert "저평가" not in result
         assert "고평가" not in result
+
+    # --- 뉴스 감정 분석 문장 테스트 ---
+
+    def _base_news_sentiment(self, **overrides):
+        base = {
+            "label": "neutral",
+            "score": 0,
+            "positive": 3,
+            "negative": 3,
+            "neutral": 4,
+            "count": 10,
+        }
+        base.update(overrides)
+        return base
+
+    def test_bullish_news_mentioned(self):
+        """bullish 뉴스 → 긍정 심리 언급."""
+        result = generate_commentary(
+            self._base_indicators(),
+            self._base_supply_demand(),
+            self._base_exchange_rate(),
+            self._base_composite_signal(),
+            self._base_support_resistance(),
+            news_sentiment=self._base_news_sentiment(label="bullish", score=5, positive=8, negative=3),
+        )
+        assert "뉴스" in result or "심리" in result or "긍정" in result
+
+    def test_bearish_news_mentioned(self):
+        """bearish 뉴스 → 부정 심리 언급."""
+        result = generate_commentary(
+            self._base_indicators(),
+            self._base_supply_demand(),
+            self._base_exchange_rate(),
+            self._base_composite_signal(),
+            self._base_support_resistance(),
+            news_sentiment=self._base_news_sentiment(label="bearish", score=-5, positive=2, negative=7),
+        )
+        assert "뉴스" in result or "심리" in result or "부정" in result
+
+    def test_neutral_news_no_mention(self):
+        """neutral 뉴스 → 뉴스 심리 관련 문장 없음."""
+        result = generate_commentary(
+            self._base_indicators(),
+            self._base_supply_demand(),
+            self._base_exchange_rate(),
+            self._base_composite_signal(),
+            self._base_support_resistance(),
+            news_sentiment=self._base_news_sentiment(label="neutral", score=0),
+        )
+        assert "뉴스 심리" not in result
+
+    def test_no_news_no_mention(self):
+        """news_sentiment=None이면 뉴스 관련 문장 없음."""
+        result = generate_commentary(
+            self._base_indicators(),
+            self._base_supply_demand(),
+            self._base_exchange_rate(),
+            self._base_composite_signal(),
+            self._base_support_resistance(),
+        )
+        assert "뉴스 심리" not in result

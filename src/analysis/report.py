@@ -401,6 +401,9 @@ def _build_composite_signal_section(sig: dict) -> list[str]:
     if "fundamentals_score" in sig:
         fund_w = sig["weights"].get("fundamentals", 15)
         lines.append(f"  펀더멘털: {sig['fundamentals_score']:+.0f} (가중치 {fund_w}%)")
+    if "news_score" in sig:
+        news_w = sig["weights"].get("news", 10)
+        lines.append(f"  뉴스: {sig['news_score']:+.0f} (가중치 {news_w}%)")
     lines.append("")
     return lines
 
@@ -556,6 +559,43 @@ def _valuation_emoji(val: str) -> str:
     return ""
 
 
+def _sentiment_emoji(label: str) -> str:
+    if label == "bullish":
+        return "🟢"
+    if label == "bearish":
+        return "🔴"
+    return "🟡"
+
+
+def _build_news_sentiment_section(
+    news: dict, headlines: list[dict] | None = None,
+) -> list[str]:
+    """뉴스 감정 분석 결과를 HTML 라인 리스트로."""
+    lines = []
+    lines.append("")
+    lines.append("<b>📰 뉴스 심리</b>")
+
+    label = news.get("label", "neutral")
+    label_kr = {"bullish": "긍정적", "bearish": "부정적", "neutral": "중립"}.get(label, "중립")
+    lines.append(f"  판정: {_sentiment_emoji(label)} {label_kr}")
+
+    pos = news.get("positive", 0)
+    neg = news.get("negative", 0)
+    neu = news.get("neutral", 0)
+    lines.append(f"  긍정 {pos} | 부정 {neg} | 중립 {neu}")
+
+    # 주요 헤드라인 최대 3개
+    if headlines:
+        shown = headlines[:3]
+        for h in shown:
+            title = h.get("title", "")
+            source = h.get("source", "")
+            if title:
+                lines.append(f"  · {title} ({source})")
+
+    return lines
+
+
 def _build_fundamentals_section(fund: dict) -> list[str]:
     """펀더멘털 분석 결과를 HTML 라인 리스트로."""
     lines = []
@@ -632,6 +672,8 @@ def generate_daily_report(
     trend_reversal: dict | None = None,
     signal_trend: dict | None = None,
     fundamentals: dict | None = None,
+    news_sentiment: dict | None = None,
+    news_headlines: list[dict] | None = None,
 ) -> str:
     """기술적 지표 dict를 HTML 텔레그램 메시지로 변환한다.
 
@@ -690,7 +732,7 @@ def generate_daily_report(
     commentary = generate_commentary(
         indicators, supply_demand, exchange_rate, composite_signal, support_resistance,
         relative_strength, trend_reversal=trend_reversal, signal_trend=signal_trend,
-        fundamentals=fundamentals,
+        fundamentals=fundamentals, news_sentiment=news_sentiment,
     )
     if commentary:
         lines.append(f"💬 {commentary}")
@@ -781,6 +823,10 @@ def generate_daily_report(
     # 펀더멘털 분석 (선택)
     if fundamentals is not None:
         lines.extend(_build_fundamentals_section(fundamentals))
+
+    # 뉴스 심리 (선택)
+    if news_sentiment is not None:
+        lines.extend(_build_news_sentiment_section(news_sentiment, news_headlines))
 
     # 지지/저항선 (선택)
     if support_resistance is not None:

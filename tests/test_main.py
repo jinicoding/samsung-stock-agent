@@ -130,6 +130,21 @@ SAMPLE_FUNDAMENTALS = {
     "dividend_attractiveness": "보통",
 }
 
+SAMPLE_NEWS_HEADLINES = [
+    {"title": "삼성전자 실적 상승 기대", "source": "한경", "date": "2026-03-29", "sentiment": "positive"},
+    {"title": "반도체 업황 우려", "source": "매경", "date": "2026-03-29", "sentiment": "negative"},
+    {"title": "삼성전자 주주환원", "source": "조선", "date": "2026-03-29", "sentiment": "neutral"},
+]
+
+SAMPLE_NEWS_SENTIMENT = {
+    "label": "neutral",
+    "score": 0,
+    "positive": 1,
+    "negative": 1,
+    "neutral": 1,
+    "count": 3,
+}
+
 SAMPLE_REPORT_HTML = "<b>삼성전자 일일 분석</b>"
 
 SAMPLE_REVERSAL = {
@@ -167,17 +182,20 @@ SAMPLE_REVERSAL = {
 @patch("src.main.get_foreign_trading", return_value=SAMPLE_TRADING)
 @patch("src.main.get_prices", return_value=SAMPLE_PRICES)
 @patch("src.main.fetch_kospi_ohlcv", return_value=SAMPLE_KOSPI)
+@patch("src.main.summarize_sentiment", return_value=SAMPLE_NEWS_SENTIMENT)
+@patch("src.main.fetch_news_headlines", return_value=SAMPLE_NEWS_HEADLINES)
 @patch("src.main.backfill_supply_demand")
 @patch("src.main.backfill_prices")
 @patch("src.main.init_db")
 def test_pipeline_full(
     mock_init, mock_bf_prices, mock_bf_sd,
+    mock_fetch_news, mock_summarize_news,
     mock_kospi, mock_prices, mock_trading, mock_ownership, mock_rates,
     mock_tech, mock_sd, mock_er, mock_sr, mock_rs, mock_fetch_fund, mock_analyze_fund,
     mock_reversal, mock_signal, mock_upsert_sig,
     mock_sig_trend, mock_eval, mock_report, mock_send,
 ):
-    """전체 파이프라인: 백필→조회→분석→지지저항→추세전환→펀더멘털→RS→시그널→기록→정확도→리포트→발송."""
+    """전체 파이프라인: 백필→조회→분석→뉴스→지지저항→추세전환→펀더멘털→RS→시그널→기록→정확도→리포트→발송."""
     from src.main import main
 
     main()
@@ -197,10 +215,13 @@ def test_pipeline_full(
     mock_reversal.assert_called_once_with(SAMPLE_INDICATORS, SAMPLE_SR)
     mock_fetch_fund.assert_called_once()
     mock_analyze_fund.assert_called_once_with(SAMPLE_RAW_FUNDAMENTALS)
+    mock_fetch_news.assert_called_once()
+    mock_summarize_news.assert_called_once_with(SAMPLE_NEWS_HEADLINES)
     mock_signal.assert_called_once_with(
         SAMPLE_INDICATORS, SAMPLE_SD, SAMPLE_ER,
         relative_strength=SAMPLE_RS, trend_reversal=SAMPLE_REVERSAL,
         fundamentals=SAMPLE_FUNDAMENTALS,
+        news_sentiment=SAMPLE_NEWS_SENTIMENT,
     )
     mock_upsert_sig.assert_called_once_with(
         date="2026-03-60", score=35.0, grade="매수우세",
@@ -214,6 +235,8 @@ def test_pipeline_full(
         accuracy_summary=SAMPLE_ACCURACY, relative_strength=SAMPLE_RS,
         trend_reversal=SAMPLE_REVERSAL, signal_trend=None,
         fundamentals=SAMPLE_FUNDAMENTALS,
+        news_sentiment=SAMPLE_NEWS_SENTIMENT,
+        news_headlines=SAMPLE_NEWS_HEADLINES,
     )
     mock_send.assert_called_once_with(SAMPLE_REPORT_HTML)
 
@@ -237,11 +260,14 @@ def test_pipeline_full(
 @patch("src.main.get_foreign_trading", return_value=SAMPLE_TRADING)
 @patch("src.main.get_prices", return_value=SAMPLE_PRICES)
 @patch("src.main.fetch_kospi_ohlcv", return_value=SAMPLE_KOSPI)
+@patch("src.main.summarize_sentiment", return_value=SAMPLE_NEWS_SENTIMENT)
+@patch("src.main.fetch_news_headlines", return_value=SAMPLE_NEWS_HEADLINES)
 @patch("src.main.backfill_supply_demand")
 @patch("src.main.backfill_prices")
 @patch("src.main.init_db")
 def test_pipeline_dry_run(
     mock_init, mock_bf_prices, mock_bf_sd,
+    mock_fetch_news, mock_summarize_news,
     mock_kospi, mock_prices, mock_trading, mock_ownership, mock_rates,
     mock_tech, mock_sd, mock_er, mock_sr, mock_rs, mock_fetch_fund, mock_analyze_fund,
     mock_reversal, mock_signal, mock_upsert_sig,
@@ -278,11 +304,14 @@ def test_pipeline_dry_run(
 @patch("src.main.get_foreign_trading", return_value=SAMPLE_TRADING)
 @patch("src.main.get_prices", return_value=SAMPLE_PRICES)
 @patch("src.main.fetch_kospi_ohlcv", return_value=SAMPLE_KOSPI)
+@patch("src.main.summarize_sentiment", return_value=SAMPLE_NEWS_SENTIMENT)
+@patch("src.main.fetch_news_headlines", return_value=SAMPLE_NEWS_HEADLINES)
 @patch("src.main.backfill_supply_demand")
 @patch("src.main.backfill_prices")
 @patch("src.main.init_db")
 def test_pipeline_with_rs(
     mock_init, mock_bf_prices, mock_bf_sd,
+    mock_fetch_news, mock_summarize_news,
     mock_kospi, mock_prices, mock_trading, mock_ownership, mock_rates,
     mock_tech, mock_sd, mock_er, mock_sr, mock_rs, mock_fetch_fund, mock_analyze_fund,
     mock_reversal, mock_signal, mock_upsert_sig,
@@ -297,18 +326,21 @@ def test_pipeline_with_rs(
     mock_kospi.assert_called_once()
     # RS 분석 호출 확인
     mock_rs.assert_called_once()
-    # composite_signal에 RS와 reversal과 fundamentals가 전달됨
+    # composite_signal에 RS와 reversal과 fundamentals와 뉴스가 전달됨
     mock_signal.assert_called_once_with(
         SAMPLE_INDICATORS, SAMPLE_SD, SAMPLE_ER,
         relative_strength=SAMPLE_RS, trend_reversal=SAMPLE_REVERSAL,
         fundamentals=SAMPLE_FUNDAMENTALS,
+        news_sentiment=SAMPLE_NEWS_SENTIMENT,
     )
-    # report에 RS와 reversal과 fundamentals가 전달됨
+    # report에 RS와 reversal과 fundamentals와 뉴스가 전달됨
     mock_report.assert_called_once()
     report_kwargs = mock_report.call_args
     assert report_kwargs[1].get("relative_strength") == SAMPLE_RS
     assert report_kwargs[1].get("trend_reversal") == SAMPLE_REVERSAL
     assert report_kwargs[1].get("fundamentals") == SAMPLE_FUNDAMENTALS
+    assert report_kwargs[1].get("news_sentiment") == SAMPLE_NEWS_SENTIMENT
+    assert report_kwargs[1].get("news_headlines") == SAMPLE_NEWS_HEADLINES
 
 
 @patch("src.main.send_message")
@@ -330,11 +362,14 @@ def test_pipeline_with_rs(
 @patch("src.main.get_foreign_trading", return_value=SAMPLE_TRADING)
 @patch("src.main.get_prices", return_value=SAMPLE_PRICES)
 @patch("src.main.fetch_kospi_ohlcv", side_effect=Exception("KOSPI API 실패"))
+@patch("src.main.summarize_sentiment", return_value=SAMPLE_NEWS_SENTIMENT)
+@patch("src.main.fetch_news_headlines", return_value=SAMPLE_NEWS_HEADLINES)
 @patch("src.main.backfill_supply_demand")
 @patch("src.main.backfill_prices")
 @patch("src.main.init_db")
 def test_pipeline_kospi_failure_fallback(
     mock_init, mock_bf_prices, mock_bf_sd,
+    mock_fetch_news, mock_summarize_news,
     mock_kospi, mock_prices, mock_trading, mock_ownership, mock_rates,
     mock_tech, mock_sd, mock_er, mock_sr, mock_rs, mock_fetch_fund, mock_analyze_fund,
     mock_reversal, mock_signal, mock_upsert_sig,
@@ -351,17 +386,19 @@ def test_pipeline_kospi_failure_fallback(
     mock_rs.assert_not_called()
     # reversal은 여전히 호출됨 (KOSPI와 무관)
     mock_reversal.assert_called_once()
-    # composite_signal에 RS=None 전달, reversal과 fundamentals는 전달
+    # composite_signal에 RS=None 전달, reversal과 fundamentals와 뉴스는 전달
     mock_signal.assert_called_once_with(
         SAMPLE_INDICATORS, SAMPLE_SD, SAMPLE_ER,
         relative_strength=None, trend_reversal=SAMPLE_REVERSAL,
         fundamentals=SAMPLE_FUNDAMENTALS,
+        news_sentiment=SAMPLE_NEWS_SENTIMENT,
     )
-    # report에 RS=None, reversal과 fundamentals 전달
+    # report에 RS=None, reversal과 fundamentals와 뉴스 전달
     report_kwargs = mock_report.call_args
     assert report_kwargs[1].get("relative_strength") is None
     assert report_kwargs[1].get("trend_reversal") == SAMPLE_REVERSAL
     assert report_kwargs[1].get("fundamentals") == SAMPLE_FUNDAMENTALS
+    assert report_kwargs[1].get("news_sentiment") == SAMPLE_NEWS_SENTIMENT
 
 
 @patch("src.main.generate_daily_report")

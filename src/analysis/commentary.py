@@ -22,6 +22,7 @@ def generate_commentary(
     trend_reversal: dict | None = None,
     signal_trend: dict | None = None,
     fundamentals: dict | None = None,
+    news_sentiment: dict | None = None,
 ) -> str:
     """분석 결과를 2~3문장 자연어 코멘터리로 변환한다.
 
@@ -75,6 +76,11 @@ def generate_commentary(
     fund_sentence = _build_fundamentals_sentence(fundamentals or {})
     if fund_sentence:
         sentences.append(fund_sentence)
+
+    # --- 4.7) 뉴스 심리 문장 ---
+    news_sentence = _build_news_sentence(news_sentiment or {})
+    if news_sentence:
+        sentences.append(news_sentence)
 
     # --- 5) 시그널 추이 문장 ---
     trend_sentence = _build_signal_trend_sentence(signal_trend or {})
@@ -358,6 +364,23 @@ def _build_fundamentals_sentence(fund: dict) -> str:
         return ""
 
     return parts[0] + "."
+
+
+def _build_news_sentence(news: dict) -> str:
+    """뉴스 감정 분석 기반 자연어 문장."""
+    if not news:
+        return ""
+
+    label = news.get("label", "neutral")
+    pos = news.get("positive", 0)
+    neg = news.get("negative", 0)
+
+    if label == "bullish":
+        return f"뉴스 심리가 긍정적(긍정 {pos}건 vs 부정 {neg}건)으로 시장 분위기가 우호적입니다."
+    elif label == "bearish":
+        return f"뉴스 심리가 부정적(부정 {neg}건 vs 긍정 {pos}건)으로 투자 심리 위축에 유의할 필요가 있습니다."
+
+    return ""
 
 
 def _build_signal_trend_sentence(st: dict) -> str:

@@ -399,3 +399,80 @@ class TestFundamentalsIntegration:
             fundamentals=_fund(per_val="저평가", pbr_val="저평가", outlook="개선", div_attr="매력적"),
         )
         assert -100 <= result["score"] <= 100
+
+
+def _news(label="neutral", score=0, positive=0, negative=0, neutral=5, count=5) -> dict:
+    """뉴스 감정 요약 stub."""
+    return {
+        "label": label,
+        "score": score,
+        "positive": positive,
+        "negative": negative,
+        "neutral": neutral,
+        "count": count,
+    }
+
+
+class TestNewsSentimentIntegration:
+    """뉴스 감정 분석이 종합 시그널에 반영되는지 테스트."""
+
+    def test_bullish_news_boosts_score(self):
+        """bullish 뉴스 → 종합 점수 상승."""
+        base = compute_composite_signal(_tech(), _supply(), _fx())
+        boosted = compute_composite_signal(
+            _tech(), _supply(), _fx(),
+            news_sentiment=_news(label="bullish", score=5, positive=8, negative=3, count=15),
+        )
+        assert boosted["score"] > base["score"]
+
+    def test_bearish_news_lowers_score(self):
+        """bearish 뉴스 → 종합 점수 하락."""
+        base = compute_composite_signal(_tech(), _supply(), _fx())
+        lowered = compute_composite_signal(
+            _tech(), _supply(), _fx(),
+            news_sentiment=_news(label="bearish", score=-5, positive=2, negative=7, count=15),
+        )
+        assert lowered["score"] < base["score"]
+
+    def test_neutral_news_minimal_effect(self):
+        """neutral 뉴스 → 점수 변화 미미."""
+        base = compute_composite_signal(_tech(), _supply(), _fx())
+        result = compute_composite_signal(
+            _tech(), _supply(), _fx(),
+            news_sentiment=_news(label="neutral", score=0, positive=3, negative=3, count=10),
+        )
+        assert abs(result["score"] - base["score"]) < 15
+
+    def test_news_score_in_result(self):
+        """결과에 news_score가 포함."""
+        result = compute_composite_signal(
+            _tech(), _supply(), _fx(),
+            news_sentiment=_news(),
+        )
+        assert "news_score" in result
+
+    def test_no_news_no_score(self):
+        """news_sentiment=None이면 news_score 없음."""
+        result = compute_composite_signal(_tech(), _supply(), _fx())
+        assert "news_score" not in result
+
+    def test_6axis_weights_all_present(self):
+        """RS + 펀더멘털 + 뉴스 모두 있으면 6축 가중치 합 100%."""
+        rs = {"rs_trend": "neutral", "alpha_1d": 0.0}
+        result = compute_composite_signal(
+            _tech(), _supply(), _fx(),
+            relative_strength=rs, fundamentals=_fund(),
+            news_sentiment=_news(),
+        )
+        w = result["weights"]
+        assert "news" in w
+        assert sum(w.values()) == 100
+
+    def test_score_clamped_with_news(self):
+        """뉴스 포함 시에도 -100~+100 범위."""
+        tech = _tech(rsi=10, macd_histogram=1000, bb_pctb=0.0, price_vs_ma5_pct=5.0)
+        result = compute_composite_signal(
+            tech, _supply("buy_dominant"), _fx("원화약세", 2.0),
+            news_sentiment=_news(label="bullish", score=10, positive=15, negative=5, count=20),
+        )
+        assert -100 <= result["score"] <= 100

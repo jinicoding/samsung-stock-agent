@@ -1114,3 +1114,71 @@ class TestFundamentalsSection:
         report = generate_daily_report(_full_indicators(), composite_signal=sig)
         assert "펀더멘털" in report
         assert "15%" in report
+
+
+class TestNewsSentimentSection:
+    """뉴스 감정 분석 섹션 테스트."""
+
+    def _news(self, **overrides):
+        base = {
+            "label": "bullish",
+            "score": 3,
+            "positive": 5,
+            "negative": 2,
+            "neutral": 3,
+            "count": 10,
+        }
+        base.update(overrides)
+        return base
+
+    def _headlines(self):
+        return [
+            {"title": "삼성전자 실적 호실적 기대", "source": "한경", "date": "2026-03-29", "sentiment": "positive"},
+            {"title": "반도체 업황 회복 신호", "source": "매일경제", "date": "2026-03-29", "sentiment": "positive"},
+            {"title": "삼성전자 주가 하락 우려", "source": "조선일보", "date": "2026-03-29", "sentiment": "negative"},
+        ]
+
+    def test_no_news_no_section(self):
+        """news_sentiment=None이면 뉴스 섹션 없음."""
+        report = generate_daily_report(_full_indicators())
+        assert "뉴스 심리" not in report
+
+    def test_news_section_present(self):
+        """news_sentiment가 있으면 뉴스 심리 섹션이 포함."""
+        report = generate_daily_report(
+            _full_indicators(),
+            news_sentiment=self._news(),
+            news_headlines=self._headlines(),
+        )
+        assert "뉴스 심리" in report
+
+    def test_news_sentiment_counts(self):
+        """긍정/부정/중립 건수가 표시됨."""
+        report = generate_daily_report(
+            _full_indicators(),
+            news_sentiment=self._news(positive=5, negative=2, neutral=3),
+        )
+        assert "긍정 5" in report
+        assert "부정 2" in report
+
+    def test_news_headlines_shown(self):
+        """주요 헤드라인이 최대 3개 표시됨."""
+        report = generate_daily_report(
+            _full_indicators(),
+            news_sentiment=self._news(),
+            news_headlines=self._headlines(),
+        )
+        assert "실적" in report or "반도체" in report
+
+    def test_composite_signal_shows_news_score(self):
+        """종합 시그널에 뉴스 점수가 표시됨."""
+        sig = {
+            "score": 30.0, "grade": "매수우세",
+            "technical_score": 40.0, "supply_score": 30.0, "exchange_score": 10.0,
+            "news_score": 20.0,
+            "weights": {"technical": 25, "supply": 25, "exchange": 15,
+                        "relative_strength": 10, "fundamentals": 15, "news": 10},
+        }
+        report = generate_daily_report(_full_indicators(), composite_signal=sig)
+        assert "뉴스" in report
+        assert "10%" in report

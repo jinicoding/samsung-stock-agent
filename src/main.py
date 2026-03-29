@@ -29,6 +29,7 @@ from src.analysis.signal_trend import analyze_signal_trend
 from src.data.kospi_index import fetch_kospi_ohlcv
 from src.data.fundamentals import fetch_fundamentals
 from src.analysis.fundamentals import analyze_fundamentals
+from src.data.news import fetch_news_headlines, summarize_sentiment
 from src.delivery.telegram_bot import send_message
 
 
@@ -80,6 +81,16 @@ def main(dry_run: bool = False):
     except Exception as e:
         print(f"[경고] KOSPI/RS 분석 실패: {e}")
 
+    # 3.65) 뉴스 헤드라인 수집 + 감정 분석
+    news_headlines = []
+    news_sentiment = None
+    try:
+        news_headlines = fetch_news_headlines()
+        if news_headlines:
+            news_sentiment = summarize_sentiment(news_headlines)
+    except Exception as e:
+        print(f"[경고] 뉴스 수집 실패: {e}")
+
     # 3.7) 추세 전환 감지
     reversal = detect_reversal_signals(indicators, sr)
 
@@ -93,7 +104,7 @@ def main(dry_run: bool = False):
         print(f"[경고] 펀더멘털 분석 실패: {e}")
 
     # 3.8) 종합 투자 시그널
-    sig = compute_composite_signal(indicators, sd or {}, er or {}, relative_strength=rs, trend_reversal=reversal, fundamentals=fund)
+    sig = compute_composite_signal(indicators, sd or {}, er or {}, relative_strength=rs, trend_reversal=reversal, fundamentals=fund, news_sentiment=news_sentiment)
 
     # 3.9) 시그널 이력 저장
     latest_price = prices[-1]["close"]
@@ -117,7 +128,7 @@ def main(dry_run: bool = False):
     sig_trend = analyze_signal_trend(db_module, days=5)
 
     # 4) 리포트 생성
-    report = generate_daily_report(indicators, supply_demand=sd, exchange_rate=er, composite_signal=sig, support_resistance=sr, accuracy_summary=accuracy_summary, relative_strength=rs, trend_reversal=reversal, signal_trend=sig_trend, fundamentals=fund)
+    report = generate_daily_report(indicators, supply_demand=sd, exchange_rate=er, composite_signal=sig, support_resistance=sr, accuracy_summary=accuracy_summary, relative_strength=rs, trend_reversal=reversal, signal_trend=sig_trend, fundamentals=fund, news_sentiment=news_sentiment, news_headlines=news_headlines)
 
     # 5) 발송 또는 출력
     if dry_run:

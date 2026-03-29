@@ -182,6 +182,29 @@ def _score_fundamentals(fund: dict) -> float:
     return _clamp(sum(scores) / len(scores))
 
 
+def _score_news_sentiment(news: dict) -> float:
+    """뉴스 감정 요약 → -100~+100 점수.
+
+    bullish/bearish/neutral 라벨 + score 강도로 산출.
+    score = positive - negative 건수.
+    """
+    label = news.get("label", "neutral")
+    raw_score = news.get("score", 0)
+    count = news.get("count", 0)
+
+    if count == 0:
+        return 0.0
+
+    # 라벨 기반 base
+    base = {"bullish": 40, "bearish": -40, "neutral": 0}.get(label, 0)
+
+    # score 강도 반영: (positive - negative) / count * 60
+    ratio = raw_score / count if count > 0 else 0
+    intensity = _clamp(ratio * 60, -60, 60)
+
+    return _clamp(base + intensity)
+
+
 def _reversal_bonus(trend_reversal: dict) -> float:
     """추세 전환 컨버전스에 따른 보너스/페널티 점수.
 
@@ -212,6 +235,7 @@ def compute_composite_signal(
     relative_strength: dict | None = None,
     trend_reversal: dict | None = None,
     fundamentals: dict | None = None,
+    news_sentiment: dict | None = None,
 ) -> dict:
     """종합 투자 시그널을 계산한다.
 
@@ -222,6 +246,7 @@ def compute_composite_signal(
         relative_strength: compute_relative_strength() 결과 (선택)
         trend_reversal: detect_reversal_signals() 결과 (선택)
         fundamentals: analyze_fundamentals() 결과 (선택)
+        news_sentiment: summarize_sentiment() 결과 (선택)
 
     Returns:
         dict with:
@@ -232,6 +257,7 @@ def compute_composite_signal(
             exchange_score: 환율 축 점수 (-100~+100)
             rs_score: 상대강도 축 점수 (-100~+100) (선택)
             fundamentals_score: 펀더멘털 축 점수 (-100~+100) (선택)
+            news_score: 뉴스 감정 축 점수 (-100~+100) (선택)
             weights: 각 축 가중치 (%)
     """
     tech_score = _score_technical(technical)
@@ -240,16 +266,36 @@ def compute_composite_signal(
 
     has_rs = relative_strength is not None
     has_fund = fundamentals is not None
+    has_news = news_sentiment is not None
 
     rs_score = _score_relative_strength(relative_strength) if has_rs else None
     fund_score = _score_fundamentals(fundamentals) if has_fund else None
+    news_score = _score_news_sentiment(news_sentiment) if has_news else None
 
-    if has_rs and has_fund:
+    if has_rs and has_fund and has_news:
+        # 6축: 기술 25%, 수급 25%, 환율 15%, 상대강도 10%, 펀더멘털 15%, 뉴스 10%
+        composite = (tech_score * 0.25 + sup_score * 0.25 + fx_score * 0.15
+                     + rs_score * 0.10 + fund_score * 0.15 + news_score * 0.10)
+        weights = {"technical": 25, "supply": 25, "exchange": 15,
+                   "relative_strength": 10, "fundamentals": 15, "news": 10}
+    elif has_rs and has_fund:
         # 5축: 기술 30%, 수급 30%, 환율 15%, 상대강도 10%, 펀더멘털 15%
         composite = (tech_score * 0.30 + sup_score * 0.30 + fx_score * 0.15
                      + rs_score * 0.10 + fund_score * 0.15)
         weights = {"technical": 30, "supply": 30, "exchange": 15,
                    "relative_strength": 10, "fundamentals": 15}
+    elif has_rs and has_news:
+        # 5축 (RS+뉴스): 기술 30%, 수급 30%, 환율 15%, 상대강도 15%, 뉴스 10%
+        composite = (tech_score * 0.30 + sup_score * 0.30 + fx_score * 0.15
+                     + rs_score * 0.15 + news_score * 0.10)
+        weights = {"technical": 30, "supply": 30, "exchange": 15,
+                   "relative_strength": 15, "news": 10}
+    elif has_fund and has_news:
+        # 5축 (펀더멘털+뉴스): 기술 30%, 수급 25%, 환율 15%, 펀더멘털 20%, 뉴스 10%
+        composite = (tech_score * 0.30 + sup_score * 0.25 + fx_score * 0.15
+                     + fund_score * 0.20 + news_score * 0.10)
+        weights = {"technical": 30, "supply": 25, "exchange": 15,
+                   "fundamentals": 20, "news": 10}
     elif has_rs:
         # 4축 (RS만): 기술 35%, 수급 35%, 환율 15%, 상대강도 15%
         composite = tech_score * 0.35 + sup_score * 0.35 + fx_score * 0.15 + rs_score * 0.15
@@ -258,6 +304,10 @@ def compute_composite_signal(
         # 4축 (펀더멘털만): 기술 35%, 수급 30%, 환율 15%, 펀더멘털 20%
         composite = tech_score * 0.35 + sup_score * 0.30 + fx_score * 0.15 + fund_score * 0.20
         weights = {"technical": 35, "supply": 30, "exchange": 15, "fundamentals": 20}
+    elif has_news:
+        # 4축 (뉴스만): 기술 35%, 수급 35%, 환율 15%, 뉴스 15%
+        composite = tech_score * 0.35 + sup_score * 0.35 + fx_score * 0.15 + news_score * 0.15
+        weights = {"technical": 35, "supply": 35, "exchange": 15, "news": 15}
     else:
         # 3축: 기술 40%, 수급 40%, 환율 20%
         composite = tech_score * 0.4 + sup_score * 0.4 + fx_score * 0.2
@@ -281,4 +331,6 @@ def compute_composite_signal(
         result["rs_score"] = rs_score
     if fund_score is not None:
         result["fundamentals_score"] = fund_score
+    if news_score is not None:
+        result["news_score"] = news_score
     return result

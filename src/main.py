@@ -30,6 +30,7 @@ from src.data.kospi_index import fetch_kospi_ohlcv
 from src.data.fundamentals import fetch_fundamentals
 from src.analysis.fundamentals import analyze_fundamentals
 from src.data.news import fetch_news_headlines, summarize_sentiment
+from src.data.consensus import fetch_consensus, analyze_consensus
 from src.delivery.telegram_bot import send_message
 
 
@@ -103,8 +104,18 @@ def main(dry_run: bool = False):
     except Exception as e:
         print(f"[경고] 펀더멘털 분석 실패: {e}")
 
+    # 3.76) 증권사 컨센서스
+    consensus = None
+    try:
+        raw_consensus = fetch_consensus()
+        if raw_consensus:
+            current_price = prices[-1]["close"]
+            consensus = analyze_consensus(raw_consensus, current_price)
+    except Exception as e:
+        print(f"[경고] 컨센서스 수집 실패: {e}")
+
     # 3.8) 종합 투자 시그널
-    sig = compute_composite_signal(indicators, sd or {}, er or {}, relative_strength=rs, trend_reversal=reversal, fundamentals=fund, news_sentiment=news_sentiment)
+    sig = compute_composite_signal(indicators, sd or {}, er or {}, relative_strength=rs, trend_reversal=reversal, fundamentals=fund, news_sentiment=news_sentiment, consensus=consensus)
 
     # 3.9) 시그널 이력 저장
     latest_price = prices[-1]["close"]
@@ -128,7 +139,7 @@ def main(dry_run: bool = False):
     sig_trend = analyze_signal_trend(db_module, days=5)
 
     # 4) 리포트 생성
-    report = generate_daily_report(indicators, supply_demand=sd, exchange_rate=er, composite_signal=sig, support_resistance=sr, accuracy_summary=accuracy_summary, relative_strength=rs, trend_reversal=reversal, signal_trend=sig_trend, fundamentals=fund, news_sentiment=news_sentiment, news_headlines=news_headlines)
+    report = generate_daily_report(indicators, supply_demand=sd, exchange_rate=er, composite_signal=sig, support_resistance=sr, accuracy_summary=accuracy_summary, relative_strength=rs, trend_reversal=reversal, signal_trend=sig_trend, fundamentals=fund, news_sentiment=news_sentiment, news_headlines=news_headlines, consensus=consensus)
 
     # 5) 발송 또는 출력
     if dry_run:

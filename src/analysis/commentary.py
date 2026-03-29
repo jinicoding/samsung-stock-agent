@@ -23,6 +23,7 @@ def generate_commentary(
     signal_trend: dict | None = None,
     fundamentals: dict | None = None,
     news_sentiment: dict | None = None,
+    consensus: dict | None = None,
 ) -> str:
     """분석 결과를 2~3문장 자연어 코멘터리로 변환한다.
 
@@ -81,6 +82,11 @@ def generate_commentary(
     news_sentence = _build_news_sentence(news_sentiment or {})
     if news_sentence:
         sentences.append(news_sentence)
+
+    # --- 4.8) 컨센서스 문장 ---
+    cons_sentence = _build_consensus_sentence(consensus or {})
+    if cons_sentence:
+        sentences.append(cons_sentence)
 
     # --- 5) 시그널 추이 문장 ---
     trend_sentence = _build_signal_trend_sentence(signal_trend or {})
@@ -413,6 +419,25 @@ def _build_signal_trend_sentence(st: dict) -> str:
         return ""
 
     return parts[0] + "."
+
+
+def _build_consensus_sentence(cons: dict) -> str:
+    """증권사 컨센서스 기반 자연어 문장."""
+    if not cons:
+        return ""
+
+    valuation = cons.get("valuation")
+    divergence = cons.get("divergence_pct")
+    rec_label = cons.get("recommendation_label")
+
+    if valuation == "저평가" and divergence is not None:
+        return f"증권사 컨센서스 목표가 대비 {divergence:.0f}% 괴리로 저평가 구간에 위치하며, 투자의견은 {rec_label}입니다."
+    elif valuation == "고평가" and divergence is not None:
+        return f"증권사 컨센서스 목표가 대비 {divergence:.0f}% 괴리로 고평가 영역이며, 투자의견은 {rec_label}입니다."
+    elif valuation == "적정하단" and divergence is not None:
+        return f"증권사 목표가 대비 {divergence:.0f}% 괴리로 적정가 하단에 위치하며, 투자의견은 {rec_label}입니다."
+
+    return ""
 
 
 def _join_parts(parts: list[str]) -> str:

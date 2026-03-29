@@ -404,6 +404,9 @@ def _build_composite_signal_section(sig: dict) -> list[str]:
     if "news_score" in sig:
         news_w = sig["weights"].get("news", 10)
         lines.append(f"  뉴스: {sig['news_score']:+.0f} (가중치 {news_w}%)")
+    if "consensus_score" in sig:
+        cons_w = sig["weights"].get("consensus", 10)
+        lines.append(f"  컨센서스: {sig['consensus_score']:+.0f} (가중치 {cons_w}%)")
     lines.append("")
     return lines
 
@@ -596,6 +599,56 @@ def _build_news_sentiment_section(
     return lines
 
 
+def _consensus_valuation_emoji(val: str) -> str:
+    if val == "저평가":
+        return "🟢"
+    if val == "고평가":
+        return "🔴"
+    if val == "적정하단":
+        return "🟡"
+    if val == "적정":
+        return "🟡"
+    return ""
+
+
+def _build_consensus_section(cons: dict) -> list[str]:
+    """증권사 컨센서스 분석 결과를 HTML 라인 리스트로."""
+    lines = []
+    lines.append("")
+    lines.append("<b>🏦 증권사 컨센서스</b>")
+
+    target = cons.get("target_price")
+    current = cons.get("current_price")
+    divergence = cons.get("divergence_pct")
+    valuation = cons.get("valuation", "판정불가")
+
+    if target is not None:
+        lines.append(f"  목표가: {int(target):,}원 (현재가: {int(current):,}원)" if current else f"  목표가: {int(target):,}원")
+
+    if divergence is not None:
+        lines.append(f"  괴리율: {divergence:+.1f}% ({_consensus_valuation_emoji(valuation)} {valuation})")
+
+    rec = cons.get("recommendation")
+    rec_label = cons.get("recommendation_label", "판정불가")
+    if rec is not None:
+        lines.append(f"  투자의견: {rec:.2f} ({rec_label})")
+
+    tone = cons.get("research_tone", "중립")
+    tone_emoji = "🟢" if tone == "긍정" else "🔴" if tone == "부정" else "🟡"
+    lines.append(f"  증권가 톤: {tone_emoji} {tone}")
+
+    # 최근 리포트 Top 3
+    researches = cons.get("researches", [])
+    if researches:
+        for r in researches[:3]:
+            title = r.get("title", "")
+            broker = r.get("broker", "")
+            if title:
+                lines.append(f"  · {title} ({broker})")
+
+    return lines
+
+
 def _build_fundamentals_section(fund: dict) -> list[str]:
     """펀더멘털 분석 결과를 HTML 라인 리스트로."""
     lines = []
@@ -674,6 +727,7 @@ def generate_daily_report(
     fundamentals: dict | None = None,
     news_sentiment: dict | None = None,
     news_headlines: list[dict] | None = None,
+    consensus: dict | None = None,
 ) -> str:
     """기술적 지표 dict를 HTML 텔레그램 메시지로 변환한다.
 
@@ -732,7 +786,7 @@ def generate_daily_report(
     commentary = generate_commentary(
         indicators, supply_demand, exchange_rate, composite_signal, support_resistance,
         relative_strength, trend_reversal=trend_reversal, signal_trend=signal_trend,
-        fundamentals=fundamentals, news_sentiment=news_sentiment,
+        fundamentals=fundamentals, news_sentiment=news_sentiment, consensus=consensus,
     )
     if commentary:
         lines.append(f"💬 {commentary}")
@@ -827,6 +881,10 @@ def generate_daily_report(
     # 뉴스 심리 (선택)
     if news_sentiment is not None:
         lines.extend(_build_news_sentiment_section(news_sentiment, news_headlines))
+
+    # 증권사 컨센서스 (선택)
+    if consensus is not None:
+        lines.extend(_build_consensus_section(consensus))
 
     # 지지/저항선 (선택)
     if support_resistance is not None:

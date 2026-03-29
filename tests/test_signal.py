@@ -476,3 +476,85 @@ class TestNewsSentimentIntegration:
             news_sentiment=_news(label="bullish", score=10, positive=15, negative=5, count=20),
         )
         assert -100 <= result["score"] <= 100
+
+
+def _cons(valuation="적정", rec_label="매수유지", tone="중립") -> dict:
+    """컨센서스 분석 결과 stub."""
+    return {
+        "target_price": 250000,
+        "current_price": 200000,
+        "divergence_pct": 25.0,
+        "valuation": valuation,
+        "recommendation": 4.0,
+        "recommendation_label": rec_label,
+        "researches": [],
+        "research_tone": tone,
+    }
+
+
+class TestConsensusIntegration:
+    """컨센서스 분석이 종합 시그널에 반영되는지 테스트."""
+
+    def test_undervalued_consensus_boosts_score(self):
+        """저평가+매수 → 점수 상승."""
+        base = compute_composite_signal(_tech(), _supply(), _fx())
+        boosted = compute_composite_signal(
+            _tech(), _supply(), _fx(),
+            consensus=_cons(valuation="저평가", rec_label="매수", tone="긍정"),
+        )
+        assert boosted["score"] > base["score"]
+
+    def test_overvalued_consensus_lowers_score(self):
+        """고평가+매도 → 점수 하락."""
+        base = compute_composite_signal(_tech(), _supply(), _fx())
+        lowered = compute_composite_signal(
+            _tech(), _supply(), _fx(),
+            consensus=_cons(valuation="고평가", rec_label="매도", tone="부정"),
+        )
+        assert lowered["score"] < base["score"]
+
+    def test_consensus_score_in_result(self):
+        """결과에 consensus_score가 포함."""
+        result = compute_composite_signal(
+            _tech(), _supply(), _fx(), consensus=_cons(),
+        )
+        assert "consensus_score" in result
+
+    def test_no_consensus_no_score(self):
+        """consensus=None이면 consensus_score 없음."""
+        result = compute_composite_signal(_tech(), _supply(), _fx())
+        assert "consensus_score" not in result
+
+    def test_consensus_weight_is_10(self):
+        """컨센서스 축 가중치는 10%."""
+        result = compute_composite_signal(
+            _tech(), _supply(), _fx(), consensus=_cons(),
+        )
+        assert result["weights"]["consensus"] == 10
+
+    def test_weights_sum_to_100_with_consensus(self):
+        """컨센서스 포함 시 가중치 합 100%."""
+        result = compute_composite_signal(
+            _tech(), _supply(), _fx(), consensus=_cons(),
+        )
+        assert sum(result["weights"].values()) == 100
+
+    def test_weights_sum_to_100_all_axes(self):
+        """모든 축(RS+펀더멘털+뉴스+컨센서스) 포함 시 가중치 합 100%."""
+        rs = {"rs_trend": "neutral", "alpha_1d": 0.0}
+        result = compute_composite_signal(
+            _tech(), _supply(), _fx(),
+            relative_strength=rs, fundamentals=_fund(),
+            news_sentiment=_news(), consensus=_cons(),
+        )
+        assert sum(result["weights"].values()) == 100
+        assert result["weights"]["consensus"] == 10
+
+    def test_score_clamped_with_consensus(self):
+        """컨센서스 포함 시에도 -100~+100 범위."""
+        tech = _tech(rsi=10, macd_histogram=1000, bb_pctb=0.0, price_vs_ma5_pct=5.0)
+        result = compute_composite_signal(
+            tech, _supply("buy_dominant"), _fx("원화약세", 2.0),
+            consensus=_cons(valuation="저평가", rec_label="매수", tone="긍정"),
+        )
+        assert -100 <= result["score"] <= 100

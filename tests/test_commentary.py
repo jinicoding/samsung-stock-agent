@@ -532,3 +532,51 @@ class TestGenerateCommentary:
             self._base_support_resistance(),
         )
         assert "뉴스 심리" not in result
+
+    def test_consensus_undervalued_mention(self):
+        """저평가 컨센서스 → 저평가 문장 포함."""
+        cons = {
+            "target_price": 250000, "current_price": 180000,
+            "divergence_pct": 38.9, "valuation": "저평가",
+            "recommendation": 4.5, "recommendation_label": "매수",
+            "researches": [], "research_tone": "긍정",
+        }
+        result = generate_commentary(
+            self._base_indicators(),
+            self._base_supply_demand(),
+            self._base_exchange_rate(),
+            self._base_composite_signal(),
+            self._base_support_resistance(),
+            consensus=cons,
+        )
+        assert "저평가" in result
+        assert "매수" in result
+
+    def test_consensus_overvalued_mention(self):
+        """고평가 컨센서스 → 고평가 문장 포함."""
+        cons = {
+            "target_price": 160000, "current_price": 180000,
+            "divergence_pct": -11.1, "valuation": "고평가",
+            "recommendation": 3.0, "recommendation_label": "중립",
+            "researches": [], "research_tone": "부정",
+        }
+        result = generate_commentary(
+            self._base_indicators(),
+            self._base_supply_demand(),
+            self._base_exchange_rate(),
+            self._base_composite_signal(),
+            self._base_support_resistance(),
+            consensus=cons,
+        )
+        assert "고평가" in result
+
+    def test_no_consensus_no_mention(self):
+        """consensus=None이면 컨센서스 관련 문장 없음."""
+        result = generate_commentary(
+            self._base_indicators(),
+            self._base_supply_demand(),
+            self._base_exchange_rate(),
+            self._base_composite_signal(),
+            self._base_support_resistance(),
+        )
+        assert "컨센서스" not in result

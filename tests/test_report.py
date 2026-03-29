@@ -1182,3 +1182,75 @@ class TestNewsSentimentSection:
         report = generate_daily_report(_full_indicators(), composite_signal=sig)
         assert "뉴스" in report
         assert "10%" in report
+
+
+class TestConsensusInReport:
+    """증권사 컨센서스 섹션이 리포트에 포함되는지 테스트."""
+
+    def _cons(self, **overrides):
+        base = {
+            "target_price": 252720,
+            "current_price": 180000,
+            "divergence_pct": 40.4,
+            "valuation": "저평가",
+            "recommendation": 4.2,
+            "recommendation_label": "매수유지",
+            "researches": [
+                {"title": "삼성전자 목표가 상향", "broker": "삼성증권", "date": "2026-03-28"},
+                {"title": "반도체 수요 회복 기대", "broker": "미래에셋", "date": "2026-03-27"},
+            ],
+            "research_tone": "긍정",
+        }
+        base.update(overrides)
+        return base
+
+    def test_no_consensus_no_section(self):
+        """consensus=None이면 컨센서스 섹션 없음."""
+        report = generate_daily_report(_full_indicators())
+        assert "증권사 컨센서스" not in report
+
+    def test_consensus_section_present(self):
+        """consensus가 있으면 섹션이 포함."""
+        report = generate_daily_report(
+            _full_indicators(), consensus=self._cons(),
+        )
+        assert "증권사 컨센서스" in report
+
+    def test_target_price_shown(self):
+        """목표가가 표시됨."""
+        report = generate_daily_report(
+            _full_indicators(), consensus=self._cons(),
+        )
+        assert "252,720" in report
+
+    def test_divergence_shown(self):
+        """괴리율이 표시됨."""
+        report = generate_daily_report(
+            _full_indicators(), consensus=self._cons(),
+        )
+        assert "40.4%" in report or "+40.4%" in report
+
+    def test_recommendation_shown(self):
+        """투자의견이 표시됨."""
+        report = generate_daily_report(
+            _full_indicators(), consensus=self._cons(),
+        )
+        assert "매수유지" in report
+
+    def test_researches_shown(self):
+        """최근 리포트 제목이 최대 3건 표시됨."""
+        report = generate_daily_report(
+            _full_indicators(), consensus=self._cons(),
+        )
+        assert "목표가 상향" in report or "수요 회복" in report
+
+    def test_composite_signal_shows_consensus_score(self):
+        """종합 시그널에 컨센서스 점수가 표시됨."""
+        sig = {
+            "score": 30.0, "grade": "매수우세",
+            "technical_score": 40.0, "supply_score": 30.0, "exchange_score": 10.0,
+            "consensus_score": 25.0,
+            "weights": {"technical": 36, "supply": 36, "exchange": 18, "consensus": 10},
+        }
+        report = generate_daily_report(_full_indicators(), composite_signal=sig)
+        assert "컨센서스" in report

@@ -24,6 +24,7 @@ def generate_commentary(
     fundamentals: dict | None = None,
     news_sentiment: dict | None = None,
     consensus: dict | None = None,
+    weekly_summary: dict | None = None,
 ) -> str:
     """분석 결과를 2~3문장 자연어 코멘터리로 변환한다.
 
@@ -92,6 +93,11 @@ def generate_commentary(
     trend_sentence = _build_signal_trend_sentence(signal_trend or {})
     if trend_sentence:
         sentences.append(trend_sentence)
+
+    # --- 6) 주간 추이 요약 문장 ---
+    weekly_sentence = _build_weekly_sentence(weekly_summary or {})
+    if weekly_sentence:
+        sentences.append(weekly_sentence)
 
     return " ".join(sentences)
 
@@ -436,6 +442,32 @@ def _build_consensus_sentence(cons: dict) -> str:
         return f"증권사 컨센서스 목표가 대비 {divergence:.0f}% 괴리로 고평가 영역이며, 투자의견은 {rec_label}입니다."
     elif valuation == "적정하단" and divergence is not None:
         return f"증권사 목표가 대비 {divergence:.0f}% 괴리로 적정가 하단에 위치하며, 투자의견은 {rec_label}입니다."
+
+    return ""
+
+
+def _build_weekly_sentence(ws: dict) -> str:
+    """주간 추이 요약을 자연어 문장으로."""
+    if not ws:
+        return ""
+
+    judgment = ws.get("judgment", "")
+    change_pct = ws.get("change_pct", 0)
+    days = ws.get("days", 0)
+
+    if not judgment or days < 2:
+        return ""
+
+    sign = "+" if change_pct > 0 else ""
+
+    if judgment == "횡보":
+        return f"이번 주 {days}거래일간 {sign}{change_pct:.1f}% 변동으로 횡보 흐름을 보였습니다."
+    elif "전환" in judgment:
+        return f"이번 주 {days}거래일간 {sign}{change_pct:.1f}% 변동과 함께 {judgment} 흐름이 나타나 추세 변화에 주목할 필요가 있습니다."
+    elif "상승" in judgment:
+        return f"이번 주 {days}거래일간 {sign}{change_pct:.1f}% 상승하며 주간 상승 흐름이 이어지고 있습니다."
+    elif "하락" in judgment:
+        return f"이번 주 {days}거래일간 {sign}{change_pct:.1f}% 하락하며 주간 약세 흐름이 지속되고 있습니다."
 
     return ""
 

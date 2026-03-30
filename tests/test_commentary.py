@@ -580,3 +580,89 @@ class TestGenerateCommentary:
             self._base_support_resistance(),
         )
         assert "컨센서스" not in result
+
+    # --- 주간 추이 요약 문장 테스트 ---
+
+    def _base_weekly_summary(self, **overrides):
+        base = {
+            "days": 5,
+            "start_date": "2026-03-24",
+            "end_date": "2026-03-28",
+            "week_open": 54000,
+            "week_close": 56000,
+            "week_high": 57000,
+            "week_low": 53500,
+            "change_pct": 3.7,
+            "total_volume": 50000000,
+            "avg_daily_volume": 10000000,
+            "institution_net_total": 500000,
+            "foreign_net_total": 1200000,
+            "signal_start_score": 20.0,
+            "signal_end_score": 45.0,
+            "signal_score_change": 25.0,
+            "signal_start_grade": "중립",
+            "signal_end_grade": "매수우세",
+            "judgment": "상승 지속",
+        }
+        base.update(overrides)
+        return base
+
+    def test_weekly_rising_mentioned(self):
+        """상승 지속 주간 → 상승 관련 문장."""
+        result = generate_commentary(
+            self._base_indicators(),
+            self._base_supply_demand(),
+            self._base_exchange_rate(),
+            self._base_composite_signal(),
+            self._base_support_resistance(),
+            weekly_summary=self._base_weekly_summary(judgment="상승 지속", change_pct=3.7),
+        )
+        assert "주간" in result or "이번 주" in result
+
+    def test_weekly_falling_mentioned(self):
+        """하락 지속 주간 → 하락 관련 문장."""
+        result = generate_commentary(
+            self._base_indicators(),
+            self._base_supply_demand(),
+            self._base_exchange_rate(),
+            self._base_composite_signal(),
+            self._base_support_resistance(),
+            weekly_summary=self._base_weekly_summary(judgment="하락 지속", change_pct=-4.2),
+        )
+        assert "주간" in result or "이번 주" in result
+
+    def test_weekly_sideways_mentioned(self):
+        """횡보 주간 → 횡보 관련 문장."""
+        result = generate_commentary(
+            self._base_indicators(),
+            self._base_supply_demand(),
+            self._base_exchange_rate(),
+            self._base_composite_signal(),
+            self._base_support_resistance(),
+            weekly_summary=self._base_weekly_summary(judgment="횡보", change_pct=0.3),
+        )
+        assert "주간" in result or "이번 주" in result
+
+    def test_weekly_reversal_mentioned(self):
+        """상승 전환 주간 → 전환 문장."""
+        result = generate_commentary(
+            self._base_indicators(),
+            self._base_supply_demand(),
+            self._base_exchange_rate(),
+            self._base_composite_signal(),
+            self._base_support_resistance(),
+            weekly_summary=self._base_weekly_summary(judgment="상승 전환", change_pct=2.5),
+        )
+        assert "주간" in result or "이번 주" in result or "전환" in result
+
+    def test_no_weekly_summary_no_mention(self):
+        """weekly_summary=None이면 주간 관련 문장 없음."""
+        result = generate_commentary(
+            self._base_indicators(),
+            self._base_supply_demand(),
+            self._base_exchange_rate(),
+            self._base_composite_signal(),
+            self._base_support_resistance(),
+        )
+        assert "주간" not in result
+        assert "이번 주" not in result

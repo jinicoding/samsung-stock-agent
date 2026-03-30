@@ -13,6 +13,7 @@ from src.data.database import (
     get_foreign_ownership,
     get_foreign_trading,
     get_prices,
+    get_signal_history,
     init_db,
     upsert_signal_history,
 )
@@ -31,6 +32,7 @@ from src.data.fundamentals import fetch_fundamentals
 from src.analysis.fundamentals import analyze_fundamentals
 from src.data.news import fetch_news_headlines, summarize_sentiment
 from src.data.consensus import fetch_consensus, analyze_consensus
+from src.analysis.weekly_summary import summarize_weekly
 from src.delivery.telegram_bot import send_message
 
 
@@ -138,8 +140,19 @@ def main(dry_run: bool = False):
     # 3.11) 시그널 추이 분석
     sig_trend = analyze_signal_trend(db_module, days=5)
 
+    # 3.12) 주간 추이 요약
+    weekly = None
+    try:
+        recent_prices = get_prices(5)
+        recent_trading = get_foreign_trading(5)
+        recent_signals = get_signal_history(5)
+        if recent_prices and len(recent_prices) >= 2:
+            weekly = summarize_weekly(recent_prices, recent_trading or [], recent_signals or [])
+    except Exception as e:
+        print(f"[경고] 주간 추이 요약 실패: {e}")
+
     # 4) 리포트 생성
-    report = generate_daily_report(indicators, supply_demand=sd, exchange_rate=er, composite_signal=sig, support_resistance=sr, accuracy_summary=accuracy_summary, relative_strength=rs, trend_reversal=reversal, signal_trend=sig_trend, fundamentals=fund, news_sentiment=news_sentiment, news_headlines=news_headlines, consensus=consensus)
+    report = generate_daily_report(indicators, supply_demand=sd, exchange_rate=er, composite_signal=sig, support_resistance=sr, accuracy_summary=accuracy_summary, relative_strength=rs, trend_reversal=reversal, signal_trend=sig_trend, fundamentals=fund, news_sentiment=news_sentiment, news_headlines=news_headlines, consensus=consensus, weekly_summary=weekly)
 
     # 5) 발송 또는 출력
     if dry_run:

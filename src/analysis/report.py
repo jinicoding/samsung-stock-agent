@@ -714,6 +714,58 @@ def _build_signal_trend_section(trend: dict) -> list[str]:
     return lines
 
 
+def _judgment_emoji(judgment: str) -> str:
+    """주간 판정 이모지."""
+    if "상승" in judgment:
+        return "📈"
+    if "하락" in judgment:
+        return "📉"
+    return "➡️"
+
+
+def _build_weekly_summary_section(ws: dict) -> list[str]:
+    """주간 추이 요약을 HTML 라인 리스트로."""
+    lines = []
+    lines.append("")
+    lines.append(f"<b>📅 주간 추이 ({ws['start_date']} ~ {ws['end_date']})</b>")
+
+    change_pct = ws["change_pct"]
+    sign = "+" if change_pct > 0 else ""
+    lines.append(
+        f"  {_judgment_emoji(ws['judgment'])} {ws['judgment']} "
+        f"({sign}{change_pct:.1f}%)"
+    )
+    lines.append(
+        f"  시가: {_format_price(ws['week_open'])} → 종가: {_format_price(ws['week_close'])}"
+    )
+    lines.append(
+        f"  고가: {_format_price(ws['week_high'])} | 저가: {_format_price(ws['week_low'])}"
+    )
+
+    avg_vol = ws["avg_daily_volume"]
+    if avg_vol >= 1_000_000:
+        vol_str = f"{avg_vol / 1_000_000:.1f}백만주"
+    else:
+        vol_str = f"{avg_vol:,.0f}주"
+    lines.append(f"  일평균 거래량: {vol_str}")
+
+    foreign = ws.get("foreign_net_total", 0)
+    institution = ws.get("institution_net_total", 0)
+    lines.append(
+        f"  주간 수급: 외국인 {_format_shares(foreign)} | 기관 {_format_shares(institution)}"
+    )
+
+    sig_change = ws.get("signal_score_change")
+    sig_start = ws.get("signal_start_grade", "")
+    sig_end = ws.get("signal_end_grade", "")
+    if sig_change is not None and sig_start and sig_end:
+        lines.append(
+            f"  시그널: {sig_start} → {sig_end} ({sig_change:+.0f}p)"
+        )
+
+    return lines
+
+
 def generate_daily_report(
     indicators: dict,
     supply_demand: dict | None = None,
@@ -728,6 +780,7 @@ def generate_daily_report(
     news_sentiment: dict | None = None,
     news_headlines: list[dict] | None = None,
     consensus: dict | None = None,
+    weekly_summary: dict | None = None,
 ) -> str:
     """기술적 지표 dict를 HTML 텔레그램 메시지로 변환한다.
 
@@ -781,12 +834,18 @@ def generate_daily_report(
     if signal_trend is not None:
         lines.extend(_build_signal_trend_section(signal_trend))
 
+    # 0.4) 주간 추이 요약 (시그널 추이 아래)
+    if weekly_summary is not None:
+        lines.extend(_build_weekly_summary_section(weekly_summary))
+        lines.append("")
+
     # 0.5) 자연어 마켓 코멘터리 (종합 판정 바로 아래)
     from src.analysis.commentary import generate_commentary
     commentary = generate_commentary(
         indicators, supply_demand, exchange_rate, composite_signal, support_resistance,
         relative_strength, trend_reversal=trend_reversal, signal_trend=signal_trend,
         fundamentals=fundamentals, news_sentiment=news_sentiment, consensus=consensus,
+        weekly_summary=weekly_summary,
     )
     if commentary:
         lines.append(f"💬 {commentary}")

@@ -1254,3 +1254,80 @@ class TestConsensusInReport:
         }
         report = generate_daily_report(_full_indicators(), composite_signal=sig)
         assert "컨센서스" in report
+
+
+# ── 주간 추이 요약 섹션 테스트 ───────────────────────────────────
+
+
+def _weekly_summary_sample() -> dict:
+    return {
+        "days": 5,
+        "start_date": "2026-03-24",
+        "end_date": "2026-03-28",
+        "week_open": 54000,
+        "week_close": 56000,
+        "week_high": 57000,
+        "week_low": 53500,
+        "change_pct": 3.7,
+        "total_volume": 50000000,
+        "avg_daily_volume": 10000000,
+        "institution_net_total": 500000,
+        "foreign_net_total": 1200000,
+        "signal_start_score": 20.0,
+        "signal_end_score": 45.0,
+        "signal_score_change": 25.0,
+        "signal_start_grade": "중립",
+        "signal_end_grade": "매수우세",
+        "judgment": "상승 지속",
+    }
+
+
+class TestWeeklySummarySection:
+    """주간 추이 요약 섹션 리포트 통합 테스트."""
+
+    def test_weekly_summary_present(self):
+        """weekly_summary가 주어지면 주간 추이 섹션이 포함된다."""
+        report = generate_daily_report(
+            _full_indicators(), weekly_summary=_weekly_summary_sample(),
+        )
+        assert "주간 추이" in report
+
+    def test_weekly_summary_contains_dates(self):
+        """주간 추이에 기간이 표시된다."""
+        ws = _weekly_summary_sample()
+        report = generate_daily_report(_full_indicators(), weekly_summary=ws)
+        assert ws["start_date"] in report
+        assert ws["end_date"] in report
+
+    def test_weekly_summary_contains_change_pct(self):
+        """주간 등락률이 표시된다."""
+        report = generate_daily_report(
+            _full_indicators(), weekly_summary=_weekly_summary_sample(),
+        )
+        assert "3.7" in report or "+3.7" in report
+
+    def test_weekly_summary_contains_judgment(self):
+        """주간 판정이 표시된다."""
+        report = generate_daily_report(
+            _full_indicators(), weekly_summary=_weekly_summary_sample(),
+        )
+        assert "상승 지속" in report
+
+    def test_weekly_summary_contains_supply(self):
+        """주간 수급 누적이 표시된다."""
+        report = generate_daily_report(
+            _full_indicators(), weekly_summary=_weekly_summary_sample(),
+        )
+        assert "외국인" in report or "기관" in report
+
+    def test_weekly_summary_none_no_section(self):
+        """weekly_summary=None이면 주간 추이 섹션 없음."""
+        report = generate_daily_report(_full_indicators())
+        assert "주간 추이" not in report
+
+    def test_weekly_summary_signal_change(self):
+        """시그널 변화가 표시된다."""
+        report = generate_daily_report(
+            _full_indicators(), weekly_summary=_weekly_summary_sample(),
+        )
+        assert "시그널" in report

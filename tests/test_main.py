@@ -208,7 +208,10 @@ SAMPLE_REVERSAL = {
 @patch("src.main.backfill_supply_demand")
 @patch("src.main.backfill_prices")
 @patch("src.main.init_db")
+@patch("src.main.get_signal_history", return_value=[])
+@patch("src.main.summarize_weekly", return_value=None)
 def test_pipeline_full(
+    mock_summarize_weekly, mock_sig_hist,
     mock_init, mock_bf_prices, mock_bf_sd,
     mock_fetch_news, mock_summarize_news,
     mock_kospi, mock_prices, mock_trading, mock_ownership, mock_rates,
@@ -227,8 +230,12 @@ def test_pipeline_full(
     mock_bf_prices.assert_called_once()
     mock_bf_sd.assert_called_once()
     mock_kospi.assert_called_once()
-    mock_prices.assert_called_once_with(60)
-    mock_trading.assert_called_once_with(20)
+    assert mock_prices.call_count == 2
+    mock_prices.assert_any_call(60)
+    mock_prices.assert_any_call(5)
+    assert mock_trading.call_count == 2
+    mock_trading.assert_any_call(20)
+    mock_trading.assert_any_call(5)
     mock_ownership.assert_called_once_with(20)
     mock_rates.assert_called_once_with(30)
     mock_tech.assert_called_once_with(SAMPLE_PRICES)
@@ -264,6 +271,7 @@ def test_pipeline_full(
         news_sentiment=SAMPLE_NEWS_SENTIMENT,
         news_headlines=SAMPLE_NEWS_HEADLINES,
         consensus=SAMPLE_CONSENSUS,
+        weekly_summary=None,
     )
     mock_send.assert_called_once_with(SAMPLE_REPORT_HTML)
 

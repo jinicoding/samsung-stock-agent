@@ -1,9 +1,17 @@
 ## Session Plan
 
-### Task 1: 반도체 업황 지표 수집 및 분석 모듈 구축
-Files: src/data/semiconductor.py, src/analysis/semiconductor.py, tests/test_semiconductor.py, tests/test_semiconductor_analysis.py
-Description: 삼성전자의 핵심 사업인 메모리 반도체 업황을 추적하는 데이터 수집 모듈과 분석 모듈을 구축한다. (1) 데이터 수집층(src/data/semiconductor.py): Naver Finance에서 SK하이닉스(000660) 주가를 가져와 메모리 반도체 동반 주가 지표로 활용하고, 필라델피아 반도체 지수(SOX) 추이를 수집한다. (2) 분석층(src/analysis/semiconductor.py): SK하이닉스 대비 삼성전자의 상대 성과, SOX 지수 추세(상승/하락/횡보), 반도체 섹터 모멘텀 스코어(-100~+100)를 산출한다. 테스트를 먼저 작성하고 구현한다. 이 세션에서는 모듈 구축만 하고, 파이프라인 통합은 다음 세션에서 진행한다.
+### Task 1: 반도체 업황 지표를 종합 시그널·리포트·코멘터리·파이프라인에 통합
+Files: src/analysis/signal.py, src/analysis/report.py, src/analysis/commentary.py, src/main.py, tests/test_signal.py, tests/test_report.py, tests/test_commentary.py, tests/test_main.py
+Description: Day 10 10:15 세션에서 구축한 반도체 업황 모듈(src/data/semiconductor.py, src/analysis/semiconductor.py)을 전체 파이프라인에 통합한다. 구체적으로:
 
-### Task 2: 시장 레짐 분류 모듈 구축
-Files: src/analysis/market_regime.py, tests/test_market_regime.py
-Description: 현재 시장 환경을 5단계(강세장/상승추세/횡보장/하락추세/약세장)로 분류하는 메타 분석 모듈을 구축한다. 기존 기술적 지표(이동평균 배열, RSI, MACD 추세), 수급 판정, 환율 추세, 상대강도, 시그널 추이 방향 등 이미 계산된 분석 결과들을 입력으로 받아 종합적인 시장 레짐을 판정한다. 레짐별 특성 설명(예: "강세장에서는 눌림목 매수 전략이 유효"), 레짐 전환 감지(이전 레짐 대비 변화), 레짐 지속 기간을 출력한다. 이 레짐 정보는 향후 코멘터리와 리포트에 통합되어, 투자자에게 "지금 어떤 장인가"라는 큰 그림을 제공한다. 테스트를 먼저 작성하고 구현한다.
+1. **signal.py**: `_score_semiconductor()` 함수 추가. `compute_semiconductor_momentum()`의 반환값(모멘텀 스코어 -100~+100)을 그대로 활용. `compute_composite_signal()`에 `semiconductor` 선택 인자 추가하고, 기존 가중치에 반도체 축 10%를 기존 축 비례 축소로 확보 (컨센서스 통합 시와 동일한 패턴).
+
+2. **report.py**: 반도체 업황 HTML 섹션 추가. 삼성전자 vs SK하이닉스 상대성과(5일/20일 alpha), SOX 지수 추세(추세·변동률·MA20), 종합 모멘텀 스코어를 표시. 기존 섹션 순서에서 펀더멘털과 뉴스 사이에 배치.
+
+3. **commentary.py**: `_build_semiconductor_sentence()` 함수 추가. 반도체 섹터 모멘텀이 강세(+30 이상)/약세(-30 이하)일 때 자연어 코멘터리 생성. `generate_commentary()`에 `semiconductor` 인자 추가.
+
+4. **main.py**: SK하이닉스 OHLCV + SOX 지수 데이터 수집 단계 추가. `compute_relative_performance()`, `compute_sox_trend()`, `compute_semiconductor_momentum()` 호출. 결과를 `compute_composite_signal()`, `generate_daily_report()`, 코멘터리에 전달.
+
+5. **테스트**: 각 모듈의 통합 테스트 추가. signal.py의 반도체 가중치 반영, report.py의 반도체 섹션 렌더링, commentary.py의 반도체 문장 생성을 검증.
+
+이전 세션들의 패턴(모듈 구축 → 파이프라인 통합)을 따르며, 기존 컨센서스 통합(Day 8 15:30)과 동일한 방식으로 진행한다.

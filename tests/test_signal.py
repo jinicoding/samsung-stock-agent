@@ -558,3 +558,75 @@ class TestConsensusIntegration:
             consensus=_cons(valuation="저평가", rec_label="매수", tone="긍정"),
         )
         assert -100 <= result["score"] <= 100
+
+
+class TestSemiconductorIntegration:
+    """반도체 업황 지표가 종합 시그널에 반영되는지 테스트."""
+
+    def test_none_semiconductor_no_effect(self):
+        """semiconductor_momentum=None이면 기존 동작 유지."""
+        base = compute_composite_signal(_tech(), _supply(), _fx())
+        result = compute_composite_signal(
+            _tech(), _supply(), _fx(), semiconductor_momentum=None,
+        )
+        assert result["score"] == pytest.approx(base["score"])
+        assert "semiconductor_score" not in result
+
+    def test_positive_momentum_boosts_score(self):
+        """양수 모멘텀 → 종합 점수 상승."""
+        base = compute_composite_signal(_tech(), _supply(), _fx())
+        boosted = compute_composite_signal(
+            _tech(), _supply(), _fx(), semiconductor_momentum=60,
+        )
+        assert boosted["score"] > base["score"]
+
+    def test_negative_momentum_lowers_score(self):
+        """음수 모멘텀 → 종합 점수 하락."""
+        base = compute_composite_signal(_tech(), _supply(), _fx())
+        lowered = compute_composite_signal(
+            _tech(), _supply(), _fx(), semiconductor_momentum=-60,
+        )
+        assert lowered["score"] < base["score"]
+
+    def test_semiconductor_score_in_result(self):
+        """결과에 semiconductor_score 키 포함."""
+        result = compute_composite_signal(
+            _tech(), _supply(), _fx(), semiconductor_momentum=50,
+        )
+        assert "semiconductor_score" in result
+        assert result["semiconductor_score"] == 50
+
+    def test_semiconductor_weight_is_10(self):
+        """반도체 축 가중치는 10%."""
+        result = compute_composite_signal(
+            _tech(), _supply(), _fx(), semiconductor_momentum=50,
+        )
+        assert result["weights"]["semiconductor"] == 10
+
+    def test_weights_sum_to_100_with_semiconductor(self):
+        """반도체 포함 시 가중치 합 100%."""
+        result = compute_composite_signal(
+            _tech(), _supply(), _fx(), semiconductor_momentum=50,
+        )
+        assert sum(result["weights"].values()) == 100
+
+    def test_weights_sum_to_100_all_axes(self):
+        """모든 축 + 반도체 포함 시 가중치 합 100%."""
+        rs = {"rs_trend": "neutral", "alpha_1d": 0.0}
+        result = compute_composite_signal(
+            _tech(), _supply(), _fx(),
+            relative_strength=rs, fundamentals=_fund(),
+            news_sentiment=_news(), consensus=_cons(),
+            semiconductor_momentum=30,
+        )
+        assert sum(result["weights"].values()) == 100
+        assert result["weights"]["semiconductor"] == 10
+
+    def test_score_clamped_with_semiconductor(self):
+        """반도체 포함 시에도 -100~+100 범위."""
+        tech = _tech(rsi=10, macd_histogram=1000, bb_pctb=0.0, price_vs_ma5_pct=5.0)
+        result = compute_composite_signal(
+            tech, _supply("buy_dominant"), _fx("원화약세", 2.0),
+            semiconductor_momentum=100,
+        )
+        assert -100 <= result["score"] <= 100

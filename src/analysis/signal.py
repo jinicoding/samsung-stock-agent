@@ -223,6 +223,14 @@ def _score_consensus(consensus: dict) -> float:
     return _clamp(sum(scores) / len(scores))
 
 
+def _score_semiconductor(momentum: int) -> float:
+    """반도체 모멘텀 스코어 → -100~+100 점수.
+
+    compute_semiconductor_momentum() 결과(-100~+100)를 그대로 시그널 점수로 사용.
+    """
+    return _clamp(float(momentum))
+
+
 def _score_news_sentiment(news: dict) -> float:
     """뉴스 감정 요약 → -100~+100 점수.
 
@@ -278,6 +286,7 @@ def compute_composite_signal(
     fundamentals: dict | None = None,
     news_sentiment: dict | None = None,
     consensus: dict | None = None,
+    semiconductor_momentum: int | None = None,
 ) -> dict:
     """종합 투자 시그널을 계산한다.
 
@@ -290,6 +299,7 @@ def compute_composite_signal(
         fundamentals: analyze_fundamentals() 결과 (선택)
         news_sentiment: summarize_sentiment() 결과 (선택)
         consensus: analyze_consensus() 결과 (선택)
+        semiconductor_momentum: compute_semiconductor_momentum() 결과 (선택)
 
     Returns:
         dict with:
@@ -302,6 +312,7 @@ def compute_composite_signal(
             fundamentals_score: 펀더멘털 축 점수 (-100~+100) (선택)
             news_score: 뉴스 감정 축 점수 (-100~+100) (선택)
             consensus_score: 컨센서스 축 점수 (-100~+100) (선택)
+            semiconductor_score: 반도체 업황 축 점수 (-100~+100) (선택)
             weights: 각 축 가중치 (%)
     """
     tech_score = _score_technical(technical)
@@ -312,11 +323,13 @@ def compute_composite_signal(
     has_fund = fundamentals is not None
     has_news = news_sentiment is not None
     has_cons = consensus is not None
+    has_semi = semiconductor_momentum is not None
 
     rs_score = _score_relative_strength(relative_strength) if has_rs else None
     fund_score = _score_fundamentals(fundamentals) if has_fund else None
     news_score = _score_news_sentiment(news_sentiment) if has_news else None
     cons_score = _score_consensus(consensus) if has_cons else None
+    semi_score = _score_semiconductor(semiconductor_momentum) if has_semi else None
 
     # --- 동적 가중치 산출 ---
     # 기본 optional 축(RS, Fund, News) 조합에 따라 base_weights를 정한 뒤,
@@ -346,12 +359,18 @@ def compute_composite_signal(
     else:
         base_weights = {"technical": 40, "supply": 40, "exchange": 20}
 
+    # consensus, semiconductor 각 10%를 기존 축에서 비례 축소하여 확보
+    extra_axes: dict[str, int] = {}
     if has_cons:
-        # consensus 10%를 기존 축에서 비례 축소하여 확보
-        cons_pct = 10
-        remaining = 100 - cons_pct
+        extra_axes["consensus"] = 10
+    if has_semi:
+        extra_axes["semiconductor"] = 10
+
+    if extra_axes:
+        extra_total = sum(extra_axes.values())
+        remaining = 100 - extra_total
         weights = {k: round(v * remaining / 100) for k, v in base_weights.items()}
-        weights["consensus"] = cons_pct
+        weights.update(extra_axes)
         # 반올림 오차 보정: 가장 큰 축에 보정
         diff = 100 - sum(weights.values())
         if diff != 0:
@@ -374,6 +393,8 @@ def compute_composite_signal(
         score_map["news"] = news_score
     if has_cons:
         score_map["consensus"] = cons_score
+    if has_semi:
+        score_map["semiconductor"] = semi_score
 
     composite = sum(score_map[k] * weights[k] / 100 for k in score_map)
 
@@ -399,4 +420,6 @@ def compute_composite_signal(
         result["news_score"] = news_score
     if cons_score is not None:
         result["consensus_score"] = cons_score
+    if semi_score is not None:
+        result["semiconductor_score"] = semi_score
     return result

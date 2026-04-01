@@ -28,6 +28,8 @@ from src.analysis.accuracy import evaluate_signals
 from src.analysis.relative_strength import compute_relative_strength
 from src.analysis.signal_trend import analyze_signal_trend
 from src.data.kospi_index import fetch_kospi_ohlcv
+from src.data.semiconductor import fetch_skhynix_ohlcv, fetch_sox_index
+from src.analysis.semiconductor import compute_relative_performance, compute_sox_trend, compute_semiconductor_momentum
 from src.data.fundamentals import fetch_fundamentals
 from src.analysis.fundamentals import analyze_fundamentals
 from src.data.news import fetch_news_headlines, summarize_sentiment
@@ -84,6 +86,30 @@ def main(dry_run: bool = False):
     except Exception as e:
         print(f"[경고] KOSPI/RS 분석 실패: {e}")
 
+    # 3.63) 반도체 업황 수집 + 분석
+    rel_perf = None
+    sox_trend = None
+    semi_momentum = None
+    try:
+        hynix_data = fetch_skhynix_ohlcv()
+        sox_data = fetch_sox_index()
+        if hynix_data:
+            samsung_closes_semi = [p["close"] for p in prices]
+            hynix_closes = [h["close"] for h in hynix_data]
+            min_len_semi = min(len(samsung_closes_semi), len(hynix_closes))
+            rel_perf = compute_relative_performance(
+                samsung_closes_semi[-min_len_semi:], hynix_closes[-min_len_semi:]
+            )
+        if sox_data:
+            sox_closes = [s["close"] for s in sox_data]
+            sox_trend = compute_sox_trend(sox_closes)
+        semi_momentum = compute_semiconductor_momentum(rel_perf, sox_trend)
+    except Exception as e:
+        print(f"[경고] 반도체 업황 분석 실패: {e}")
+        rel_perf = None
+        sox_trend = None
+        semi_momentum = None
+
     # 3.65) 뉴스 헤드라인 수집 + 감정 분석
     news_headlines = []
     news_sentiment = None
@@ -117,7 +143,7 @@ def main(dry_run: bool = False):
         print(f"[경고] 컨센서스 수집 실패: {e}")
 
     # 3.8) 종합 투자 시그널
-    sig = compute_composite_signal(indicators, sd or {}, er or {}, relative_strength=rs, trend_reversal=reversal, fundamentals=fund, news_sentiment=news_sentiment, consensus=consensus)
+    sig = compute_composite_signal(indicators, sd or {}, er or {}, relative_strength=rs, trend_reversal=reversal, fundamentals=fund, news_sentiment=news_sentiment, consensus=consensus, semiconductor_momentum=semi_momentum)
 
     # 3.9) 시그널 이력 저장
     latest_price = prices[-1]["close"]
@@ -152,7 +178,7 @@ def main(dry_run: bool = False):
         print(f"[경고] 주간 추이 요약 실패: {e}")
 
     # 4) 리포트 생성
-    report = generate_daily_report(indicators, supply_demand=sd, exchange_rate=er, composite_signal=sig, support_resistance=sr, accuracy_summary=accuracy_summary, relative_strength=rs, trend_reversal=reversal, signal_trend=sig_trend, fundamentals=fund, news_sentiment=news_sentiment, news_headlines=news_headlines, consensus=consensus, weekly_summary=weekly)
+    report = generate_daily_report(indicators, supply_demand=sd, exchange_rate=er, composite_signal=sig, support_resistance=sr, accuracy_summary=accuracy_summary, relative_strength=rs, trend_reversal=reversal, signal_trend=sig_trend, fundamentals=fund, news_sentiment=news_sentiment, news_headlines=news_headlines, consensus=consensus, weekly_summary=weekly, rel_perf=rel_perf, sox_trend=sox_trend, semiconductor_momentum=semi_momentum)
 
     # 5) 발송 또는 출력
     if dry_run:

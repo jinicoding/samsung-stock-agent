@@ -164,6 +164,34 @@ SAMPLE_CONSENSUS = {
     "research_tone": "긍정",
 }
 
+SAMPLE_HYNIX = [
+    {"date": f"2026-03-{d:02d}", "open": 200000.0, "high": 205000.0, "low": 195000.0, "close": 200000.0 + d * 500.0, "volume": 3000000}
+    for d in range(1, 61)
+]
+
+SAMPLE_SOX = [
+    {"date": f"2026-03-{d:02d}", "close": 4000.0 + d * 10.0}
+    for d in range(1, 61)
+]
+
+SAMPLE_REL_PERF = {
+    "samsung_return_5d": 1.0,
+    "hynix_return_5d": 1.5,
+    "alpha_5d": -0.5,
+    "trend": "underperform",
+}
+
+SAMPLE_SOX_TREND = {
+    "current": 4600.0,
+    "ma5": 4550.0,
+    "ma20": 4400.0,
+    "trend": "uptrend",
+    "change_5d_pct": 2.0,
+    "change_20d_pct": 5.0,
+}
+
+SAMPLE_SEMI_MOMENTUM = 30
+
 SAMPLE_REPORT_HTML = "<b>삼성전자 일일 분석</b>"
 
 SAMPLE_REVERSAL = {
@@ -203,6 +231,11 @@ SAMPLE_REVERSAL = {
 @patch("src.main.get_foreign_trading", return_value=SAMPLE_TRADING)
 @patch("src.main.get_prices", return_value=SAMPLE_PRICES)
 @patch("src.main.fetch_kospi_ohlcv", return_value=SAMPLE_KOSPI)
+@patch("src.main.compute_semiconductor_momentum", return_value=SAMPLE_SEMI_MOMENTUM)
+@patch("src.main.compute_sox_trend", return_value=SAMPLE_SOX_TREND)
+@patch("src.main.compute_relative_performance", return_value=SAMPLE_REL_PERF)
+@patch("src.main.fetch_sox_index", return_value=SAMPLE_SOX)
+@patch("src.main.fetch_skhynix_ohlcv", return_value=SAMPLE_HYNIX)
 @patch("src.main.summarize_sentiment", return_value=SAMPLE_NEWS_SENTIMENT)
 @patch("src.main.fetch_news_headlines", return_value=SAMPLE_NEWS_HEADLINES)
 @patch("src.main.backfill_supply_demand")
@@ -214,6 +247,8 @@ def test_pipeline_full(
     mock_summarize_weekly, mock_sig_hist,
     mock_init, mock_bf_prices, mock_bf_sd,
     mock_fetch_news, mock_summarize_news,
+    mock_fetch_hynix, mock_fetch_sox,
+    mock_rel_perf, mock_sox_trend, mock_semi_momentum,
     mock_kospi, mock_prices, mock_trading, mock_ownership, mock_rates,
     mock_tech, mock_sd, mock_er, mock_sr, mock_rs,
     mock_fetch_fund, mock_analyze_fund,
@@ -249,12 +284,19 @@ def test_pipeline_full(
     mock_summarize_news.assert_called_once_with(SAMPLE_NEWS_HEADLINES)
     mock_fetch_cons.assert_called_once()
     mock_analyze_cons.assert_called_once()
+    # 반도체 수집·분석 호출 확인
+    mock_fetch_hynix.assert_called_once()
+    mock_fetch_sox.assert_called_once()
+    mock_rel_perf.assert_called_once()
+    mock_sox_trend.assert_called_once()
+    mock_semi_momentum.assert_called_once_with(SAMPLE_REL_PERF, SAMPLE_SOX_TREND)
     mock_signal.assert_called_once_with(
         SAMPLE_INDICATORS, SAMPLE_SD, SAMPLE_ER,
         relative_strength=SAMPLE_RS, trend_reversal=SAMPLE_REVERSAL,
         fundamentals=SAMPLE_FUNDAMENTALS,
         news_sentiment=SAMPLE_NEWS_SENTIMENT,
         consensus=SAMPLE_CONSENSUS,
+        semiconductor_momentum=SAMPLE_SEMI_MOMENTUM,
     )
     mock_upsert_sig.assert_called_once_with(
         date="2026-03-60", score=35.0, grade="매수우세",
@@ -272,6 +314,9 @@ def test_pipeline_full(
         news_headlines=SAMPLE_NEWS_HEADLINES,
         consensus=SAMPLE_CONSENSUS,
         weekly_summary=None,
+        rel_perf=SAMPLE_REL_PERF,
+        sox_trend=SAMPLE_SOX_TREND,
+        semiconductor_momentum=SAMPLE_SEMI_MOMENTUM,
     )
     mock_send.assert_called_once_with(SAMPLE_REPORT_HTML)
 
@@ -297,6 +342,11 @@ def test_pipeline_full(
 @patch("src.main.get_foreign_trading", return_value=SAMPLE_TRADING)
 @patch("src.main.get_prices", return_value=SAMPLE_PRICES)
 @patch("src.main.fetch_kospi_ohlcv", return_value=SAMPLE_KOSPI)
+@patch("src.main.compute_semiconductor_momentum", return_value=SAMPLE_SEMI_MOMENTUM)
+@patch("src.main.compute_sox_trend", return_value=SAMPLE_SOX_TREND)
+@patch("src.main.compute_relative_performance", return_value=SAMPLE_REL_PERF)
+@patch("src.main.fetch_sox_index", return_value=SAMPLE_SOX)
+@patch("src.main.fetch_skhynix_ohlcv", return_value=SAMPLE_HYNIX)
 @patch("src.main.summarize_sentiment", return_value=SAMPLE_NEWS_SENTIMENT)
 @patch("src.main.fetch_news_headlines", return_value=SAMPLE_NEWS_HEADLINES)
 @patch("src.main.backfill_supply_demand")
@@ -305,6 +355,8 @@ def test_pipeline_full(
 def test_pipeline_dry_run(
     mock_init, mock_bf_prices, mock_bf_sd,
     mock_fetch_news, mock_summarize_news,
+    mock_fetch_hynix, mock_fetch_sox,
+    mock_rel_perf, mock_sox_trend, mock_semi_momentum,
     mock_kospi, mock_prices, mock_trading, mock_ownership, mock_rates,
     mock_tech, mock_sd, mock_er, mock_sr, mock_rs,
     mock_fetch_fund, mock_analyze_fund,
@@ -345,6 +397,11 @@ def test_pipeline_dry_run(
 @patch("src.main.get_foreign_trading", return_value=SAMPLE_TRADING)
 @patch("src.main.get_prices", return_value=SAMPLE_PRICES)
 @patch("src.main.fetch_kospi_ohlcv", return_value=SAMPLE_KOSPI)
+@patch("src.main.compute_semiconductor_momentum", return_value=SAMPLE_SEMI_MOMENTUM)
+@patch("src.main.compute_sox_trend", return_value=SAMPLE_SOX_TREND)
+@patch("src.main.compute_relative_performance", return_value=SAMPLE_REL_PERF)
+@patch("src.main.fetch_sox_index", return_value=SAMPLE_SOX)
+@patch("src.main.fetch_skhynix_ohlcv", return_value=SAMPLE_HYNIX)
 @patch("src.main.summarize_sentiment", return_value=SAMPLE_NEWS_SENTIMENT)
 @patch("src.main.fetch_news_headlines", return_value=SAMPLE_NEWS_HEADLINES)
 @patch("src.main.backfill_supply_demand")
@@ -353,6 +410,8 @@ def test_pipeline_dry_run(
 def test_pipeline_with_rs(
     mock_init, mock_bf_prices, mock_bf_sd,
     mock_fetch_news, mock_summarize_news,
+    mock_fetch_hynix, mock_fetch_sox,
+    mock_rel_perf, mock_sox_trend, mock_semi_momentum,
     mock_kospi, mock_prices, mock_trading, mock_ownership, mock_rates,
     mock_tech, mock_sd, mock_er, mock_sr, mock_rs,
     mock_fetch_fund, mock_analyze_fund,
@@ -360,7 +419,7 @@ def test_pipeline_with_rs(
     mock_reversal, mock_signal, mock_upsert_sig,
     mock_sig_trend, mock_eval, mock_report, mock_send,
 ):
-    """RS 분석이 파이프라인에 통합되어 composite_signal과 report에 전달된다."""
+    """RS + 반도체 분석이 파이프라인에 통합되어 composite_signal과 report에 전달된다."""
     from src.main import main
 
     main()
@@ -369,15 +428,20 @@ def test_pipeline_with_rs(
     mock_kospi.assert_called_once()
     # RS 분석 호출 확인
     mock_rs.assert_called_once()
-    # composite_signal에 RS와 reversal과 fundamentals와 뉴스와 컨센서스가 전달됨
+    # 반도체 수집·분석 호출 확인
+    mock_fetch_hynix.assert_called_once()
+    mock_fetch_sox.assert_called_once()
+    mock_semi_momentum.assert_called_once()
+    # composite_signal에 RS와 reversal과 fundamentals와 뉴스와 컨센서스와 반도체가 전달됨
     mock_signal.assert_called_once_with(
         SAMPLE_INDICATORS, SAMPLE_SD, SAMPLE_ER,
         relative_strength=SAMPLE_RS, trend_reversal=SAMPLE_REVERSAL,
         fundamentals=SAMPLE_FUNDAMENTALS,
         news_sentiment=SAMPLE_NEWS_SENTIMENT,
         consensus=SAMPLE_CONSENSUS,
+        semiconductor_momentum=SAMPLE_SEMI_MOMENTUM,
     )
-    # report에 RS와 reversal과 fundamentals와 뉴스와 컨센서스가 전달됨
+    # report에 RS와 reversal과 fundamentals와 뉴스와 컨센서스와 반도체가 전달됨
     mock_report.assert_called_once()
     report_kwargs = mock_report.call_args
     assert report_kwargs[1].get("relative_strength") == SAMPLE_RS
@@ -386,6 +450,7 @@ def test_pipeline_with_rs(
     assert report_kwargs[1].get("news_sentiment") == SAMPLE_NEWS_SENTIMENT
     assert report_kwargs[1].get("news_headlines") == SAMPLE_NEWS_HEADLINES
     assert report_kwargs[1].get("consensus") == SAMPLE_CONSENSUS
+    assert report_kwargs[1].get("semiconductor_momentum") == SAMPLE_SEMI_MOMENTUM
 
 
 @patch("src.main.send_message")
@@ -409,6 +474,11 @@ def test_pipeline_with_rs(
 @patch("src.main.get_foreign_trading", return_value=SAMPLE_TRADING)
 @patch("src.main.get_prices", return_value=SAMPLE_PRICES)
 @patch("src.main.fetch_kospi_ohlcv", side_effect=Exception("KOSPI API 실패"))
+@patch("src.main.compute_semiconductor_momentum", return_value=SAMPLE_SEMI_MOMENTUM)
+@patch("src.main.compute_sox_trend", return_value=SAMPLE_SOX_TREND)
+@patch("src.main.compute_relative_performance", return_value=SAMPLE_REL_PERF)
+@patch("src.main.fetch_sox_index", return_value=SAMPLE_SOX)
+@patch("src.main.fetch_skhynix_ohlcv", return_value=SAMPLE_HYNIX)
 @patch("src.main.summarize_sentiment", return_value=SAMPLE_NEWS_SENTIMENT)
 @patch("src.main.fetch_news_headlines", return_value=SAMPLE_NEWS_HEADLINES)
 @patch("src.main.backfill_supply_demand")
@@ -417,6 +487,8 @@ def test_pipeline_with_rs(
 def test_pipeline_kospi_failure_fallback(
     mock_init, mock_bf_prices, mock_bf_sd,
     mock_fetch_news, mock_summarize_news,
+    mock_fetch_hynix, mock_fetch_sox,
+    mock_rel_perf, mock_sox_trend, mock_semi_momentum,
     mock_kospi, mock_prices, mock_trading, mock_ownership, mock_rates,
     mock_tech, mock_sd, mock_er, mock_sr, mock_rs,
     mock_fetch_fund, mock_analyze_fund,
@@ -435,21 +507,26 @@ def test_pipeline_kospi_failure_fallback(
     mock_rs.assert_not_called()
     # reversal은 여전히 호출됨 (KOSPI와 무관)
     mock_reversal.assert_called_once()
-    # composite_signal에 RS=None 전달, reversal과 fundamentals와 뉴스와 컨센서스 전달
+    # 반도체 수집은 KOSPI와 독립 — 여전히 호출됨
+    mock_fetch_hynix.assert_called_once()
+    mock_fetch_sox.assert_called_once()
+    # composite_signal에 RS=None 전달, reversal과 fundamentals와 뉴스와 컨센서스와 반도체 전달
     mock_signal.assert_called_once_with(
         SAMPLE_INDICATORS, SAMPLE_SD, SAMPLE_ER,
         relative_strength=None, trend_reversal=SAMPLE_REVERSAL,
         fundamentals=SAMPLE_FUNDAMENTALS,
         news_sentiment=SAMPLE_NEWS_SENTIMENT,
         consensus=SAMPLE_CONSENSUS,
+        semiconductor_momentum=SAMPLE_SEMI_MOMENTUM,
     )
-    # report에 RS=None, reversal과 fundamentals와 뉴스와 컨센서스 전달
+    # report에 RS=None, reversal과 fundamentals와 뉴스와 컨센서스와 반도체 전달
     report_kwargs = mock_report.call_args
     assert report_kwargs[1].get("relative_strength") is None
     assert report_kwargs[1].get("trend_reversal") == SAMPLE_REVERSAL
     assert report_kwargs[1].get("fundamentals") == SAMPLE_FUNDAMENTALS
     assert report_kwargs[1].get("news_sentiment") == SAMPLE_NEWS_SENTIMENT
     assert report_kwargs[1].get("consensus") == SAMPLE_CONSENSUS
+    assert report_kwargs[1].get("semiconductor_momentum") == SAMPLE_SEMI_MOMENTUM
 
 
 @patch("src.main.generate_daily_report")

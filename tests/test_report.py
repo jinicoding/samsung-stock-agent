@@ -1331,3 +1331,116 @@ class TestWeeklySummarySection:
             _full_indicators(), weekly_summary=_weekly_summary_sample(),
         )
         assert "시그널" in report
+
+
+# ── 반도체 업황 섹션 테스트 ───────────────────────────────────
+
+
+def _rel_perf_sample(**overrides) -> dict:
+    base = {
+        "samsung_return_5d": 3.0,
+        "hynix_return_5d": 1.5,
+        "alpha_5d": 1.5,
+        "samsung_return_20d": 5.0,
+        "hynix_return_20d": 2.0,
+        "alpha_20d": 3.0,
+        "rs_current": 0.35,
+        "rs_ma20": 0.34,
+        "relative_trend": "outperform",
+    }
+    base.update(overrides)
+    return base
+
+
+def _sox_trend_sample(**overrides) -> dict:
+    base = {
+        "trend": "상승",
+        "change_pct": 5.2,
+        "ma20": 4800.0,
+        "current": 5050.0,
+        "strength": 0.5,
+    }
+    base.update(overrides)
+    return base
+
+
+class TestSemiconductorInReport:
+    """반도체 업황 섹션이 리포트에 포함되는지 테스트."""
+
+    def test_no_semiconductor_no_section(self):
+        """반도체 데이터 없으면 섹션 없음."""
+        report = generate_daily_report(_full_indicators())
+        assert "반도체 업황" not in report
+
+    def test_semiconductor_section_present(self):
+        """반도체 데이터가 있으면 섹션이 포함."""
+        report = generate_daily_report(
+            _full_indicators(),
+            rel_perf=_rel_perf_sample(),
+            sox_trend=_sox_trend_sample(),
+            semiconductor_momentum=45,
+        )
+        assert "반도체 업황" in report
+
+    def test_semiconductor_shows_alpha(self):
+        """alpha_5d, alpha_20d가 표시됨."""
+        report = generate_daily_report(
+            _full_indicators(),
+            rel_perf=_rel_perf_sample(alpha_5d=1.5, alpha_20d=3.0),
+            sox_trend=_sox_trend_sample(),
+            semiconductor_momentum=45,
+        )
+        assert "1.5" in report or "+1.5" in report
+        assert "3.0" in report or "+3.0" in report
+
+    def test_semiconductor_shows_sox(self):
+        """SOX 지수 정보가 표시됨."""
+        report = generate_daily_report(
+            _full_indicators(),
+            rel_perf=_rel_perf_sample(),
+            sox_trend=_sox_trend_sample(trend="상승", change_pct=5.2),
+            semiconductor_momentum=45,
+        )
+        assert "SOX" in report
+        assert "상승" in report
+
+    def test_semiconductor_shows_momentum(self):
+        """모멘텀 스코어가 표시됨."""
+        report = generate_daily_report(
+            _full_indicators(),
+            rel_perf=_rel_perf_sample(),
+            sox_trend=_sox_trend_sample(),
+            semiconductor_momentum=45,
+        )
+        assert "45" in report or "모멘텀" in report
+
+    def test_semiconductor_none_rel_perf(self):
+        """rel_perf=None이면 반도체 섹션 없음."""
+        report = generate_daily_report(
+            _full_indicators(),
+            rel_perf=None,
+            sox_trend=_sox_trend_sample(),
+            semiconductor_momentum=45,
+        )
+        assert "반도체 업황" not in report
+
+    def test_semiconductor_none_sox(self):
+        """sox_trend=None이면 반도체 섹션 없음."""
+        report = generate_daily_report(
+            _full_indicators(),
+            rel_perf=_rel_perf_sample(),
+            sox_trend=None,
+            semiconductor_momentum=45,
+        )
+        assert "반도체 업황" not in report
+
+    def test_composite_signal_shows_semiconductor_score(self):
+        """종합 시그널에 반도체 점수가 표시됨."""
+        sig = {
+            "score": 30.0, "grade": "매수우세",
+            "technical_score": 40.0, "supply_score": 30.0, "exchange_score": 10.0,
+            "semiconductor_score": 35.0,
+            "weights": {"technical": 36, "supply": 36, "exchange": 18, "semiconductor": 10},
+        }
+        report = generate_daily_report(_full_indicators(), composite_signal=sig)
+        assert "반도체" in report

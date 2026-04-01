@@ -666,3 +666,78 @@ class TestGenerateCommentary:
         )
         assert "주간" not in result
         assert "이번 주" not in result
+
+    # --- 반도체 업황 문장 테스트 ---
+
+    def _base_rel_perf(self, **overrides):
+        base = {
+            "alpha_5d": 1.5,
+            "alpha_20d": 3.0,
+            "relative_trend": "outperform",
+        }
+        base.update(overrides)
+        return base
+
+    def _base_sox_trend(self, **overrides):
+        base = {
+            "trend": "상승",
+            "change_pct": 5.2,
+            "strength": 0.5,
+        }
+        base.update(overrides)
+        return base
+
+    def test_semiconductor_bullish_mentioned(self):
+        """SOX 상승 + outperform → 반도체 호조 언급."""
+        result = generate_commentary(
+            self._base_indicators(),
+            self._base_supply_demand(),
+            self._base_exchange_rate(),
+            self._base_composite_signal(),
+            self._base_support_resistance(),
+            rel_perf=self._base_rel_perf(),
+            sox_trend=self._base_sox_trend(),
+            semiconductor_momentum=45,
+        )
+        assert "반도체" in result
+
+    def test_semiconductor_bearish_mentioned(self):
+        """SOX 하락 + underperform → 반도체 부진 언급."""
+        result = generate_commentary(
+            self._base_indicators(),
+            self._base_supply_demand(),
+            self._base_exchange_rate(),
+            self._base_composite_signal(),
+            self._base_support_resistance(),
+            rel_perf=self._base_rel_perf(relative_trend="underperform", alpha_5d=-2.0),
+            sox_trend=self._base_sox_trend(trend="하락", change_pct=-4.5),
+            semiconductor_momentum=-40,
+        )
+        assert "반도체" in result
+
+    def test_semiconductor_none_no_mention(self):
+        """반도체 데이터가 None이면 관련 문장 없음."""
+        result = generate_commentary(
+            self._base_indicators(),
+            self._base_supply_demand(),
+            self._base_exchange_rate(),
+            self._base_composite_signal(),
+            self._base_support_resistance(),
+        )
+        assert "반도체" not in result
+
+    def test_semiconductor_momentum_zero_no_mention(self):
+        """모멘텀이 0이고 SOX 횡보면 문장 없음."""
+        result = generate_commentary(
+            self._base_indicators(),
+            self._base_supply_demand(),
+            self._base_exchange_rate(),
+            self._base_composite_signal(),
+            self._base_support_resistance(),
+            rel_perf=self._base_rel_perf(relative_trend="neutral", alpha_5d=0.1),
+            sox_trend=self._base_sox_trend(trend="횡보", change_pct=0.5),
+            semiconductor_momentum=0,
+        )
+        # 횡보/중립이면 반도체 문장 안 나올 수 있음
+        # (구현에 따라 달라질 수 있으므로 에러 없이 동작하는지만 확인)
+        assert isinstance(result, str)

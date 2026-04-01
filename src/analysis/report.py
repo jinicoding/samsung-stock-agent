@@ -407,6 +407,9 @@ def _build_composite_signal_section(sig: dict) -> list[str]:
     if "consensus_score" in sig:
         cons_w = sig["weights"].get("consensus", 10)
         lines.append(f"  컨센서스: {sig['consensus_score']:+.0f} (가중치 {cons_w}%)")
+    if "semiconductor_score" in sig:
+        semi_w = sig["weights"].get("semiconductor", 10)
+        lines.append(f"  반도체: {sig['semiconductor_score']:+.0f} (가중치 {semi_w}%)")
     lines.append("")
     return lines
 
@@ -766,6 +769,44 @@ def _build_weekly_summary_section(ws: dict) -> list[str]:
     return lines
 
 
+def _build_semiconductor_section(
+    rel_perf: dict, sox_trend: dict, momentum: int,
+) -> list[str]:
+    """반도체 업황 분석 결과를 HTML 라인 리스트로."""
+    lines = []
+    lines.append("")
+    lines.append("<b>🔬 반도체 업황</b>")
+
+    # 삼성전자 vs SK하이닉스 상대성과
+    alpha_5d = rel_perf.get("alpha_5d")
+    alpha_20d = rel_perf.get("alpha_20d")
+    trend = rel_perf.get("relative_trend", "neutral")
+    trend_kr = {"outperform": "우위", "underperform": "열위", "neutral": "동행"}.get(trend, "동행")
+
+    alpha_5d_str = f"{alpha_5d:+.1f}%" if alpha_5d is not None else "N/A"
+    alpha_20d_str = f"{alpha_20d:+.1f}%" if alpha_20d is not None else "N/A"
+    lines.append(f"  vs SK하이닉스: {trend_kr} (5일 α {alpha_5d_str} | 20일 α {alpha_20d_str})")
+
+    # SOX 지수 추세
+    sox_label = sox_trend.get("trend", "횡보")
+    sox_change = sox_trend.get("change_pct", 0)
+    sox_current = sox_trend.get("current")
+    sox_emoji = "📈" if sox_label == "상승" else "📉" if sox_label == "하락" else "➡️"
+    current_str = f" ({sox_current:,.0f})" if sox_current is not None else ""
+    lines.append(f"  SOX: {sox_emoji} {sox_label} ({sox_change:+.1f}%){current_str}")
+
+    # 모멘텀 스코어
+    if momentum >= 30:
+        m_emoji = "🟢"
+    elif momentum <= -30:
+        m_emoji = "🔴"
+    else:
+        m_emoji = "🟡"
+    lines.append(f"  모멘텀: {m_emoji} {momentum:+d}점")
+
+    return lines
+
+
 def generate_daily_report(
     indicators: dict,
     supply_demand: dict | None = None,
@@ -781,6 +822,9 @@ def generate_daily_report(
     news_headlines: list[dict] | None = None,
     consensus: dict | None = None,
     weekly_summary: dict | None = None,
+    rel_perf: dict | None = None,
+    sox_trend: dict | None = None,
+    semiconductor_momentum: int | None = None,
 ) -> str:
     """기술적 지표 dict를 HTML 텔레그램 메시지로 변환한다.
 
@@ -845,7 +889,8 @@ def generate_daily_report(
         indicators, supply_demand, exchange_rate, composite_signal, support_resistance,
         relative_strength, trend_reversal=trend_reversal, signal_trend=signal_trend,
         fundamentals=fundamentals, news_sentiment=news_sentiment, consensus=consensus,
-        weekly_summary=weekly_summary,
+        weekly_summary=weekly_summary, rel_perf=rel_perf, sox_trend=sox_trend,
+        semiconductor_momentum=semiconductor_momentum,
     )
     if commentary:
         lines.append(f"💬 {commentary}")
@@ -940,6 +985,10 @@ def generate_daily_report(
     # 뉴스 심리 (선택)
     if news_sentiment is not None:
         lines.extend(_build_news_sentiment_section(news_sentiment, news_headlines))
+
+    # 반도체 업황 (선택)
+    if rel_perf is not None and sox_trend is not None and semiconductor_momentum is not None:
+        lines.extend(_build_semiconductor_section(rel_perf, sox_trend, semiconductor_momentum))
 
     # 증권사 컨센서스 (선택)
     if consensus is not None:

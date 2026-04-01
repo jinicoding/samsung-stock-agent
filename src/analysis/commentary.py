@@ -25,6 +25,9 @@ def generate_commentary(
     news_sentiment: dict | None = None,
     consensus: dict | None = None,
     weekly_summary: dict | None = None,
+    rel_perf: dict | None = None,
+    sox_trend: dict | None = None,
+    semiconductor_momentum: int | None = None,
 ) -> str:
     """분석 결과를 2~3문장 자연어 코멘터리로 변환한다.
 
@@ -88,6 +91,13 @@ def generate_commentary(
     cons_sentence = _build_consensus_sentence(consensus or {})
     if cons_sentence:
         sentences.append(cons_sentence)
+
+    # --- 4.9) 반도체 업황 문장 ---
+    semi_sentence = _build_semiconductor_sentence(
+        rel_perf or {}, sox_trend or {}, semiconductor_momentum,
+    )
+    if semi_sentence:
+        sentences.append(semi_sentence)
 
     # --- 5) 시그널 추이 문장 ---
     trend_sentence = _build_signal_trend_sentence(signal_trend or {})
@@ -469,6 +479,55 @@ def _build_weekly_sentence(ws: dict) -> str:
     elif "하락" in judgment:
         return f"이번 주 {days}거래일간 {sign}{change_pct:.1f}% 하락하며 주간 약세 흐름이 지속되고 있습니다."
 
+    return ""
+
+
+def _build_semiconductor_sentence(
+    rel_perf: dict, sox_trend: dict, momentum: int | None,
+) -> str:
+    """반도체 업황에 따른 자연어 코멘트."""
+    if momentum is None:
+        return ""
+    if not rel_perf or not sox_trend:
+        return ""
+
+    trend = rel_perf.get("relative_trend", "neutral")
+    sox_label = sox_trend.get("trend", "횡보")
+    alpha_5d = rel_perf.get("alpha_5d")
+
+    # 강한 호조
+    if momentum >= 30:
+        parts = ["반도체 업황이 호조세로"]
+        details = []
+        if sox_label == "상승":
+            details.append("SOX 지수 상승")
+        if trend == "outperform" and alpha_5d is not None:
+            details.append(f"SK하이닉스 대비 초과수익({alpha_5d:+.1f}%)")
+        elif trend == "outperform":
+            details.append("SK하이닉스 대비 초과수익")
+        if details:
+            parts.append(", ".join(details) + "이 긍정적입니다.")
+        else:
+            parts.append("긍정적인 흐름입니다.")
+        return " ".join(parts)
+
+    # 강한 부진
+    if momentum <= -30:
+        parts = ["반도체 업황이 부진한 가운데"]
+        details = []
+        if sox_label == "하락":
+            details.append("SOX 지수 하락")
+        if trend == "underperform" and alpha_5d is not None:
+            details.append(f"SK하이닉스 대비 부진({alpha_5d:+.1f}%)")
+        elif trend == "underperform":
+            details.append("SK하이닉스 대비 부진")
+        if details:
+            parts.append(", ".join(details) + "이 부담 요인입니다.")
+        else:
+            parts.append("업황 개선 여부를 주시할 필요가 있습니다.")
+        return " ".join(parts)
+
+    # 중립 범위는 문장 생략
     return ""
 
 

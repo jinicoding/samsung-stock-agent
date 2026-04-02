@@ -1,32 +1,9 @@
 ## Session Plan
 
-9축 종합 시그널 시스템이 완성된 상태에서, 핵심 결함을 발견했다:
-모든 분석 축이 시장 국면(추세/횡보/고변동)을 구분하지 않고 동일 가중치로 합산된다.
-RSI·스토캐스틱은 횡보장에서 유효하고, MA·MACD는 추세장에서 유효한데,
-이 구분 없이 합산하면 whipsaw 노이즈가 발생한다.
+### Task 1: ADX 추세 강도를 종합 시그널·리포트·코멘터리에 통합
+Files: src/analysis/signal.py, src/analysis/report.py, src/analysis/commentary.py, tests/test_signal.py, tests/test_report.py, tests/test_commentary.py
+Description: ADX(Average Directional Index)는 Day 12 13:30에 technical.py에 구현되었으나 signal/report/commentary에 아직 반영되지 않았다. signal.py의 _score_technical()에서 ADX 값을 활용하여 추세 강도에 따른 기존 시그널 확신도를 조절한다(ADX>25 강한 추세 시 +DI/-DI 방향으로 시그널 강화, ADX<20 추세 부재 시 모멘텀 시그널 약화). report.py에 ADX 섹션(ADX 값, +DI/-DI, 추세 강도 등급)을 추가하고, commentary.py에 추세 강도 코멘트를 추가한다. 테스트를 먼저 작성한다.
 
-추세 강도의 표준 지표인 ADX(Average Directional Index)를 먼저 구현하고,
-이를 기반으로 시장 레짐 탐지 → 시그널 가중치 동적 조정 체계를 구축한다.
-
-### Task 1: ADX(Average Directional Index) 추세 강도 지표 구현
-Files: tests/test_technical.py, src/analysis/technical.py
-Description:
-- 기술적 분석 모듈에 ADX(14) 지표를 추가한다. TDD: 테스트 먼저 작성.
-  1. Wilder smoothing 방식으로 True Range, +DM, -DM, +DI, -DI, DX, ADX를 계산
-  2. compute_technical_indicators 결과에 adx, plus_di, minus_di 키 추가
-  3. 테스트: 상승 추세 데이터에서 ADX > 25 & +DI > -DI, 횡보 데이터에서 ADX < 20,
-     하락 추세에서 -DI > +DI, 데이터 부족 시 None 반환
-
-### Task 2: 시장 레짐 탐지 모듈 구축 및 시그널·리포트·코멘터리 통합
-Files: src/analysis/market_regime.py, tests/test_market_regime.py, src/analysis/signal.py, src/analysis/report.py, src/analysis/commentary.py, src/main.py, tests/test_signal.py, tests/test_report.py, tests/test_commentary.py, tests/test_main.py
-Description:
-- 새로운 market_regime 모듈을 만들어 현재 시장 상태를 4가지로 분류한다. TDD: 테스트 먼저 작성.
-  1. 분류 기준: ADX(추세 강도) + MA 배열(정배열/역배열) + 변동성 레짐(ATR percentile)
-     - ADX≥25 + 정배열 → trending_up(상승추세)
-     - ADX≥25 + 역배열 → trending_down(하락추세)
-     - ADX<20 + 저변동 → ranging(횡보)
-     - 고변동성(HV 80th percentile 이상) → volatile(고변동)
-  2. signal.py: 레짐별 가중치 미세 조정 (추세장: 기술적↑ 수급↑, 횡보장: 지지저항↑, 고변동: 변동성↑)
-  3. report.py: 시장 레짐 섹션 추가 — "현재 시장 국면: 상승추세 (ADX 32)" 형태
-  4. commentary.py: 레짐에 따른 자연어 해설 — "추세가 강한 시장에서 기술적 지표의 신뢰도가 높습니다"
-  5. main.py: 파이프라인에 market_regime 분석 호출 추가, 결과를 signal/report/commentary에 전달
+### Task 2: 일일 리포트에 투자자 액션 요약(Action Summary) 섹션 추가
+Files: src/analysis/report.py, tests/test_report.py
+Description: 현재 리포트는 각 축별 분석 데이터를 나열하지만, 투자자가 "그래서 오늘 어떤 점에 주목해야 하는가"를 한눈에 파악하기 어렵다. 리포트 최상단에 3줄 이내의 액션 요약 섹션을 추가한다. 종합 시그널 등급, 가장 주목할 변화(전일 대비 가장 크게 변한 축), 핵심 리스크/기회 요인을 요약한다. 이는 단순 데이터 나열이 아닌 "왜 이 숫자가 중요한지"를 설명하는 나의 핵심 차별화 미션에 직결된다. 테스트를 먼저 작성한다.

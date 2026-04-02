@@ -1505,3 +1505,48 @@ class TestVolatilitySection:
         """volatility=None이면 섹션 없음."""
         report = generate_daily_report(_full_indicators())
         assert "변동성 분석" not in report
+
+
+class TestADXInReport:
+    """ADX 추세 강도 섹션 테스트."""
+
+    def _indicators_with_adx(self, adx=25.0, plus_di=20.0, minus_di=15.0):
+        ind = _full_indicators()
+        ind["adx"] = adx
+        ind["plus_di"] = plus_di
+        ind["minus_di"] = minus_di
+        return ind
+
+    def test_adx_section_present(self):
+        """ADX 데이터 전달 시 섹션이 포함됨."""
+        report = generate_daily_report(self._indicators_with_adx())
+        assert "ADX" in report
+
+    def test_adx_shows_values(self):
+        """ADX, +DI, -DI 값이 표시됨."""
+        report = generate_daily_report(self._indicators_with_adx(adx=28.5, plus_di=22.3, minus_di=14.7))
+        assert "28.5" in report
+        assert "+DI" in report
+        assert "-DI" in report
+
+    def test_adx_strong_trend_label(self):
+        """ADX>25이면 강한 추세 표시."""
+        report = generate_daily_report(self._indicators_with_adx(adx=30.0))
+        assert "강한 추세" in report
+
+    def test_adx_weak_trend_label(self):
+        """ADX<20이면 추세 부재 표시."""
+        report = generate_daily_report(self._indicators_with_adx(adx=15.0))
+        assert "추세 부재" in report
+
+    def test_adx_moderate_trend_label(self):
+        """ADX 20~25이면 약한 추세 표시."""
+        report = generate_daily_report(self._indicators_with_adx(adx=22.0))
+        assert "약한 추세" in report
+
+    def test_no_adx_no_section(self):
+        """ADX=None이면 ADX 섹션 없음."""
+        ind = _full_indicators()
+        ind["adx"] = None
+        report = generate_daily_report(ind)
+        assert "ADX(14)" not in report

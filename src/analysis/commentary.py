@@ -59,6 +59,11 @@ def generate_commentary(
     if obv_sentence:
         sentences.append(obv_sentence)
 
+    # --- 1.6) ADX 추세 강도 문장 ---
+    adx_sentence = _build_adx_sentence(indicators)
+    if adx_sentence:
+        sentences.append(adx_sentence)
+
     # --- 1.7) 추세 전환 감지 문장 ---
     reversal_sentence = _build_reversal_sentence(trend_reversal or {})
     if reversal_sentence:
@@ -597,6 +602,26 @@ def _build_volatility_sentence(vol: dict) -> str:
 
     if squeeze:
         return "볼린저 밴드폭 수축이 감지되어 변동성 확대에 대비할 필요가 있습니다."
+
+    return ""
+
+
+def _build_adx_sentence(indicators: dict) -> str:
+    """ADX 추세 강도 기반 자연어 문장."""
+    adx = indicators.get("adx")
+    if adx is None:
+        return ""
+
+    plus_di = indicators.get("plus_di", 0) or 0
+    minus_di = indicators.get("minus_di", 0) or 0
+
+    if adx > 25:
+        direction = "상승" if plus_di > minus_di else "하락"
+        if adx > 40:
+            return f"ADX {adx:.0f}으로 매우 강한 {direction} 추세가 진행 중이며 추세 추종 전략이 유효한 구간입니다."
+        return f"ADX {adx:.0f}으로 {direction} 추세가 뚜렷하게 형성되어 있습니다."
+    elif adx < 20:
+        return f"ADX {adx:.0f}으로 뚜렷한 추세가 부재하여 횡보 구간으로 판단되며 방향성 확인이 필요합니다."
 
     return ""
 

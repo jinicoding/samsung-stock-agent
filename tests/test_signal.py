@@ -11,7 +11,8 @@ from src.analysis.signal import compute_composite_signal
 
 def _tech(rsi=50.0, macd_histogram=0.0, bb_pctb=0.5,
           price_vs_ma5_pct=0.0, price_vs_ma20_pct=0.0,
-          volume_ratio_5d=1.0) -> dict:
+          volume_ratio_5d=1.0, adx=None, plus_di=None,
+          minus_di=None) -> dict:
     """기술적 분석 결과 stub."""
     return {
         "current_price": 55000,
@@ -26,6 +27,9 @@ def _tech(rsi=50.0, macd_histogram=0.0, bb_pctb=0.5,
         "ma5": 55000,
         "ma20": 54000,
         "ma60": 53000,
+        "adx": adx,
+        "plus_di": plus_di,
+        "minus_di": minus_di,
     }
 
 
@@ -220,6 +224,39 @@ class TestCompositeSignal:
         result1 = compute_composite_signal(tech1, _supply(), _fx())
         result2 = compute_composite_signal(tech2, _supply(), _fx())
         assert result1["technical_score"] == pytest.approx(result2["technical_score"])
+
+    def test_adx_strong_trend_bullish_boosts(self):
+        """ADX>25이고 +DI>-DI면 기술적 점수가 ADX 없을 때보다 높다."""
+        tech_no_adx = _tech(macd_histogram=100)
+        tech_adx_bull = _tech(macd_histogram=100, adx=30, plus_di=28, minus_di=15)
+        r_no = compute_composite_signal(tech_no_adx, _supply(), _fx())
+        r_adx = compute_composite_signal(tech_adx_bull, _supply(), _fx())
+        assert r_adx["technical_score"] > r_no["technical_score"]
+
+    def test_adx_strong_trend_bearish_lowers(self):
+        """ADX>25이고 -DI>+DI면 기술적 점수가 ADX 없을 때보다 낮다."""
+        tech_no_adx = _tech(macd_histogram=-100)
+        tech_adx_bear = _tech(macd_histogram=-100, adx=30, plus_di=12, minus_di=28)
+        r_no = compute_composite_signal(tech_no_adx, _supply(), _fx())
+        r_adx = compute_composite_signal(tech_adx_bear, _supply(), _fx())
+        assert r_adx["technical_score"] < r_no["technical_score"]
+
+    def test_adx_weak_trend_dampens_momentum(self):
+        """ADX<20이면 모멘텀 시그널이 약화되어 극단 점수가 줄어든다."""
+        tech_no_adx = _tech(rsi=30, macd_histogram=300)
+        tech_weak = _tech(rsi=30, macd_histogram=300, adx=15, plus_di=20, minus_di=18)
+        r_no = compute_composite_signal(tech_no_adx, _supply(), _fx())
+        r_weak = compute_composite_signal(tech_weak, _supply(), _fx())
+        # 약한 추세 → 시그널 약화 → 절대값이 줄어듦
+        assert abs(r_weak["technical_score"]) < abs(r_no["technical_score"])
+
+    def test_adx_none_no_effect(self):
+        """ADX가 None이면 점수에 영향 없음."""
+        tech1 = _tech(adx=None, plus_di=None, minus_di=None)
+        tech2 = _tech()
+        r1 = compute_composite_signal(tech1, _supply(), _fx())
+        r2 = compute_composite_signal(tech2, _supply(), _fx())
+        assert r1["technical_score"] == pytest.approx(r2["technical_score"])
 
 
 class TestTrendReversalIntegration:

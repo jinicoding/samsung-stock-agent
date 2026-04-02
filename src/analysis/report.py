@@ -1015,6 +1015,30 @@ def generate_daily_report(
             lines.append(f"  밴드폭: {bb_width:.3f} | 상단: {_format_price(bb_upper)} | 하단: {_format_price(bb_lower)}")
         lines.append("")
 
+    # 6.5) ADX 추세 강도
+    adx_val = indicators.get("adx")
+    if adx_val is not None:
+        plus_di = indicators.get("plus_di")
+        minus_di = indicators.get("minus_di")
+        if adx_val > 25:
+            adx_grade = "강한 추세"
+            adx_emoji = "💪"
+        elif adx_val >= 20:
+            adx_grade = "약한 추세"
+            adx_emoji = "〰️"
+        else:
+            adx_grade = "추세 부재"
+            adx_emoji = "😶"
+        lines.append(f"<b>ADX(14):</b> {adx_val:.1f} ({adx_grade}) {adx_emoji}")
+        di_parts = []
+        if plus_di is not None:
+            di_parts.append(f"+DI: {plus_di:.1f}")
+        if minus_di is not None:
+            di_parts.append(f"-DI: {minus_di:.1f}")
+        if di_parts:
+            lines.append(f"  {' | '.join(di_parts)}")
+        lines.append("")
+
     # 7) OBV 다이버전스 경고
     obv_div = indicators.get("obv_divergence")
     if obv_div == "bearish":

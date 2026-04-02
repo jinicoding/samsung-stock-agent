@@ -803,3 +803,49 @@ class TestGenerateCommentary:
             self._base_support_resistance(),
         )
         assert "ATR" not in result
+
+    # --- ADX 추세 강도 문장 테스트 ---
+
+    def test_adx_strong_bullish_trend_mentioned(self):
+        """ADX>25이고 +DI>-DI → 강한 상승 추세 언급."""
+        result = generate_commentary(
+            self._base_indicators(adx=30.0, plus_di=28.0, minus_di=15.0),
+            self._base_supply_demand(),
+            self._base_exchange_rate(),
+            self._base_composite_signal(),
+            self._base_support_resistance(),
+        )
+        assert "추세" in result or "ADX" in result
+
+    def test_adx_strong_bearish_trend_mentioned(self):
+        """ADX>25이고 -DI>+DI → 강한 하락 추세 언급."""
+        result = generate_commentary(
+            self._base_indicators(adx=32.0, plus_di=12.0, minus_di=30.0),
+            self._base_supply_demand(),
+            self._base_exchange_rate(),
+            self._base_composite_signal(),
+            self._base_support_resistance(),
+        )
+        assert "추세" in result or "ADX" in result or "하락" in result
+
+    def test_adx_weak_no_trend_mentioned(self):
+        """ADX<20 → 추세 부재/방향성 모색 언급."""
+        result = generate_commentary(
+            self._base_indicators(adx=15.0, plus_di=18.0, minus_di=17.0),
+            self._base_supply_demand(),
+            self._base_exchange_rate(),
+            self._base_composite_signal(),
+            self._base_support_resistance(),
+        )
+        assert "추세" in result or "방향" in result or "횡보" in result
+
+    def test_adx_none_no_mention(self):
+        """ADX=None이면 추세 강도 문장 없음."""
+        result = generate_commentary(
+            self._base_indicators(adx=None, plus_di=None, minus_di=None),
+            self._base_supply_demand(),
+            self._base_exchange_rate(),
+            self._base_composite_signal(),
+            self._base_support_resistance(),
+        )
+        assert "ADX" not in result

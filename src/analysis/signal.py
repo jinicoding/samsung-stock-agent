@@ -61,7 +61,23 @@ def _score_technical(tech: dict) -> float:
 
     if not scores:
         return 0.0
-    return _clamp(sum(scores) / len(scores))
+    raw = sum(scores) / len(scores)
+
+    # ADX 기반 확신도 조절
+    adx = tech.get("adx")
+    if adx is not None:
+        plus_di = tech.get("plus_di", 0)
+        minus_di = tech.get("minus_di", 0)
+        if adx > 25:
+            # 강한 추세: +DI/-DI 방향으로 시그널 강화
+            di_bias = 20.0 if plus_di > minus_di else -20.0
+            raw += di_bias * (adx - 25) / 25  # ADX 50에서 최대 ±20
+        elif adx < 20:
+            # 추세 부재: 모멘텀 시그널 약화 (0~30% 감쇠)
+            dampen = 1.0 - (20 - adx) / 20 * 0.3
+            raw *= dampen
+
+    return _clamp(raw)
 
 
 def _score_supply(supply: dict) -> float:

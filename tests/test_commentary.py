@@ -741,3 +741,65 @@ class TestGenerateCommentary:
         # 횡보/중립이면 반도체 문장 안 나올 수 있음
         # (구현에 따라 달라질 수 있으므로 에러 없이 동작하는지만 확인)
         assert isinstance(result, str)
+
+    # --- 변동성 분석 문장 테스트 ---
+
+    def _base_volatility(self, **overrides):
+        base = {
+            "atr": 1500.0,
+            "atr_pct": 2.7,
+            "hv20": 0.25,
+            "volatility_percentile": 50.0,
+            "volatility_regime": "보통",
+            "bandwidth_squeeze": False,
+        }
+        base.update(overrides)
+        return base
+
+    def test_high_volatility_risk_warning(self):
+        """고변동성 → 리스크 경고 문장."""
+        result = generate_commentary(
+            self._base_indicators(),
+            self._base_supply_demand(),
+            self._base_exchange_rate(),
+            self._base_composite_signal(),
+            self._base_support_resistance(),
+            volatility=self._base_volatility(volatility_regime="고변동성"),
+        )
+        assert "변동성" in result or "리스크" in result
+
+    def test_low_volatility_squeeze_breakout_mention(self):
+        """저변동성 + 밴드폭 수축 → 돌파 대비 언급."""
+        result = generate_commentary(
+            self._base_indicators(),
+            self._base_supply_demand(),
+            self._base_exchange_rate(),
+            self._base_composite_signal(),
+            self._base_support_resistance(),
+            volatility=self._base_volatility(volatility_regime="저변동성", bandwidth_squeeze=True),
+        )
+        assert "변동성" in result or "수축" in result or "돌파" in result
+
+    def test_normal_volatility_no_mention(self):
+        """보통 변동성 + 수축 없음 → 변동성 관련 문장 없음."""
+        result = generate_commentary(
+            self._base_indicators(),
+            self._base_supply_demand(),
+            self._base_exchange_rate(),
+            self._base_composite_signal(),
+            self._base_support_resistance(),
+            volatility=self._base_volatility(volatility_regime="보통", bandwidth_squeeze=False),
+        )
+        assert "고변동성" not in result
+        assert "밴드폭 수축" not in result
+
+    def test_no_volatility_no_mention(self):
+        """volatility=None이면 변동성 관련 문장 없음."""
+        result = generate_commentary(
+            self._base_indicators(),
+            self._base_supply_demand(),
+            self._base_exchange_rate(),
+            self._base_composite_signal(),
+            self._base_support_resistance(),
+        )
+        assert "ATR" not in result

@@ -28,6 +28,7 @@ def generate_commentary(
     rel_perf: dict | None = None,
     sox_trend: dict | None = None,
     semiconductor_momentum: int | None = None,
+    volatility: dict | None = None,
 ) -> str:
     """분석 결과를 2~3문장 자연어 코멘터리로 변환한다.
 
@@ -91,6 +92,11 @@ def generate_commentary(
     cons_sentence = _build_consensus_sentence(consensus or {})
     if cons_sentence:
         sentences.append(cons_sentence)
+
+    # --- 4.95) 변동성 분석 문장 ---
+    vol_sentence = _build_volatility_sentence(volatility or {})
+    if vol_sentence:
+        sentences.append(vol_sentence)
 
     # --- 4.9) 반도체 업황 문장 ---
     semi_sentence = _build_semiconductor_sentence(
@@ -528,6 +534,29 @@ def _build_semiconductor_sentence(
         return " ".join(parts)
 
     # 중립 범위는 문장 생략
+    return ""
+
+
+def _build_volatility_sentence(vol: dict) -> str:
+    """변동성 분석 기반 자연어 문장."""
+    if not vol:
+        return ""
+
+    regime = vol.get("volatility_regime")
+    squeeze = vol.get("bandwidth_squeeze", False)
+
+    if regime == "고변동성":
+        atr_pct = vol.get("atr_pct")
+        if atr_pct is not None:
+            return f"현재 변동성이 높은 구간(ATR {atr_pct:.1f}%)으로 리스크 관리에 유의할 필요가 있습니다."
+        return "현재 변동성이 높은 구간으로 리스크 관리에 유의할 필요가 있습니다."
+
+    if regime == "저변동성" and squeeze:
+        return "변동성이 낮고 볼린저 밴드폭이 수축되어 있어 조만간 방향성 돌파가 나올 수 있는 구간입니다."
+
+    if squeeze:
+        return "볼린저 밴드폭 수축이 감지되어 변동성 확대에 대비할 필요가 있습니다."
+
     return ""
 
 

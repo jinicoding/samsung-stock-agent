@@ -34,6 +34,7 @@ from src.data.fundamentals import fetch_fundamentals
 from src.analysis.fundamentals import analyze_fundamentals
 from src.data.news import fetch_news_headlines, summarize_sentiment
 from src.data.consensus import fetch_consensus, analyze_consensus
+from src.analysis.volatility import compute_volatility
 from src.analysis.weekly_summary import summarize_weekly
 from src.delivery.telegram_bot import send_message
 
@@ -67,6 +68,13 @@ def main(dry_run: bool = False):
     indicators = compute_technical_indicators(prices)
     sd = analyze_supply_demand(trading, ownership) if trading else None
     er = analyze_exchange_rate(rates, prices) if rates else None
+
+    # 3.45) 변동성 분석
+    vol = None
+    try:
+        vol = compute_volatility(prices)
+    except Exception as e:
+        print(f"[경고] 변동성 분석 실패: {e}")
 
     # 3.5) 지지/저항선 분석
     sr = analyze_support_resistance(prices)
@@ -143,7 +151,7 @@ def main(dry_run: bool = False):
         print(f"[경고] 컨센서스 수집 실패: {e}")
 
     # 3.8) 종합 투자 시그널
-    sig = compute_composite_signal(indicators, sd or {}, er or {}, relative_strength=rs, trend_reversal=reversal, fundamentals=fund, news_sentiment=news_sentiment, consensus=consensus, semiconductor_momentum=semi_momentum)
+    sig = compute_composite_signal(indicators, sd or {}, er or {}, relative_strength=rs, trend_reversal=reversal, fundamentals=fund, news_sentiment=news_sentiment, consensus=consensus, semiconductor_momentum=semi_momentum, volatility=vol)
 
     # 3.9) 시그널 이력 저장
     latest_price = prices[-1]["close"]
@@ -178,7 +186,7 @@ def main(dry_run: bool = False):
         print(f"[경고] 주간 추이 요약 실패: {e}")
 
     # 4) 리포트 생성
-    report = generate_daily_report(indicators, supply_demand=sd, exchange_rate=er, composite_signal=sig, support_resistance=sr, accuracy_summary=accuracy_summary, relative_strength=rs, trend_reversal=reversal, signal_trend=sig_trend, fundamentals=fund, news_sentiment=news_sentiment, news_headlines=news_headlines, consensus=consensus, weekly_summary=weekly, rel_perf=rel_perf, sox_trend=sox_trend, semiconductor_momentum=semi_momentum)
+    report = generate_daily_report(indicators, supply_demand=sd, exchange_rate=er, composite_signal=sig, support_resistance=sr, accuracy_summary=accuracy_summary, relative_strength=rs, trend_reversal=reversal, signal_trend=sig_trend, fundamentals=fund, news_sentiment=news_sentiment, news_headlines=news_headlines, consensus=consensus, weekly_summary=weekly, rel_perf=rel_perf, sox_trend=sox_trend, semiconductor_momentum=semi_momentum, volatility=vol)
 
     # 5) 발송 또는 출력
     if dry_run:

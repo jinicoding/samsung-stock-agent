@@ -614,6 +614,35 @@ def _consensus_valuation_emoji(val: str) -> str:
     return ""
 
 
+def _build_volatility_section(vol: dict) -> list[str]:
+    """변동성 분석 결과를 HTML 라인 리스트로."""
+    lines = []
+    lines.append("")
+    lines.append("<b>📉 변동성 분석</b>")
+
+    atr = vol.get("atr")
+    atr_pct = vol.get("atr_pct")
+    if atr is not None and atr_pct is not None:
+        lines.append(f"  ATR(14): {atr:,.0f}원 ({atr_pct:.1f}%)")
+
+    hv20 = vol.get("hv20")
+    if hv20 is not None:
+        lines.append(f"  HV20(연율화): {hv20 * 100:.1f}%")
+
+    regime = vol.get("volatility_regime")
+    percentile = vol.get("volatility_percentile")
+    if regime is not None:
+        pct_str = f" (백분위 {percentile:.0f}%)" if percentile is not None else ""
+        regime_emoji = "🔴" if regime == "고변동성" else "🟢" if regime == "저변동성" else ""
+        lines.append(f"  변동성 체제: {regime}{pct_str} {regime_emoji}".rstrip())
+
+    squeeze = vol.get("bandwidth_squeeze")
+    if squeeze:
+        lines.append("  ⚡ 볼린저 밴드폭 수축 감지 — 돌파 대비 구간")
+
+    return lines
+
+
 def _build_consensus_section(cons: dict) -> list[str]:
     """증권사 컨센서스 분석 결과를 HTML 라인 리스트로."""
     lines = []
@@ -825,6 +854,7 @@ def generate_daily_report(
     rel_perf: dict | None = None,
     sox_trend: dict | None = None,
     semiconductor_momentum: int | None = None,
+    volatility: dict | None = None,
 ) -> str:
     """기술적 지표 dict를 HTML 텔레그램 메시지로 변환한다.
 
@@ -890,7 +920,7 @@ def generate_daily_report(
         relative_strength, trend_reversal=trend_reversal, signal_trend=signal_trend,
         fundamentals=fundamentals, news_sentiment=news_sentiment, consensus=consensus,
         weekly_summary=weekly_summary, rel_perf=rel_perf, sox_trend=sox_trend,
-        semiconductor_momentum=semiconductor_momentum,
+        semiconductor_momentum=semiconductor_momentum, volatility=volatility,
     )
     if commentary:
         lines.append(f"💬 {commentary}")
@@ -985,6 +1015,10 @@ def generate_daily_report(
     # 뉴스 심리 (선택)
     if news_sentiment is not None:
         lines.extend(_build_news_sentiment_section(news_sentiment, news_headlines))
+
+    # 변동성 분석 (선택)
+    if volatility is not None:
+        lines.extend(_build_volatility_section(volatility))
 
     # 반도체 업황 (선택)
     if rel_perf is not None and sox_trend is not None and semiconductor_momentum is not None:

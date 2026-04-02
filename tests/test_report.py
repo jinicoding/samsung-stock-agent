@@ -1444,3 +1444,64 @@ class TestSemiconductorInReport:
         }
         report = generate_daily_report(_full_indicators(), composite_signal=sig)
         assert "반도체" in report
+
+
+class TestVolatilitySection:
+    """변동성 분석 섹션 테스트."""
+
+    def _vol_data(self, **overrides):
+        base = {
+            "atr": 1500.0,
+            "atr_pct": 2.7,
+            "hv20": 0.25,
+            "volatility_percentile": 50.0,
+            "volatility_regime": "보통",
+            "bandwidth_squeeze": False,
+        }
+        base.update(overrides)
+        return base
+
+    def test_volatility_section_present(self):
+        """변동성 데이터 전달 시 섹션이 포함됨."""
+        report = generate_daily_report(
+            _full_indicators(),
+            volatility=self._vol_data(),
+        )
+        assert "변동성 분석" in report
+
+    def test_volatility_section_shows_atr(self):
+        """ATR 값이 표시됨."""
+        report = generate_daily_report(
+            _full_indicators(),
+            volatility=self._vol_data(atr=1500.0, atr_pct=2.7),
+        )
+        assert "ATR" in report
+
+    def test_volatility_section_shows_hv20(self):
+        """HV20 연율화 값이 표시됨."""
+        report = generate_daily_report(
+            _full_indicators(),
+            volatility=self._vol_data(hv20=0.25),
+        )
+        assert "HV20" in report or "25.0%" in report
+
+    def test_volatility_section_shows_regime(self):
+        """변동성 체제가 표시됨."""
+        report = generate_daily_report(
+            _full_indicators(),
+            volatility=self._vol_data(volatility_regime="고변동성"),
+        )
+        assert "고변동성" in report
+
+    def test_volatility_squeeze_shown(self):
+        """밴드폭 수축이 표시됨."""
+        report = generate_daily_report(
+            _full_indicators(),
+            volatility=self._vol_data(bandwidth_squeeze=True),
+        )
+        assert "수축" in report
+
+    def test_no_volatility_no_section(self):
+        """volatility=None이면 섹션 없음."""
+        report = generate_daily_report(_full_indicators())
+        assert "변동성 분석" not in report

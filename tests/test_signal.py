@@ -560,6 +560,103 @@ class TestConsensusIntegration:
         assert -100 <= result["score"] <= 100
 
 
+def _vol(regime="보통", squeeze=False) -> dict:
+    """변동성 분석 결과 stub."""
+    return {
+        "atr": 1500.0,
+        "atr_pct": 2.7,
+        "hv20": 0.25,
+        "volatility_percentile": 50.0,
+        "volatility_regime": regime,
+        "bandwidth_squeeze": squeeze,
+    }
+
+
+class TestVolatilityIntegration:
+    """변동성 분석이 종합 시그널에 반영되는지 테스트."""
+
+    def test_high_volatility_lowers_score(self):
+        """고변동성 → 종합 점수 하락."""
+        base = compute_composite_signal(_tech(), _supply(), _fx())
+        lowered = compute_composite_signal(
+            _tech(), _supply(), _fx(),
+            volatility=_vol(regime="고변동성"),
+        )
+        assert lowered["score"] < base["score"]
+
+    def test_low_volatility_boosts_score(self):
+        """저변동성 → 종합 점수 상승."""
+        base = compute_composite_signal(_tech(), _supply(), _fx())
+        boosted = compute_composite_signal(
+            _tech(), _supply(), _fx(),
+            volatility=_vol(regime="저변동성"),
+        )
+        assert boosted["score"] > base["score"]
+
+    def test_squeeze_boosts_score(self):
+        """밴드폭 수축 → 추가 상승."""
+        no_squeeze = compute_composite_signal(
+            _tech(), _supply(), _fx(),
+            volatility=_vol(regime="보통", squeeze=False),
+        )
+        squeeze = compute_composite_signal(
+            _tech(), _supply(), _fx(),
+            volatility=_vol(regime="보통", squeeze=True),
+        )
+        assert squeeze["volatility_score"] > no_squeeze["volatility_score"]
+
+    def test_volatility_score_in_result(self):
+        """결과에 volatility_score 키 포함."""
+        result = compute_composite_signal(
+            _tech(), _supply(), _fx(),
+            volatility=_vol(),
+        )
+        assert "volatility_score" in result
+
+    def test_no_volatility_no_score(self):
+        """volatility=None이면 volatility_score 없음."""
+        result = compute_composite_signal(_tech(), _supply(), _fx())
+        assert "volatility_score" not in result
+
+    def test_volatility_weight_is_5(self):
+        """변동성 축 가중치는 5%."""
+        result = compute_composite_signal(
+            _tech(), _supply(), _fx(),
+            volatility=_vol(),
+        )
+        assert result["weights"]["volatility"] == 5
+
+    def test_weights_sum_to_100_with_volatility(self):
+        """변동성 포함 시 가중치 합 100%."""
+        result = compute_composite_signal(
+            _tech(), _supply(), _fx(),
+            volatility=_vol(),
+        )
+        assert sum(result["weights"].values()) == 100
+
+    def test_weights_sum_to_100_all_axes(self):
+        """모든 축 + 변동성 포함 시 가중치 합 100%."""
+        rs = {"rs_trend": "neutral", "alpha_1d": 0.0}
+        result = compute_composite_signal(
+            _tech(), _supply(), _fx(),
+            relative_strength=rs, fundamentals=_fund(),
+            news_sentiment=_news(), consensus=_cons(),
+            semiconductor_momentum=30,
+            volatility=_vol(),
+        )
+        assert sum(result["weights"].values()) == 100
+        assert result["weights"]["volatility"] == 5
+
+    def test_score_clamped_with_volatility(self):
+        """변동성 포함 시에도 -100~+100 범위."""
+        tech = _tech(rsi=10, macd_histogram=1000, bb_pctb=0.0, price_vs_ma5_pct=5.0)
+        result = compute_composite_signal(
+            tech, _supply("buy_dominant"), _fx("원화약세", 2.0),
+            volatility=_vol(regime="저변동성", squeeze=True),
+        )
+        assert -100 <= result["score"] <= 100
+
+
 class TestSemiconductorIntegration:
     """반도체 업황 지표가 종합 시그널에 반영되는지 테스트."""
 

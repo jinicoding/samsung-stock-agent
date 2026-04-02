@@ -223,6 +223,23 @@ def _score_consensus(consensus: dict) -> float:
     return _clamp(sum(scores) / len(scores))
 
 
+def _score_volatility(vol: dict) -> float:
+    """변동성 분석 → -100~+100 점수.
+
+    고변동성=-30, 저변동성=+20, 보통=0.
+    밴드폭 수축 시 +15 가산.
+    """
+    regime = vol.get("volatility_regime")
+    squeeze = vol.get("bandwidth_squeeze", False)
+
+    base = {"고변동성": -30, "저변동성": 20, "보통": 0}.get(regime, 0)
+
+    if squeeze:
+        base += 15
+
+    return _clamp(float(base))
+
+
 def _score_semiconductor(momentum: int) -> float:
     """반도체 모멘텀 스코어 → -100~+100 점수.
 
@@ -287,6 +304,7 @@ def compute_composite_signal(
     news_sentiment: dict | None = None,
     consensus: dict | None = None,
     semiconductor_momentum: int | None = None,
+    volatility: dict | None = None,
 ) -> dict:
     """종합 투자 시그널을 계산한다.
 
@@ -300,6 +318,7 @@ def compute_composite_signal(
         news_sentiment: summarize_sentiment() 결과 (선택)
         consensus: analyze_consensus() 결과 (선택)
         semiconductor_momentum: compute_semiconductor_momentum() 결과 (선택)
+        volatility: compute_volatility() 결과 (선택)
 
     Returns:
         dict with:
@@ -324,12 +343,14 @@ def compute_composite_signal(
     has_news = news_sentiment is not None
     has_cons = consensus is not None
     has_semi = semiconductor_momentum is not None
+    has_vol = volatility is not None
 
     rs_score = _score_relative_strength(relative_strength) if has_rs else None
     fund_score = _score_fundamentals(fundamentals) if has_fund else None
     news_score = _score_news_sentiment(news_sentiment) if has_news else None
     cons_score = _score_consensus(consensus) if has_cons else None
     semi_score = _score_semiconductor(semiconductor_momentum) if has_semi else None
+    vol_score = _score_volatility(volatility) if has_vol else None
 
     # --- 동적 가중치 산출 ---
     # 기본 optional 축(RS, Fund, News) 조합에 따라 base_weights를 정한 뒤,
@@ -359,12 +380,14 @@ def compute_composite_signal(
     else:
         base_weights = {"technical": 40, "supply": 40, "exchange": 20}
 
-    # consensus, semiconductor 각 10%를 기존 축에서 비례 축소하여 확보
+    # consensus, semiconductor 각 10%, volatility 5%를 기존 축에서 비례 축소하여 확보
     extra_axes: dict[str, int] = {}
     if has_cons:
         extra_axes["consensus"] = 10
     if has_semi:
         extra_axes["semiconductor"] = 10
+    if has_vol:
+        extra_axes["volatility"] = 5
 
     if extra_axes:
         extra_total = sum(extra_axes.values())
@@ -395,6 +418,8 @@ def compute_composite_signal(
         score_map["consensus"] = cons_score
     if has_semi:
         score_map["semiconductor"] = semi_score
+    if has_vol:
+        score_map["volatility"] = vol_score
 
     composite = sum(score_map[k] * weights[k] / 100 for k in score_map)
 
@@ -422,4 +447,6 @@ def compute_composite_signal(
         result["consensus_score"] = cons_score
     if semi_score is not None:
         result["semiconductor_score"] = semi_score
+    if vol_score is not None:
+        result["volatility_score"] = vol_score
     return result

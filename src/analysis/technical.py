@@ -231,6 +231,79 @@ def _bollinger_bands(
     return upper, lower, width, pctb
 
 
+def _adx(
+    highs: list[float],
+    lows: list[float],
+    closes: list[float],
+    period: int = 14,
+) -> tuple[float | None, float | None, float | None]:
+    """ADX(Average Directional Index)를 Wilder smoothing으로 계산한다.
+
+    Returns:
+        (adx, plus_di, minus_di) — 데이터 부족 시 (None, None, None).
+        최소 2*period + 1 개의 데이터 필요.
+    """
+    n = len(closes)
+    if n < 2 * period + 1:
+        return None, None, None
+
+    # 1. TR, +DM, -DM 계산 (index 1부터)
+    tr_list: list[float] = []
+    plus_dm_list: list[float] = []
+    minus_dm_list: list[float] = []
+
+    for i in range(1, n):
+        high_diff = highs[i] - highs[i - 1]
+        low_diff = lows[i - 1] - lows[i]
+
+        plus_dm = high_diff if high_diff > 0 and high_diff > low_diff else 0.0
+        minus_dm = low_diff if low_diff > 0 and low_diff > high_diff else 0.0
+
+        tr = max(
+            highs[i] - lows[i],
+            abs(highs[i] - closes[i - 1]),
+            abs(lows[i] - closes[i - 1]),
+        )
+        tr_list.append(tr)
+        plus_dm_list.append(plus_dm)
+        minus_dm_list.append(minus_dm)
+
+    # 2. Wilder smoothing: 첫 period개 합산 후, 이후 (prev - prev/period + current)
+    smoothed_tr = sum(tr_list[:period])
+    smoothed_plus_dm = sum(plus_dm_list[:period])
+    smoothed_minus_dm = sum(minus_dm_list[:period])
+
+    dx_list: list[float] = []
+
+    def _calc_di_dx():
+        plus_di = (smoothed_plus_dm / smoothed_tr * 100) if smoothed_tr != 0 else 0.0
+        minus_di = (smoothed_minus_dm / smoothed_tr * 100) if smoothed_tr != 0 else 0.0
+        di_sum = plus_di + minus_di
+        dx = abs(plus_di - minus_di) / di_sum * 100 if di_sum != 0 else 0.0
+        return plus_di, minus_di, dx
+
+    plus_di, minus_di, dx = _calc_di_dx()
+    dx_list.append(dx)
+
+    for i in range(period, len(tr_list)):
+        smoothed_tr = smoothed_tr - smoothed_tr / period + tr_list[i]
+        smoothed_plus_dm = smoothed_plus_dm - smoothed_plus_dm / period + plus_dm_list[i]
+        smoothed_minus_dm = smoothed_minus_dm - smoothed_minus_dm / period + minus_dm_list[i]
+
+        plus_di, minus_di, dx = _calc_di_dx()
+        dx_list.append(dx)
+
+    # 3. ADX = Wilder smoothing of DX
+    if len(dx_list) < period:
+        return None, None, None
+
+    adx = sum(dx_list[:period]) / period
+    for i in range(period, len(dx_list)):
+        adx = (adx * (period - 1) + dx_list[i]) / period
+
+    return adx, plus_di, minus_di
+
+
 def compute_technical_indicators(rows: list[dict]) -> dict:
     """OHLCV rows로부터 기초 기술적 지표를 계산한다.
 
@@ -295,6 +368,9 @@ def compute_technical_indicators(rows: list[dict]) -> dict:
     # 스토캐스틱 오실레이터 (14, 3)
     stoch_k, stoch_d = _stochastic(highs, lows, closes)
 
+    # ADX (14)
+    adx_val, plus_di, minus_di = _adx(highs, lows, closes)
+
     return {
         "current_date": rows[-1]["date"],
         "current_price": current,
@@ -330,4 +406,8 @@ def compute_technical_indicators(rows: list[dict]) -> dict:
         # 스토캐스틱 오실레이터 (14, 3)
         "stoch_k": stoch_k,
         "stoch_d": stoch_d,
+        # ADX (14)
+        "adx": adx_val,
+        "plus_di": plus_di,
+        "minus_di": minus_di,
     }

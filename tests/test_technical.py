@@ -2,7 +2,7 @@
 
 import pytest
 
-from src.analysis.technical import compute_technical_indicators, _ema, _macd, _obv, _obv_divergence, _stochastic
+from src.analysis.technical import compute_technical_indicators, _ema, _macd, _obv, _obv_divergence, _stochastic, _adx
 
 
 def _make_rows(prices: list[float], base_volume: int = 1_000_000) -> list[dict]:
@@ -520,6 +520,88 @@ class TestStochastic:
         result = compute_technical_indicators(_make_rows(prices))
         assert result["stoch_k"] is None
         assert result["stoch_d"] is None
+
+
+class TestADX:
+    """ADX(Average Directional Index) 추세 강도 지표 테스트."""
+
+    def _make_trend_rows(self, direction: str, n: int = 40) -> list[dict]:
+        """추세 데이터 생성. direction: 'up', 'down', 'sideways'."""
+        rows = []
+        base = 50000
+        for i in range(n):
+            if direction == "up":
+                p = base + i * 300
+            elif direction == "down":
+                p = base - i * 300
+            else:  # sideways
+                p = base + (200 if i % 2 == 0 else -200)
+            rows.append({
+                "date": f"2026-01-{i + 1:02d}",
+                "open": p - 50,
+                "high": p + 200,
+                "low": p - 200,
+                "close": p,
+                "volume": 1_000_000,
+            })
+        return rows
+
+    def test_adx_uptrend_strong(self):
+        """강한 상승 추세에서 ADX > 25 & +DI > -DI."""
+        rows = self._make_trend_rows("up", 40)
+        highs = [r["high"] for r in rows]
+        lows = [r["low"] for r in rows]
+        closes = [r["close"] for r in rows]
+        adx, plus_di, minus_di = _adx(highs, lows, closes)
+        assert adx is not None
+        assert adx > 25
+        assert plus_di > minus_di
+
+    def test_adx_downtrend_minus_di_dominant(self):
+        """하락 추세에서 -DI > +DI."""
+        rows = self._make_trend_rows("down", 40)
+        highs = [r["high"] for r in rows]
+        lows = [r["low"] for r in rows]
+        closes = [r["close"] for r in rows]
+        adx, plus_di, minus_di = _adx(highs, lows, closes)
+        assert adx is not None
+        assert minus_di > plus_di
+
+    def test_adx_sideways_weak(self):
+        """횡보 데이터에서 ADX < 20."""
+        rows = self._make_trend_rows("sideways", 40)
+        highs = [r["high"] for r in rows]
+        lows = [r["low"] for r in rows]
+        closes = [r["close"] for r in rows]
+        adx, plus_di, minus_di = _adx(highs, lows, closes)
+        assert adx is not None
+        assert adx < 20
+
+    def test_adx_insufficient_data(self):
+        """데이터 부족 시 (None, None, None)."""
+        highs = [100] * 10
+        lows = [90] * 10
+        closes = [95] * 10
+        adx, plus_di, minus_di = _adx(highs, lows, closes)
+        assert adx is None
+        assert plus_di is None
+        assert minus_di is None
+
+    def test_compute_indicators_includes_adx(self):
+        """compute_technical_indicators에 adx, plus_di, minus_di 키 포함."""
+        rows = self._make_trend_rows("up", 40)
+        result = compute_technical_indicators(rows)
+        assert "adx" in result
+        assert "plus_di" in result
+        assert "minus_di" in result
+
+    def test_compute_indicators_adx_none_insufficient(self):
+        """데이터 부족 시 adx, plus_di, minus_di 는 None."""
+        prices = [50000] * 10
+        result = compute_technical_indicators(_make_rows(prices))
+        assert result["adx"] is None
+        assert result["plus_di"] is None
+        assert result["minus_di"] is None
 
 
 class TestEdgeCases:

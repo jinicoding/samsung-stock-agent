@@ -29,6 +29,7 @@ def generate_commentary(
     sox_trend: dict | None = None,
     semiconductor_momentum: int | None = None,
     volatility: dict | None = None,
+    candlestick: dict | None = None,
 ) -> str:
     """분석 결과를 2~3문장 자연어 코멘터리로 변환한다.
 
@@ -92,6 +93,11 @@ def generate_commentary(
     cons_sentence = _build_consensus_sentence(consensus or {})
     if cons_sentence:
         sentences.append(cons_sentence)
+
+    # --- 4.93) 캔들스틱 패턴 문장 ---
+    candle_sentence = _build_candlestick_sentence(candlestick or {})
+    if candle_sentence:
+        sentences.append(candle_sentence)
 
     # --- 4.95) 변동성 분석 문장 ---
     vol_sentence = _build_volatility_sentence(volatility or {})
@@ -535,6 +541,41 @@ def _build_semiconductor_sentence(
 
     # 중립 범위는 문장 생략
     return ""
+
+
+def _build_candlestick_sentence(candle: dict) -> str:
+    """캔들스틱 패턴 기반 자연어 문장."""
+    if not candle:
+        return ""
+
+    patterns = candle.get("patterns", [])
+    if not patterns:
+        return ""
+
+    signal = candle.get("signal", "neutral")
+    score = candle.get("score", 0)
+
+    pattern_names = {
+        "doji": "도지", "hammer": "해머", "hanging_man": "행잉맨",
+        "bullish_marubozu": "강세 마루보즈", "bearish_marubozu": "약세 마루보즈",
+        "bullish_engulfing": "강세 인걸핑", "bearish_engulfing": "약세 인걸핑",
+        "morning_star": "모닝스타", "evening_star": "이브닝스타",
+    }
+
+    names = [pattern_names.get(p["name"], p["name"]) for p in patterns]
+    joined = "·".join(names)
+
+    if signal == "bullish" and score >= 50:
+        return f"캔들스틱에서 {joined} 패턴이 감지되어 강한 강세 반전 신호를 보이고 있습니다."
+    elif signal == "bullish":
+        return f"캔들스틱에서 {joined} 패턴이 나타나 강세 전환 가능성에 주목할 필요가 있습니다."
+    elif signal == "bearish" and score <= -50:
+        return f"캔들스틱에서 {joined} 패턴이 감지되어 강한 약세 전환 신호에 유의할 필요가 있습니다."
+    elif signal == "bearish":
+        return f"캔들스틱에서 {joined} 패턴이 나타나 약세 전환 가능성을 주시할 필요가 있습니다."
+
+    # neutral — 도지 등 방향성 불확실 패턴
+    return f"캔들스틱에서 {joined} 패턴이 나타나 방향성 모색 구간으로 판단됩니다."
 
 
 def _build_volatility_sentence(vol: dict) -> str:

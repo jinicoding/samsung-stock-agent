@@ -240,6 +240,14 @@ def _score_volatility(vol: dict) -> float:
     return _clamp(float(base))
 
 
+def _score_candlestick(candle: dict) -> float:
+    """캔들스틱 패턴 분석 → -100~+100 점수.
+
+    detect_candlestick_patterns() 결과의 score를 그대로 사용.
+    """
+    return _clamp(float(candle.get("score", 0)))
+
+
 def _score_semiconductor(momentum: int) -> float:
     """반도체 모멘텀 스코어 → -100~+100 점수.
 
@@ -305,6 +313,7 @@ def compute_composite_signal(
     consensus: dict | None = None,
     semiconductor_momentum: int | None = None,
     volatility: dict | None = None,
+    candlestick: dict | None = None,
 ) -> dict:
     """종합 투자 시그널을 계산한다.
 
@@ -319,6 +328,7 @@ def compute_composite_signal(
         consensus: analyze_consensus() 결과 (선택)
         semiconductor_momentum: compute_semiconductor_momentum() 결과 (선택)
         volatility: compute_volatility() 결과 (선택)
+        candlestick: detect_candlestick_patterns() 결과 (선택)
 
     Returns:
         dict with:
@@ -344,6 +354,7 @@ def compute_composite_signal(
     has_cons = consensus is not None
     has_semi = semiconductor_momentum is not None
     has_vol = volatility is not None
+    has_candle = candlestick is not None
 
     rs_score = _score_relative_strength(relative_strength) if has_rs else None
     fund_score = _score_fundamentals(fundamentals) if has_fund else None
@@ -351,6 +362,7 @@ def compute_composite_signal(
     cons_score = _score_consensus(consensus) if has_cons else None
     semi_score = _score_semiconductor(semiconductor_momentum) if has_semi else None
     vol_score = _score_volatility(volatility) if has_vol else None
+    candle_score = _score_candlestick(candlestick) if has_candle else None
 
     # --- 동적 가중치 산출 ---
     # 기본 optional 축(RS, Fund, News) 조합에 따라 base_weights를 정한 뒤,
@@ -388,6 +400,8 @@ def compute_composite_signal(
         extra_axes["semiconductor"] = 10
     if has_vol:
         extra_axes["volatility"] = 5
+    if has_candle:
+        extra_axes["candlestick"] = 5
 
     if extra_axes:
         extra_total = sum(extra_axes.values())
@@ -420,6 +434,8 @@ def compute_composite_signal(
         score_map["semiconductor"] = semi_score
     if has_vol:
         score_map["volatility"] = vol_score
+    if has_candle:
+        score_map["candlestick"] = candle_score
 
     composite = sum(score_map[k] * weights[k] / 100 for k in score_map)
 
@@ -449,4 +465,6 @@ def compute_composite_signal(
         result["semiconductor_score"] = semi_score
     if vol_score is not None:
         result["volatility_score"] = vol_score
+    if candle_score is not None:
+        result["candlestick_score"] = candle_score
     return result

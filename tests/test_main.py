@@ -201,6 +201,12 @@ SAMPLE_VOLATILITY = {
     "bandwidth_squeeze": False,
 }
 
+SAMPLE_CANDLESTICK = {
+    "patterns": [{"name": "bullish_marubozu", "direction": "bullish", "weight": 60}],
+    "signal": "bullish",
+    "score": 100.0,
+}
+
 SAMPLE_REPORT_HTML = "<b>삼성전자 일일 분석</b>"
 
 SAMPLE_REVERSAL = {
@@ -248,6 +254,7 @@ SAMPLE_REVERSAL = {
 @patch("src.main.summarize_sentiment", return_value=SAMPLE_NEWS_SENTIMENT)
 @patch("src.main.fetch_news_headlines", return_value=SAMPLE_NEWS_HEADLINES)
 @patch("src.main.compute_volatility", return_value=SAMPLE_VOLATILITY)
+@patch("src.main.detect_candlestick_patterns", return_value=SAMPLE_CANDLESTICK)
 @patch("src.main.backfill_supply_demand")
 @patch("src.main.backfill_prices")
 @patch("src.main.init_db")
@@ -256,7 +263,7 @@ SAMPLE_REVERSAL = {
 def test_pipeline_full(
     mock_summarize_weekly, mock_sig_hist,
     mock_init, mock_bf_prices, mock_bf_sd,
-    mock_volatility,
+    mock_candlestick, mock_volatility,
     mock_fetch_news, mock_summarize_news,
     mock_fetch_hynix, mock_fetch_sox,
     mock_rel_perf, mock_sox_trend, mock_semi_momentum,
@@ -311,6 +318,7 @@ def test_pipeline_full(
         consensus=SAMPLE_CONSENSUS,
         semiconductor_momentum=SAMPLE_SEMI_MOMENTUM,
         volatility=SAMPLE_VOLATILITY,
+        candlestick=SAMPLE_CANDLESTICK,
     )
     mock_upsert_sig.assert_called_once_with(
         date="2026-03-60", score=35.0, grade="매수우세",
@@ -332,6 +340,7 @@ def test_pipeline_full(
         sox_trend=SAMPLE_SOX_TREND,
         semiconductor_momentum=SAMPLE_SEMI_MOMENTUM,
         volatility=SAMPLE_VOLATILITY,
+        candlestick=SAMPLE_CANDLESTICK,
     )
     mock_send.assert_called_once_with(SAMPLE_REPORT_HTML)
 
@@ -365,12 +374,13 @@ def test_pipeline_full(
 @patch("src.main.summarize_sentiment", return_value=SAMPLE_NEWS_SENTIMENT)
 @patch("src.main.fetch_news_headlines", return_value=SAMPLE_NEWS_HEADLINES)
 @patch("src.main.compute_volatility", return_value=SAMPLE_VOLATILITY)
+@patch("src.main.detect_candlestick_patterns", return_value=SAMPLE_CANDLESTICK)
 @patch("src.main.backfill_supply_demand")
 @patch("src.main.backfill_prices")
 @patch("src.main.init_db")
 def test_pipeline_dry_run(
     mock_init, mock_bf_prices, mock_bf_sd,
-    mock_volatility,
+    mock_candlestick, mock_volatility,
     mock_fetch_news, mock_summarize_news,
     mock_fetch_hynix, mock_fetch_sox,
     mock_rel_perf, mock_sox_trend, mock_semi_momentum,
@@ -422,12 +432,13 @@ def test_pipeline_dry_run(
 @patch("src.main.summarize_sentiment", return_value=SAMPLE_NEWS_SENTIMENT)
 @patch("src.main.fetch_news_headlines", return_value=SAMPLE_NEWS_HEADLINES)
 @patch("src.main.compute_volatility", return_value=SAMPLE_VOLATILITY)
+@patch("src.main.detect_candlestick_patterns", return_value=SAMPLE_CANDLESTICK)
 @patch("src.main.backfill_supply_demand")
 @patch("src.main.backfill_prices")
 @patch("src.main.init_db")
 def test_pipeline_with_rs(
     mock_init, mock_bf_prices, mock_bf_sd,
-    mock_volatility,
+    mock_candlestick, mock_volatility,
     mock_fetch_news, mock_summarize_news,
     mock_fetch_hynix, mock_fetch_sox,
     mock_rel_perf, mock_sox_trend, mock_semi_momentum,
@@ -438,7 +449,7 @@ def test_pipeline_with_rs(
     mock_reversal, mock_signal, mock_upsert_sig,
     mock_sig_trend, mock_eval, mock_report, mock_send,
 ):
-    """RS + 반도체 + 변동성 분석이 파이프라인에 통합되어 composite_signal과 report에 전달된다."""
+    """RS + 반도체 + 변동성 + 캔들스틱 분석이 파이프라인에 통합되어 composite_signal과 report에 전달된다."""
     from src.main import main
 
     main()
@@ -453,7 +464,7 @@ def test_pipeline_with_rs(
     mock_fetch_hynix.assert_called_once()
     mock_fetch_sox.assert_called_once()
     mock_semi_momentum.assert_called_once()
-    # composite_signal에 RS와 reversal과 fundamentals와 뉴스와 컨센서스와 반도체와 변동성이 전달됨
+    # composite_signal에 RS와 reversal과 fundamentals와 뉴스와 컨센서스와 반도체와 변동성과 캔들스틱이 전달됨
     mock_signal.assert_called_once_with(
         SAMPLE_INDICATORS, SAMPLE_SD, SAMPLE_ER,
         relative_strength=SAMPLE_RS, trend_reversal=SAMPLE_REVERSAL,
@@ -462,8 +473,9 @@ def test_pipeline_with_rs(
         consensus=SAMPLE_CONSENSUS,
         semiconductor_momentum=SAMPLE_SEMI_MOMENTUM,
         volatility=SAMPLE_VOLATILITY,
+        candlestick=SAMPLE_CANDLESTICK,
     )
-    # report에 RS와 reversal과 fundamentals와 뉴스와 컨센서스와 반도체와 변동성이 전달됨
+    # report에 RS와 reversal과 fundamentals와 뉴스와 컨센서스와 반도체와 변동성과 캔들스틱이 전달됨
     mock_report.assert_called_once()
     report_kwargs = mock_report.call_args
     assert report_kwargs[1].get("relative_strength") == SAMPLE_RS
@@ -474,6 +486,7 @@ def test_pipeline_with_rs(
     assert report_kwargs[1].get("consensus") == SAMPLE_CONSENSUS
     assert report_kwargs[1].get("semiconductor_momentum") == SAMPLE_SEMI_MOMENTUM
     assert report_kwargs[1].get("volatility") == SAMPLE_VOLATILITY
+    assert report_kwargs[1].get("candlestick") == SAMPLE_CANDLESTICK
 
 
 @patch("src.main.send_message")
@@ -505,12 +518,13 @@ def test_pipeline_with_rs(
 @patch("src.main.summarize_sentiment", return_value=SAMPLE_NEWS_SENTIMENT)
 @patch("src.main.fetch_news_headlines", return_value=SAMPLE_NEWS_HEADLINES)
 @patch("src.main.compute_volatility", return_value=SAMPLE_VOLATILITY)
+@patch("src.main.detect_candlestick_patterns", return_value=SAMPLE_CANDLESTICK)
 @patch("src.main.backfill_supply_demand")
 @patch("src.main.backfill_prices")
 @patch("src.main.init_db")
 def test_pipeline_kospi_failure_fallback(
     mock_init, mock_bf_prices, mock_bf_sd,
-    mock_volatility,
+    mock_candlestick, mock_volatility,
     mock_fetch_news, mock_summarize_news,
     mock_fetch_hynix, mock_fetch_sox,
     mock_rel_perf, mock_sox_trend, mock_semi_momentum,
@@ -537,7 +551,7 @@ def test_pipeline_kospi_failure_fallback(
     # 반도체 수집은 KOSPI와 독립 — 여전히 호출됨
     mock_fetch_hynix.assert_called_once()
     mock_fetch_sox.assert_called_once()
-    # composite_signal에 RS=None 전달, reversal과 fundamentals와 뉴스와 컨센서스와 반도체와 변동성 전달
+    # composite_signal에 RS=None 전달, reversal과 fundamentals와 뉴스와 컨센서스와 반도체와 변동성과 캔들스틱 전달
     mock_signal.assert_called_once_with(
         SAMPLE_INDICATORS, SAMPLE_SD, SAMPLE_ER,
         relative_strength=None, trend_reversal=SAMPLE_REVERSAL,
@@ -546,8 +560,9 @@ def test_pipeline_kospi_failure_fallback(
         consensus=SAMPLE_CONSENSUS,
         semiconductor_momentum=SAMPLE_SEMI_MOMENTUM,
         volatility=SAMPLE_VOLATILITY,
+        candlestick=SAMPLE_CANDLESTICK,
     )
-    # report에 RS=None, reversal과 fundamentals와 뉴스와 컨센서스와 반도체와 변동성 전달
+    # report에 RS=None, reversal과 fundamentals와 뉴스와 컨센서스와 반도체와 변동성과 캔들스틱 전달
     report_kwargs = mock_report.call_args
     assert report_kwargs[1].get("relative_strength") is None
     assert report_kwargs[1].get("trend_reversal") == SAMPLE_REVERSAL
@@ -556,6 +571,7 @@ def test_pipeline_kospi_failure_fallback(
     assert report_kwargs[1].get("consensus") == SAMPLE_CONSENSUS
     assert report_kwargs[1].get("semiconductor_momentum") == SAMPLE_SEMI_MOMENTUM
     assert report_kwargs[1].get("volatility") == SAMPLE_VOLATILITY
+    assert report_kwargs[1].get("candlestick") == SAMPLE_CANDLESTICK
 
 
 @patch("src.main.generate_daily_report")

@@ -643,6 +643,39 @@ def _build_volatility_section(vol: dict) -> list[str]:
     return lines
 
 
+def _build_candlestick_section(candle: dict) -> list[str]:
+    """캔들스틱 패턴 분석 결과를 HTML 라인 리스트로."""
+    lines = []
+    patterns = candle.get("patterns", [])
+    if not patterns:
+        return lines
+
+    lines.append("")
+    lines.append("<b>🕯 캔들스틱 패턴</b>")
+
+    signal = candle.get("signal", "neutral")
+    score = candle.get("score", 0)
+
+    signal_kr = {"bullish": "강세", "bearish": "약세", "neutral": "중립"}.get(signal, "중립")
+    signal_emoji = "🟢" if signal == "bullish" else "🔴" if signal == "bearish" else ""
+
+    pattern_names = {
+        "doji": "도지", "hammer": "해머", "hanging_man": "행잉맨",
+        "bullish_marubozu": "강세 마루보즈", "bearish_marubozu": "약세 마루보즈",
+        "bullish_engulfing": "강세 인걸핑", "bearish_engulfing": "약세 인걸핑",
+        "morning_star": "모닝스타", "evening_star": "이브닝스타",
+    }
+
+    for p in patterns:
+        name = pattern_names.get(p["name"], p["name"])
+        dir_kr = {"bullish": "강세", "bearish": "약세", "neutral": "중립"}.get(p["direction"], "")
+        lines.append(f"  {name} ({dir_kr}, 신뢰도 {p['weight']})")
+
+    lines.append(f"  종합: {signal_kr} ({score:+.0f}점) {signal_emoji}".rstrip())
+
+    return lines
+
+
 def _build_consensus_section(cons: dict) -> list[str]:
     """증권사 컨센서스 분석 결과를 HTML 라인 리스트로."""
     lines = []
@@ -855,6 +888,7 @@ def generate_daily_report(
     sox_trend: dict | None = None,
     semiconductor_momentum: int | None = None,
     volatility: dict | None = None,
+    candlestick: dict | None = None,
 ) -> str:
     """기술적 지표 dict를 HTML 텔레그램 메시지로 변환한다.
 
@@ -921,6 +955,7 @@ def generate_daily_report(
         fundamentals=fundamentals, news_sentiment=news_sentiment, consensus=consensus,
         weekly_summary=weekly_summary, rel_perf=rel_perf, sox_trend=sox_trend,
         semiconductor_momentum=semiconductor_momentum, volatility=volatility,
+        candlestick=candlestick,
     )
     if commentary:
         lines.append(f"💬 {commentary}")
@@ -1015,6 +1050,10 @@ def generate_daily_report(
     # 뉴스 심리 (선택)
     if news_sentiment is not None:
         lines.extend(_build_news_sentiment_section(news_sentiment, news_headlines))
+
+    # 캔들스틱 패턴 (선택)
+    if candlestick is not None:
+        lines.extend(_build_candlestick_section(candlestick))
 
     # 변동성 분석 (선택)
     if volatility is not None:

@@ -207,6 +207,25 @@ SAMPLE_CANDLESTICK = {
     "score": 100.0,
 }
 
+SAMPLE_WATCHPOINTS = {
+    "scenarios": {
+        "nearest_support": 55000.0,
+        "nearest_resistance": 58000.0,
+        "next_support": 54500.0,
+        "next_resistance": None,
+    },
+    "daily_range": {
+        "expected_high": 62500.0,
+        "expected_low": 59500.0,
+        "atr": 1500.0,
+        "atr_pct": 2.7,
+    },
+    "factors": [
+        {"type": "opportunity", "text": "강세 전환 신호 감지"},
+        {"type": "opportunity", "text": "외국인·기관 매수 우세 (외인 3일 연속 순매수)"},
+    ],
+}
+
 SAMPLE_REPORT_HTML = "<b>삼성전자 일일 분석</b>"
 
 SAMPLE_REVERSAL = {
@@ -260,8 +279,9 @@ SAMPLE_REVERSAL = {
 @patch("src.main.init_db")
 @patch("src.main.get_signal_history", return_value=[])
 @patch("src.main.summarize_weekly", return_value=None)
+@patch("src.main.build_watchpoints", return_value=SAMPLE_WATCHPOINTS)
 def test_pipeline_full(
-    mock_summarize_weekly, mock_sig_hist,
+    mock_watchpoints, mock_summarize_weekly, mock_sig_hist,
     mock_init, mock_bf_prices, mock_bf_sd,
     mock_candlestick, mock_volatility,
     mock_fetch_news, mock_summarize_news,
@@ -341,6 +361,7 @@ def test_pipeline_full(
         semiconductor_momentum=SAMPLE_SEMI_MOMENTUM,
         volatility=SAMPLE_VOLATILITY,
         candlestick=SAMPLE_CANDLESTICK,
+        watchpoints=SAMPLE_WATCHPOINTS,
     )
     mock_send.assert_called_once_with(SAMPLE_REPORT_HTML)
 

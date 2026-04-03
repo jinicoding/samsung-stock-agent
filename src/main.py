@@ -37,6 +37,7 @@ from src.data.consensus import fetch_consensus, analyze_consensus
 from src.analysis.volatility import compute_volatility
 from src.analysis.candlestick import detect_candlestick_patterns
 from src.analysis.weekly_summary import summarize_weekly
+from src.analysis.watchpoints import build_watchpoints
 from src.delivery.telegram_bot import send_message
 
 
@@ -182,6 +183,20 @@ def main(dry_run: bool = False):
     # 3.11) 시그널 추이 분석
     sig_trend = analyze_signal_trend(db_module, days=5)
 
+    # 3.11.5) 핵심 관찰 포인트
+    wp = None
+    try:
+        wp = build_watchpoints(
+            current_price=prices[-1]["close"],
+            support_resistance=sr,
+            volatility=vol,
+            trend_reversal=reversal,
+            supply_demand=sd,
+            news_sentiment=news_sentiment,
+        )
+    except Exception as e:
+        print(f"[경고] 관찰 포인트 생성 실패: {e}")
+
     # 3.12) 주간 추이 요약
     weekly = None
     try:
@@ -194,7 +209,7 @@ def main(dry_run: bool = False):
         print(f"[경고] 주간 추이 요약 실패: {e}")
 
     # 4) 리포트 생성
-    report = generate_daily_report(indicators, supply_demand=sd, exchange_rate=er, composite_signal=sig, support_resistance=sr, accuracy_summary=accuracy_summary, relative_strength=rs, trend_reversal=reversal, signal_trend=sig_trend, fundamentals=fund, news_sentiment=news_sentiment, news_headlines=news_headlines, consensus=consensus, weekly_summary=weekly, rel_perf=rel_perf, sox_trend=sox_trend, semiconductor_momentum=semi_momentum, volatility=vol, candlestick=candle)
+    report = generate_daily_report(indicators, supply_demand=sd, exchange_rate=er, composite_signal=sig, support_resistance=sr, accuracy_summary=accuracy_summary, relative_strength=rs, trend_reversal=reversal, signal_trend=sig_trend, fundamentals=fund, news_sentiment=news_sentiment, news_headlines=news_headlines, consensus=consensus, weekly_summary=weekly, rel_perf=rel_perf, sox_trend=sox_trend, semiconductor_momentum=semi_momentum, volatility=vol, candlestick=candle, watchpoints=wp)
 
     # 5) 발송 또는 출력
     if dry_run:

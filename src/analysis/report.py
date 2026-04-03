@@ -976,6 +976,54 @@ def _build_executive_summary(
     return lines
 
 
+def _build_watchpoints_section(watchpoints: dict, current_price: float) -> list[str]:
+    """핵심 관찰 포인트(Key Watchpoints) 섹션을 생성한다."""
+    if watchpoints is None:
+        return []
+
+    lines = []
+    lines.append("<b>🔭 핵심 관찰 포인트</b>")
+
+    # (1) 지지/저항 시나리오
+    sc = watchpoints.get("scenarios", {})
+    ns = sc.get("nearest_support")
+    nr = sc.get("nearest_resistance")
+    if ns is not None or nr is not None:
+        lines.append("  <b>시나리오:</b>")
+        if ns is not None:
+            next_sup = sc.get("next_support")
+            if next_sup is not None:
+                lines.append(f"  ▼ {_format_price(ns)} 지지 이탈 시 → {_format_price(next_sup)} 주목")
+            else:
+                lines.append(f"  ▼ 최근접 지지선: {_format_price(ns)}")
+        if nr is not None:
+            next_res = sc.get("next_resistance")
+            if next_res is not None:
+                lines.append(f"  ▲ {_format_price(nr)} 저항 돌파 시 → {_format_price(next_res)} 주목")
+            else:
+                lines.append(f"  ▲ 최근접 저항선: {_format_price(nr)}")
+
+    # (2) ATR 기반 예상 일일 변동 범위
+    dr = watchpoints.get("daily_range", {})
+    exp_high = dr.get("expected_high")
+    exp_low = dr.get("expected_low")
+    atr_pct = dr.get("atr_pct")
+    if exp_high is not None and exp_low is not None:
+        lines.append(f"  <b>예상 범위:</b> {_format_price(exp_low)} ~ {_format_price(exp_high)}"
+                     + (f" (ATR {atr_pct:.1f}%)" if atr_pct is not None else ""))
+
+    # (3) 핵심 리스크/기회 요인
+    factors = watchpoints.get("factors", [])
+    if factors:
+        lines.append("  <b>주목 요인:</b>")
+        for f in factors:
+            emoji = "⚠️" if f["type"] == "risk" else "💡"
+            lines.append(f"  {emoji} {f['text']}")
+
+    lines.append("")
+    return lines
+
+
 def generate_daily_report(
     indicators: dict,
     supply_demand: dict | None = None,
@@ -996,6 +1044,7 @@ def generate_daily_report(
     semiconductor_momentum: int | None = None,
     volatility: dict | None = None,
     candlestick: dict | None = None,
+    watchpoints: dict | None = None,
 ) -> str:
     """기술적 지표 dict를 HTML 텔레그램 메시지로 변환한다.
 
@@ -1049,6 +1098,10 @@ def generate_daily_report(
         support_resistance=support_resistance,
         trend_reversal=trend_reversal,
     ))
+
+    # 0.05) 핵심 관찰 포인트 (Executive Summary 바로 아래)
+    if watchpoints is not None:
+        lines.extend(_build_watchpoints_section(watchpoints, price))
 
     # 0.1) 종합 투자 시그널
     if composite_signal is not None:

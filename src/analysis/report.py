@@ -875,6 +875,107 @@ def _build_semiconductor_section(
     return lines
 
 
+def _build_executive_summary(
+    composite_signal: dict | None = None,
+    signal_trend: dict | None = None,
+    indicators: dict | None = None,
+    support_resistance: dict | None = None,
+    trend_reversal: dict | None = None,
+) -> list[str]:
+    """핵심 요약(Executive Summary) 섹션을 생성한다.
+
+    투자자가 이 섹션만 읽어도 오늘의 시장 상황을 파악할 수 있도록
+    종합 등급, 주요 축, 방향 변화, 주의 이벤트를 압축 표시한다.
+    """
+    if composite_signal is None:
+        return []
+
+    lines = []
+    sig = composite_signal
+    grade = sig["grade"]
+    score = sig["score"]
+
+    lines.append(f"<b>📊 핵심 요약</b>")
+
+    # (1) 종합 시그널 점수와 등급 한 줄 표시
+    lines.append(f"  {_grade_emoji(grade)} {grade} ({score:+.1f}점)")
+
+    # (2) 가장 강한 매수/매도 축 2개 하이라이트
+    axis_names = {
+        "technical_score": "기술적",
+        "supply_score": "수급",
+        "exchange_score": "환율",
+        "rs_score": "상대강도",
+        "fundamentals_score": "펀더멘털",
+        "news_score": "뉴스",
+        "consensus_score": "컨센서스",
+        "semiconductor_score": "반도체",
+        "volatility_score": "변동성",
+        "candlestick_score": "캔들스틱",
+    }
+    axes = []
+    for key, name in axis_names.items():
+        if key in sig:
+            axes.append((name, sig[key]))
+
+    # 절대값 기준 상위 2개
+    axes.sort(key=lambda x: abs(x[1]), reverse=True)
+    top_axes = axes[:2]
+    if top_axes:
+        parts = []
+        for name, val in top_axes:
+            direction = "▲" if val > 0 else "▼" if val < 0 else "–"
+            parts.append(f"{name}{direction}")
+        lines.append(f"  주요 축: {' | '.join(parts)}")
+
+    # (3) 전일 대비 시그널 방향 변화
+    if signal_trend is not None:
+        direction = signal_trend.get("direction", "횡보")
+        score_change = signal_trend.get("score_change", 0)
+        dir_emoji = "📈" if direction == "개선" else "📉" if direction == "악화" else "➡️"
+        change_str = f"{score_change:+.1f}p" if score_change != 0 else "변동없음"
+        lines.append(f"  방향: {dir_emoji} {direction} ({change_str})")
+
+    # (4) 주의 이벤트
+    alerts = []
+
+    # 추세 전환 감지
+    if trend_reversal is not None:
+        convergence = trend_reversal.get("convergence", "none")
+        if convergence in ("strong", "moderate"):
+            tr_dir = trend_reversal.get("direction", "neutral")
+            dir_kr = "강세" if tr_dir == "bullish" else "약세"
+            alerts.append(f"추세 전환({dir_kr}) 감지")
+
+    # 지지/저항 근접 (현재가 대비 1% 이내)
+    if support_resistance is not None and indicators is not None:
+        price = indicators.get("current_price", 0)
+        if price > 0:
+            ns = support_resistance.get("nearest_support")
+            nr = support_resistance.get("nearest_resistance")
+            if ns is not None:
+                dist = (price - ns) / price * 100
+                if dist <= 1.0:
+                    alerts.append(f"지지선 근접({_format_price(ns)}원)")
+            if nr is not None:
+                dist = (nr - price) / price * 100
+                if dist <= 1.0:
+                    alerts.append(f"저항선 근접({_format_price(nr)}원)")
+
+    # 극단적 RSI
+    if indicators is not None:
+        rsi = indicators.get("rsi_14")
+        rsi_status = classify_rsi(rsi)
+        if rsi_status in ("과매수", "과매도"):
+            alerts.append(f"RSI {rsi_status}({rsi:.0f})")
+
+    if alerts:
+        lines.append(f"  ⚠️ {' / '.join(alerts)}")
+
+    lines.append("")
+    return lines
+
+
 def generate_daily_report(
     indicators: dict,
     supply_demand: dict | None = None,
@@ -940,7 +1041,16 @@ def generate_daily_report(
     lines.append(f"<b>{date}</b>")
     lines.append("")
 
-    # 0) 종합 투자 시그널 (최상단)
+    # 0) 핵심 요약 (Executive Summary) — 최상단
+    lines.extend(_build_executive_summary(
+        composite_signal=composite_signal,
+        signal_trend=signal_trend,
+        indicators=indicators,
+        support_resistance=support_resistance,
+        trend_reversal=trend_reversal,
+    ))
+
+    # 0.1) 종합 투자 시그널
     if composite_signal is not None:
         lines.extend(_build_composite_signal_section(composite_signal))
 

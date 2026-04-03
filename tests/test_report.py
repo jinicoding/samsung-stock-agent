@@ -2,7 +2,7 @@
 
 import pytest
 
-from src.analysis.report import generate_daily_report, classify_ma_alignment, assess_volume, assess_market_temperature, classify_macd, classify_bb_position, classify_stochastic
+from src.analysis.report import generate_daily_report, classify_ma_alignment, assess_volume, assess_market_temperature, classify_macd, classify_bb_position, classify_stochastic, _build_executive_summary
 
 
 class TestClassifyMaAlignment:
@@ -1589,3 +1589,186 @@ class TestCompositeSignalVolatilityCandlestick:
         report = generate_daily_report(_full_indicators(), composite_signal=sig)
         assert "변동성: +15" in report
         assert "캔들스틱: +20" in report
+
+
+class TestBuildExecutiveSummary:
+    """핵심 요약(Executive Summary) 섹션 테스트."""
+
+    def test_returns_empty_without_composite_signal(self):
+        """composite_signal이 없으면 빈 리스트 반환."""
+        result = _build_executive_summary(
+            composite_signal=None,
+            signal_trend=None,
+            indicators=_full_indicators(),
+        )
+        assert result == []
+
+    def test_shows_grade_and_score(self):
+        """종합 등급과 점수가 한 줄로 표시된다."""
+        sig = _composite_signal_bullish()
+        result = _build_executive_summary(
+            composite_signal=sig,
+            signal_trend=None,
+            indicators=_full_indicators(),
+        )
+        text = "\n".join(result)
+        assert "핵심 요약" in text
+        assert "매수우세" in text
+        assert "+45.0" in text
+
+    def test_highlights_strongest_axes(self):
+        """가장 강한 매수/매도 축 2개를 하이라이트한다."""
+        sig = {
+            "score": 45.0, "grade": "매수우세",
+            "technical_score": 50.0, "supply_score": 60.0, "exchange_score": -10.0,
+            "weights": {"technical": 40, "supply": 40, "exchange": 20},
+        }
+        result = _build_executive_summary(
+            composite_signal=sig,
+            signal_trend=None,
+            indicators=_full_indicators(),
+        )
+        text = "\n".join(result)
+        assert "수급" in text
+        assert "기술적" in text
+
+    def test_shows_signal_direction_change(self):
+        """signal_trend의 score_change로 방향 변화를 표시한다."""
+        sig = _composite_signal_bullish()
+        trend = {
+            "direction": "개선",
+            "score_change": 12.5,
+            "days_available": 5,
+            "consecutive_same_grade": 2,
+            "latest_grade": "매수우세",
+            "sparkline": "▂▃▅▆█",
+            "scores": [20, 25, 30, 35, 45],
+        }
+        result = _build_executive_summary(
+            composite_signal=sig,
+            signal_trend=trend,
+            indicators=_full_indicators(),
+        )
+        text = "\n".join(result)
+        assert "개선" in text
+        assert "+12.5" in text
+
+    def test_shows_deteriorating_direction(self):
+        """악화 방향도 정상적으로 표시된다."""
+        sig = {
+            "score": -30.0, "grade": "매도우세",
+            "technical_score": -40.0, "supply_score": -50.0, "exchange_score": 10.0,
+            "weights": {"technical": 40, "supply": 40, "exchange": 20},
+        }
+        trend = {
+            "direction": "악화",
+            "score_change": -15.0,
+            "days_available": 3,
+            "consecutive_same_grade": 1,
+            "latest_grade": "매도우세",
+            "sparkline": "█▅▂",
+            "scores": [10, -10, -30],
+        }
+        result = _build_executive_summary(
+            composite_signal=sig,
+            signal_trend=trend,
+            indicators=_full_indicators(),
+        )
+        text = "\n".join(result)
+        assert "악화" in text
+        assert "-15.0" in text
+
+    def test_alerts_extreme_rsi(self):
+        """극단적 RSI(과매수/과매도) 경고를 표시한다."""
+        sig = _composite_signal_bullish()
+        result = _build_executive_summary(
+            composite_signal=sig,
+            signal_trend=None,
+            indicators=_full_indicators(rsi_14=75.0),
+        )
+        text = "\n".join(result)
+        assert "RSI" in text
+        assert "과매수" in text
+
+    def test_alerts_extreme_rsi_oversold(self):
+        """RSI 과매도 경고."""
+        sig = _composite_signal_bullish()
+        result = _build_executive_summary(
+            composite_signal=sig,
+            signal_trend=None,
+            indicators=_full_indicators(rsi_14=25.0),
+        )
+        text = "\n".join(result)
+        assert "과매도" in text
+
+    def test_no_alert_normal_rsi(self):
+        """RSI가 정상 범위이면 RSI 경고 없음."""
+        sig = _composite_signal_bullish()
+        result = _build_executive_summary(
+            composite_signal=sig,
+            signal_trend=None,
+            indicators=_full_indicators(rsi_14=50.0),
+            support_resistance=None,
+            trend_reversal=None,
+        )
+        text = "\n".join(result)
+        assert "과매수" not in text
+        assert "과매도" not in text
+
+    def test_alert_support_nearby(self):
+        """지지선 근접 경고."""
+        sig = _composite_signal_bullish()
+        sr = {
+            "pivot": {"pp": 55000, "s1": 54000, "s2": 53000, "r1": 56000, "r2": 57000},
+            "swing_levels": [],
+            "ma_levels": {},
+            "nearest_support": 54800,
+            "nearest_resistance": 58000,
+        }
+        result = _build_executive_summary(
+            composite_signal=sig,
+            signal_trend=None,
+            indicators=_full_indicators(current_price=55000),
+            support_resistance=sr,
+        )
+        text = "\n".join(result)
+        assert "지지선" in text
+
+    def test_alert_trend_reversal(self):
+        """추세 전환 감지 경고."""
+        sig = _composite_signal_bullish()
+        tr = {
+            "convergence": "strong",
+            "direction": "bearish",
+            "score": 80,
+            "active_categories": 4,
+            "category_signals": {},
+        }
+        result = _build_executive_summary(
+            composite_signal=sig,
+            signal_trend=None,
+            indicators=_full_indicators(),
+            trend_reversal=tr,
+        )
+        text = "\n".join(result)
+        assert "추세 전환" in text
+
+    def test_executive_summary_in_report(self):
+        """generate_daily_report에 핵심 요약 섹션이 포함된다."""
+        sig = _composite_signal_bullish()
+        report = generate_daily_report(
+            _full_indicators(),
+            composite_signal=sig,
+        )
+        assert "핵심 요약" in report
+
+    def test_executive_summary_before_composite_signal(self):
+        """핵심 요약이 종합 판정 섹션보다 먼저 나온다."""
+        sig = _composite_signal_bullish()
+        report = generate_daily_report(
+            _full_indicators(),
+            composite_signal=sig,
+        )
+        summary_pos = report.find("핵심 요약")
+        composite_pos = report.find("오늘의 종합 판정")
+        assert summary_pos < composite_pos

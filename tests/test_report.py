@@ -1550,3 +1550,42 @@ class TestADXInReport:
         ind["adx"] = None
         report = generate_daily_report(ind)
         assert "ADX(14)" not in report
+
+
+class TestCompositeSignalVolatilityCandlestick:
+    """종합 시그널 섹션에 변동성·캔들스틱 점수 표시 테스트."""
+
+    def test_composite_signal_shows_volatility_score(self):
+        """종합 시그널에 변동성 점수가 표시됨."""
+        sig = {
+            "score": 30.0, "grade": "매수우세",
+            "technical_score": 40.0, "supply_score": 30.0, "exchange_score": 10.0,
+            "volatility_score": 15.0,
+            "weights": {"technical": 36, "supply": 36, "exchange": 18, "volatility": 5, "candlestick": 5},
+        }
+        report = generate_daily_report(_full_indicators(), composite_signal=sig)
+        assert "변동성" in report
+        assert "가중치 5%" in report
+
+    def test_composite_signal_shows_candlestick_score(self):
+        """종합 시그널에 캔들스틱 점수가 표시됨."""
+        sig = {
+            "score": 30.0, "grade": "매수우세",
+            "technical_score": 40.0, "supply_score": 30.0, "exchange_score": 10.0,
+            "candlestick_score": 20.0,
+            "weights": {"technical": 36, "supply": 36, "exchange": 18, "candlestick": 5},
+        }
+        report = generate_daily_report(_full_indicators(), composite_signal=sig)
+        assert "캔들스틱" in report
+
+    def test_composite_signal_shows_both_volatility_and_candlestick(self):
+        """종합 시그널에 변동성과 캔들스틱 점수 모두 표시됨."""
+        sig = {
+            "score": 30.0, "grade": "매수우세",
+            "technical_score": 40.0, "supply_score": 30.0, "exchange_score": 10.0,
+            "volatility_score": 15.0, "candlestick_score": 20.0,
+            "weights": {"technical": 34, "supply": 34, "exchange": 17, "volatility": 5, "candlestick": 5, "semiconductor": 5},
+        }
+        report = generate_daily_report(_full_indicators(), composite_signal=sig)
+        assert "변동성: +15" in report
+        assert "캔들스틱: +20" in report

@@ -410,6 +410,12 @@ def _build_composite_signal_section(sig: dict) -> list[str]:
     if "semiconductor_score" in sig:
         semi_w = sig["weights"].get("semiconductor", 10)
         lines.append(f"  반도체: {sig['semiconductor_score']:+.0f} (가중치 {semi_w}%)")
+    if "volatility_score" in sig:
+        vol_w = sig["weights"].get("volatility", 5)
+        lines.append(f"  변동성: {sig['volatility_score']:+.0f} (가중치 {vol_w}%)")
+    if "candlestick_score" in sig:
+        candle_w = sig["weights"].get("candlestick", 5)
+        lines.append(f"  캔들스틱: {sig['candlestick_score']:+.0f} (가중치 {candle_w}%)")
     lines.append("")
     return lines
 

@@ -2,7 +2,7 @@
 
 import pytest
 
-from src.analysis.signal import compute_composite_signal
+from src.analysis.signal import adapt_weights, compute_composite_signal
 
 
 # ---------------------------------------------------------------------------
@@ -850,3 +850,141 @@ class TestSemiconductorIntegration:
             semiconductor_momentum=100,
         )
         assert -100 <= result["score"] <= 100
+
+
+# ---------------------------------------------------------------------------
+# adapt_weights 테스트
+# ---------------------------------------------------------------------------
+
+def _accuracy_summary(overrides: dict | None = None) -> dict:
+    """축별 정확도 요약 stub.
+
+    기본값: 모든 축 hit_rate_5d=50%, evaluated_5d=10.
+    overrides로 특정 축 값 덮어쓰기.
+    """
+    per_axis = {}
+    for axis in (
+        "technical_score", "supply_score", "exchange_score",
+        "fundamentals_score", "news_score", "consensus_score",
+        "semiconductor_score", "volatility_score", "candlestick_score",
+    ):
+        per_axis[axis] = {
+            "hit_rate_5d": 50.0,
+            "evaluated_5d": 10,
+            "hit_rate_3d": 50.0,
+            "evaluated_3d": 10,
+            "hit_rate_1d": 50.0,
+            "evaluated_1d": 10,
+        }
+    if overrides:
+        for axis, vals in overrides.items():
+            per_axis[axis].update(vals)
+    return {"total_signals": 20, "per_axis": per_axis}
+
+
+class TestAdaptWeights:
+    """적응형 가중치 시스템 테스트."""
+
+    def test_all_equal_hit_rate_no_change(self):
+        """모든 축 적중률이 동일하면 가중치 변동 없음."""
+        base = {"technical": 40, "supply": 40, "exchange": 20}
+        summary = _accuracy_summary()
+        result = adapt_weights(base, summary)
+        assert result == base
+
+    def test_high_hit_rate_increases_weight(self):
+        """적중률 높은 축의 가중치가 증가."""
+        base = {"technical": 40, "supply": 40, "exchange": 20}
+        summary = _accuracy_summary({
+            "technical_score": {"hit_rate_5d": 80.0, "evaluated_5d": 10},
+        })
+        result = adapt_weights(base, summary)
+        assert result["technical"] > 40
+
+    def test_low_hit_rate_decreases_weight(self):
+        """적중률 낮은 축의 가중치가 감소."""
+        base = {"technical": 40, "supply": 40, "exchange": 20}
+        summary = _accuracy_summary({
+            "technical_score": {"hit_rate_5d": 20.0, "evaluated_5d": 10},
+        })
+        result = adapt_weights(base, summary)
+        assert result["technical"] < 40
+
+    def test_weights_sum_to_100(self):
+        """조정 후 가중치 합계는 항상 100."""
+        base = {"technical": 25, "supply": 25, "exchange": 15,
+                "relative_strength": 10, "fundamentals": 15, "news": 10}
+        summary = _accuracy_summary({
+            "technical_score": {"hit_rate_5d": 90.0, "evaluated_5d": 10},
+            "supply_score": {"hit_rate_5d": 30.0, "evaluated_5d": 10},
+            "news_score": {"hit_rate_5d": 70.0, "evaluated_5d": 10},
+        })
+        result = adapt_weights(base, summary)
+        assert sum(result.values()) == 100
+
+    def test_adjustment_within_30_percent(self):
+        """가중치 조정폭은 기본값의 ±30% 이내."""
+        base = {"technical": 40, "supply": 40, "exchange": 20}
+        summary = _accuracy_summary({
+            "technical_score": {"hit_rate_5d": 100.0, "evaluated_5d": 10},
+            "supply_score": {"hit_rate_5d": 0.0, "evaluated_5d": 10},
+        })
+        result = adapt_weights(base, summary)
+        for key in base:
+            assert result[key] >= base[key] * 0.7
+            assert result[key] <= base[key] * 1.3
+
+    def test_insufficient_data_no_adjustment(self):
+        """evaluated_5d < 5이면 해당 축 조정하지 않음."""
+        base = {"technical": 40, "supply": 40, "exchange": 20}
+        summary = _accuracy_summary({
+            "technical_score": {"hit_rate_5d": 90.0, "evaluated_5d": 3},
+        })
+        result = adapt_weights(base, summary)
+        assert result == base
+
+    def test_none_hit_rate_no_adjustment(self):
+        """hit_rate_5d가 None이면 해당 축 조정하지 않음."""
+        base = {"technical": 40, "supply": 40, "exchange": 20}
+        summary = _accuracy_summary({
+            "technical_score": {"hit_rate_5d": None, "evaluated_5d": 10},
+        })
+        result = adapt_weights(base, summary)
+        assert result == base
+
+    def test_empty_accuracy_summary_no_change(self):
+        """accuracy_summary가 비어있으면 가중치 변동 없음."""
+        base = {"technical": 40, "supply": 40, "exchange": 20}
+        summary = {"total_signals": 0, "per_axis": {}}
+        result = adapt_weights(base, summary)
+        assert result == base
+
+    def test_composite_signal_with_accuracy(self):
+        """compute_composite_signal에 accuracy_summary 전달 시 적응형 가중치 사용."""
+        summary = _accuracy_summary({
+            "technical_score": {"hit_rate_5d": 90.0, "evaluated_5d": 10},
+            "supply_score": {"hit_rate_5d": 30.0, "evaluated_5d": 10},
+        })
+        result = compute_composite_signal(
+            _tech(), _supply(), _fx(),
+            accuracy_summary=summary,
+        )
+        w = result["weights"]
+        assert w["technical"] > w["supply"]
+        assert sum(w.values()) == 100
+
+    def test_composite_signal_without_accuracy_unchanged(self):
+        """accuracy_summary 미제공 시 기존 정적 가중치 유지 (하위 호환)."""
+        result = compute_composite_signal(_tech(), _supply(), _fx())
+        assert result["weights"] == {"technical": 40, "supply": 40, "exchange": 20}
+
+    def test_adapted_weights_in_result(self):
+        """적응형 가중치 사용 시 결과에 adapted_weights 표시."""
+        summary = _accuracy_summary({
+            "technical_score": {"hit_rate_5d": 80.0, "evaluated_5d": 10},
+        })
+        result = compute_composite_signal(
+            _tech(), _supply(), _fx(),
+            accuracy_summary=summary,
+        )
+        assert result.get("adapted_weights") is True

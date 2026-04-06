@@ -4,7 +4,93 @@
 -100~+100 점수와 5단계 판정을 반환한다.
 
 가중치: 기술적 40%, 수급 40%, 환율 20%
+적응형 가중치: accuracy_summary 제공 시 축별 적중률 기반 ±30% 동적 조정.
 """
+
+from __future__ import annotations
+
+# 축 이름 → accuracy per_axis 키 매핑
+_AXIS_TO_ACCURACY_KEY: dict[str, str] = {
+    "technical": "technical_score",
+    "supply": "supply_score",
+    "exchange": "exchange_score",
+    "relative_strength": "rs_score",
+    "fundamentals": "fundamentals_score",
+    "news": "news_score",
+    "consensus": "consensus_score",
+    "semiconductor": "semiconductor_score",
+    "volatility": "volatility_score",
+    "candlestick": "candlestick_score",
+}
+
+
+def adapt_weights(
+    base_weights: dict[str, int],
+    accuracy_summary: dict,
+    max_adj: float = 0.30,
+    min_evaluated: int = 5,
+) -> dict[str, int]:
+    """축별 적중률(hit_rate_5d) 기반으로 가중치를 동적 조정한다.
+
+    Args:
+        base_weights: 축 이름 → 정적 가중치(%) 맵.
+        accuracy_summary: evaluate_signals() 반환값의 summary.
+        max_adj: 최대 조정 비율 (기본 0.30 = ±30%).
+        min_evaluated: 이 수 미만의 평가 데이터가 있는 축은 조정하지 않음.
+
+    Returns:
+        조정된 가중치(%) 맵. 합계는 항상 100.
+    """
+    per_axis = accuracy_summary.get("per_axis", {})
+    if not per_axis:
+        return dict(base_weights)
+
+    # 1) 각 축의 적중률 수집 (데이터 부족 또는 None이면 제외)
+    hit_rates: dict[str, float] = {}
+    for axis in base_weights:
+        acc_key = _AXIS_TO_ACCURACY_KEY.get(axis, axis + "_score")
+        axis_data = per_axis.get(acc_key, {})
+        hr = axis_data.get("hit_rate_5d")
+        ev = axis_data.get("evaluated_5d", 0)
+        if hr is not None and ev >= min_evaluated:
+            hit_rates[axis] = hr
+
+    # 조정 가능한 축이 없으면 원본 반환
+    if not hit_rates:
+        return dict(base_weights)
+
+    # 평균 적중률 (조정 대상 축만)
+    avg_hr = sum(hit_rates.values()) / len(hit_rates)
+
+    # 2) 적중률 편차로 raw 조정 계수 산출 (±max_adj)
+    raw_factors: dict[str, float] = {}
+    for axis in base_weights:
+        if axis in hit_rates:
+            deviation = hit_rates[axis] - avg_hr  # -100~+100 범위
+            # deviation을 ±50 기준으로 ±max_adj에 매핑
+            factor = 1.0 + (deviation / 50.0) * max_adj
+            factor = max(1.0 - max_adj, min(1.0 + max_adj, factor))
+        else:
+            factor = 1.0  # 데이터 부족: 조정 안 함
+        raw_factors[axis] = factor
+
+    # 3) raw 가중치 산출 후 정규화하여 합 100 유지
+    raw_weights = {k: base_weights[k] * raw_factors[k] for k in base_weights}
+    total_raw = sum(raw_weights.values())
+
+    if total_raw == 0:
+        return dict(base_weights)
+
+    # 정규화 + 반올림
+    adjusted = {k: round(v / total_raw * 100) for k, v in raw_weights.items()}
+
+    # 반올림 오차 보정: 가장 큰 축에서 조정
+    diff = 100 - sum(adjusted.values())
+    if diff != 0:
+        largest = max(adjusted, key=adjusted.get)  # type: ignore[arg-type]
+        adjusted[largest] += diff
+
+    return adjusted
 
 
 def _clamp(value: float, lo: float = -100.0, hi: float = 100.0) -> float:
@@ -330,6 +416,7 @@ def compute_composite_signal(
     semiconductor_momentum: int | None = None,
     volatility: dict | None = None,
     candlestick: dict | None = None,
+    accuracy_summary: dict | None = None,
 ) -> dict:
     """종합 투자 시그널을 계산한다.
 
@@ -432,6 +519,14 @@ def compute_composite_signal(
     else:
         weights = dict(base_weights)
 
+    # --- 적응형 가중치 조정 ---
+    adapted = False
+    if accuracy_summary is not None:
+        adapted_weights = adapt_weights(weights, accuracy_summary)
+        if adapted_weights != weights:
+            adapted = True
+            weights = adapted_weights
+
     # --- 가중 합산 ---
     score_map: dict[str, float] = {
         "technical": tech_score,
@@ -469,6 +564,8 @@ def compute_composite_signal(
         "exchange_score": fx_score,
         "weights": weights,
     }
+    if adapted:
+        result["adapted_weights"] = True
     if rs_score is not None:
         result["rs_score"] = rs_score
     if fund_score is not None:

@@ -1,9 +1,9 @@
 ## Session Plan
 
-### Task 1: 다축 수렴 분석(Convergence)을 종합 시그널·리포트·코멘터리·파이프라인에 통합
-Files: src/main.py, src/analysis/signal.py, src/analysis/report.py, src/analysis/commentary.py, tests/test_signal.py, tests/test_report.py, tests/test_commentary.py, tests/test_main.py
-Description: Day 15에서 구축한 `src/analysis/convergence.py`의 `analyze_convergence()`를 파이프라인에 통합한다. (1) `main.py`에서 `compute_composite_signal()` 이후 `analyze_convergence(scores)`를 호출하여 수렴 데이터를 산출한다. scores 딕셔너리는 sig에서 추출한 각 축 점수(technical_score, supply_score, exchange_score, fundamental_score, news_score, consensus_score, semiconductor_score, volatility_score, candlestick_score)로 구성한다. (2) `signal.py`의 `compute_composite_signal()`이 convergence 결과를 받아 확신도(conviction)에 따라 최종 점수를 조절하도록 한다 — strong convergence일 때 점수 강화(±10%), mixed일 때 점수 감쇠(−10%). (3) `report.py`에 수렴 분석 HTML 섹션을 추가한다: 수렴 수준, 지배적 방향, 일치/충돌 축, 확신도를 표시한다. (4) `commentary.py`에 수렴 분석에 따른 자연어 해설을 추가한다 (예: "9축 중 7축이 강세를 가리키며 강한 수렴 — 시그널 신뢰도 높음"). 테스트를 먼저 작성하고 구현한다.
+### Task 1: signal_history 테이블에 9축 점수 전체 저장 확대
+Files: src/data/database.py, src/main.py, tests/test_database.py, tests/test_main.py
+Description: 현재 signal_history 테이블이 technical_score, supply_score, exchange_score 3축만 저장하고 나머지 6축(fundamentals, news, consensus, semiconductor, volatility, candlestick)은 버리고 있다. 9축 전체를 저장해야 축별 정확도 분석이 가능하다. (1) init_db()에서 CREATE TABLE에 6개 컬럼 추가 (REAL DEFAULT NULL — 기존 데이터 호환). 기존 DB 마이그레이션을 위해 ALTER TABLE ADD COLUMN도 init_db() 내에 추가. (2) upsert_signal_history()가 optional kwargs로 6축 점수를 받아 저장. (3) get_signal_history()가 9축 점수 전부 반환. (4) main.py에서 sig dict의 축별 점수를 upsert에 전달. 테스트 먼저 작성.
 
-### Task 2: signal_history 테이블을 9축 전체 점수 + 수렴 데이터로 확장
-Files: src/data/database.py, src/main.py, src/analysis/signal_trend.py, tests/test_database.py, tests/test_signal_trend.py
-Description: 현재 signal_history 테이블은 technical_score, supply_score, exchange_score 3개 축만 저장한다. 나머지 6개 축(fundamental_score, news_score, consensus_score, semiconductor_score, volatility_score, candlestick_score)과 수렴 데이터(convergence_level, conviction)를 추가한다. (1) `database.py`의 `CREATE TABLE`에 9개 컬럼을 추가하되, 기존 3개 컬럼은 유지하고 6개를 `REAL DEFAULT NULL`로 추가한다. SQLite는 ALTER TABLE ADD COLUMN을 지원하므로 마이그레이션 함수를 init_db() 내에 추가한다. convergence_level(TEXT)과 conviction(REAL)도 추가한다. (2) `upsert_signal_history()`와 `get_signal_history()`의 시그니처를 확장하여 새 컬럼을 읽고 쓸 수 있게 한다. 기존 호출부와의 하위 호환성을 위해 새 파라미터는 기본값 None으로 설정한다. (3) `main.py`에서 upsert_signal_history 호출 시 9축 점수와 수렴 데이터를 모두 전달한다. (4) `signal_trend.py`가 확장된 데이터를 활용하여 각 축별 추이를 분석할 수 있도록 한다. 테스트를 먼저 작성하고 구현한다.
+### Task 2: 축별 예측 정확도 분석 (Per-Axis Accuracy Decomposition)
+Files: src/analysis/accuracy.py, src/analysis/report.py, tests/test_accuracy.py, tests/test_report.py
+Description: Task 1에서 저장된 9축 점수를 활용하여 각 축이 독립적으로 얼마나 예측력이 있는지 분석한다. (1) accuracy.py에 evaluate_axis_accuracy() 함수 추가: 각 축의 score 부호(양수=강세, 음수=약세)와 실제 forward return 방향을 대조하여 축별 hit rate를 산출. (2) report.py의 시그널 정확도 섹션에 축별 hit rate 테이블 추가: "어떤 축이 가장 예측력이 높은가"를 투자자에게 보여준다. (3) 수렴 강도별 정확도 비교: convergence_level이 strong일 때 vs mixed일 때 overall hit rate 차이를 보여줘서 수렴 분석의 유효성을 검증한다. 테스트 먼저 작성.

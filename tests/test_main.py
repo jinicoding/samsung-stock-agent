@@ -365,6 +365,12 @@ def test_pipeline_full(
         date="2026-03-60", score=35.0, grade="매수우세",
         technical_score=40.0, supply_score=50.0, exchange_score=-10.0,
         price=61000,
+        fundamentals_score=None,
+        news_score=None,
+        consensus_score=None,
+        semiconductor_score=None,
+        volatility_score=None,
+        candlestick_score=None,
     )
     mock_eval.assert_called_once()
     mock_report.assert_called_once_with(

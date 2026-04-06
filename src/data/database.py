@@ -61,9 +61,24 @@ def init_db() -> None:
             technical_score   REAL NOT NULL,
             supply_score      REAL NOT NULL,
             exchange_score    REAL NOT NULL,
-            price             REAL NOT NULL
+            price             REAL NOT NULL,
+            fundamentals_score  REAL DEFAULT NULL,
+            news_score          REAL DEFAULT NULL,
+            consensus_score     REAL DEFAULT NULL,
+            semiconductor_score REAL DEFAULT NULL,
+            volatility_score    REAL DEFAULT NULL,
+            candlestick_score   REAL DEFAULT NULL
         )
     """)
+    # 기존 DB 마이그레이션: 새 컬럼이 없으면 추가
+    _new_columns = [
+        "fundamentals_score", "news_score", "consensus_score",
+        "semiconductor_score", "volatility_score", "candlestick_score",
+    ]
+    existing = {row[1] for row in conn.execute("PRAGMA table_info(signal_history)").fetchall()}
+    for col in _new_columns:
+        if col not in existing:
+            conn.execute(f"ALTER TABLE signal_history ADD COLUMN {col} REAL DEFAULT NULL")
     conn.commit()
     conn.close()
 
@@ -258,14 +273,25 @@ def upsert_signal_history(
     supply_score: float,
     exchange_score: float,
     price: float,
+    *,
+    fundamentals_score: float | None = None,
+    news_score: float | None = None,
+    consensus_score: float | None = None,
+    semiconductor_score: float | None = None,
+    volatility_score: float | None = None,
+    candlestick_score: float | None = None,
 ) -> None:
-    """시그널 이력 단건 삽입/갱신."""
+    """시그널 이력 단건 삽입/갱신 (9축 점수 지원)."""
     conn = get_connection()
     conn.execute(
         "INSERT OR REPLACE INTO signal_history "
-        "(date, score, grade, technical_score, supply_score, exchange_score, price) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?)",
-        (date, score, grade, technical_score, supply_score, exchange_score, price),
+        "(date, score, grade, technical_score, supply_score, exchange_score, price, "
+        "fundamentals_score, news_score, consensus_score, "
+        "semiconductor_score, volatility_score, candlestick_score) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (date, score, grade, technical_score, supply_score, exchange_score, price,
+         fundamentals_score, news_score, consensus_score,
+         semiconductor_score, volatility_score, candlestick_score),
     )
     conn.commit()
     conn.close()
@@ -276,7 +302,9 @@ def get_signal_history(days: int) -> list[dict]:
     conn = get_connection()
     cur = conn.execute(
         "SELECT date, score, grade, technical_score, supply_score, "
-        "exchange_score, price FROM signal_history "
+        "exchange_score, price, fundamentals_score, news_score, "
+        "consensus_score, semiconductor_score, volatility_score, "
+        "candlestick_score FROM signal_history "
         "ORDER BY date DESC LIMIT ?",
         (days,),
     )

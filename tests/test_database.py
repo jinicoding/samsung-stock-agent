@@ -197,3 +197,116 @@ def test_get_signal_history_limits(temp_db):
     rows = db.get_signal_history(3)
     assert len(rows) == 3
     assert rows[0]["date"] == "2026-03-22"
+
+
+# ── signal_history 9축 확장 ─────────────────────────────────────
+
+def test_upsert_signal_history_9axes(temp_db):
+    """9축 점수 전체를 저장하고 조회할 수 있다."""
+    db_path, db = temp_db
+    db.init_db()
+    db.upsert_signal_history(
+        date="2026-04-01",
+        score=42.0,
+        grade="매수우세",
+        technical_score=50.0,
+        supply_score=40.0,
+        exchange_score=10.0,
+        price=58000.0,
+        fundamentals_score=30.0,
+        news_score=20.0,
+        consensus_score=60.0,
+        semiconductor_score=45.0,
+        volatility_score=-15.0,
+        candlestick_score=25.0,
+    )
+    rows = db.get_signal_history(10)
+    assert len(rows) == 1
+    r = rows[0]
+    assert r["fundamentals_score"] == 30.0
+    assert r["news_score"] == 20.0
+    assert r["consensus_score"] == 60.0
+    assert r["semiconductor_score"] == 45.0
+    assert r["volatility_score"] == -15.0
+    assert r["candlestick_score"] == 25.0
+
+
+def test_upsert_signal_history_partial_axes(temp_db):
+    """일부 축만 전달하면 나머지는 NULL로 저장된다."""
+    db_path, db = temp_db
+    db.init_db()
+    db.upsert_signal_history(
+        date="2026-04-01",
+        score=20.0,
+        grade="중립",
+        technical_score=10.0,
+        supply_score=15.0,
+        exchange_score=5.0,
+        price=56000.0,
+        fundamentals_score=30.0,
+    )
+    rows = db.get_signal_history(10)
+    assert len(rows) == 1
+    r = rows[0]
+    assert r["fundamentals_score"] == 30.0
+    assert r["news_score"] is None
+    assert r["consensus_score"] is None
+
+
+def test_signal_history_backward_compat(temp_db):
+    """기존 3축만 전달해도 정상 동작한다 (하위호환)."""
+    db_path, db = temp_db
+    db.init_db()
+    db.upsert_signal_history(
+        date="2026-04-01",
+        score=10.0,
+        grade="중립",
+        technical_score=5.0,
+        supply_score=5.0,
+        exchange_score=0.0,
+        price=55000.0,
+    )
+    rows = db.get_signal_history(10)
+    assert len(rows) == 1
+    r = rows[0]
+    assert r["technical_score"] == 5.0
+    assert r["fundamentals_score"] is None
+    assert r["candlestick_score"] is None
+
+
+def test_migrate_adds_columns(temp_db):
+    """기존 테이블에 새 컬럼이 없어도 init_db() 마이그레이션으로 추가된다."""
+    db_path, db = temp_db
+    # 먼저 구형 스키마로 테이블 생성
+    conn = sqlite3.connect(db_path)
+    conn.execute("""
+        CREATE TABLE signal_history (
+            date              TEXT PRIMARY KEY,
+            score             REAL NOT NULL,
+            grade             TEXT NOT NULL,
+            technical_score   REAL NOT NULL,
+            supply_score      REAL NOT NULL,
+            exchange_score    REAL NOT NULL,
+            price             REAL NOT NULL
+        )
+    """)
+    conn.execute(
+        "INSERT INTO signal_history VALUES (?, ?, ?, ?, ?, ?, ?)",
+        ("2026-03-30", 10.0, "중립", 5.0, 5.0, 0.0, 55000.0),
+    )
+    conn.commit()
+    conn.close()
+    # init_db()가 마이그레이션 수행
+    db.init_db()
+    # 새 컬럼으로 저장 가능
+    db.upsert_signal_history(
+        date="2026-04-01", score=20.0, grade="매수우세",
+        technical_score=10.0, supply_score=10.0, exchange_score=0.0,
+        price=56000.0, fundamentals_score=30.0,
+    )
+    rows = db.get_signal_history(10)
+    assert len(rows) == 2
+    # 기존 행은 새 컬럼이 NULL
+    assert rows[0]["fundamentals_score"] is None
+    # 새 행은 값이 있음
+    assert rows[1]["fundamentals_score"] == 30.0

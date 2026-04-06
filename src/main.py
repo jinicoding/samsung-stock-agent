@@ -191,6 +191,12 @@ def main(dry_run: bool = False):
         supply_score=sig["supply_score"],
         exchange_score=sig["exchange_score"],
         price=latest_price,
+        fundamentals_score=sig.get("fundamentals_score"),
+        news_score=sig.get("news_score"),
+        consensus_score=sig.get("consensus_score"),
+        semiconductor_score=sig.get("semiconductor_score"),
+        volatility_score=sig.get("volatility_score"),
+        candlestick_score=sig.get("candlestick_score"),
     )
 
     # 3.10) 시그널 정확도 평가

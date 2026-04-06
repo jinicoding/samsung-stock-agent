@@ -21,7 +21,8 @@ from src.analysis.technical import compute_technical_indicators
 from src.analysis.supply_demand import analyze_supply_demand
 from src.analysis.exchange_rate import analyze_exchange_rate
 from src.analysis.report import generate_daily_report
-from src.analysis.signal import compute_composite_signal
+from src.analysis.signal import compute_composite_signal, adjust_for_convergence
+from src.analysis.convergence import analyze_convergence
 from src.analysis.support_resistance import analyze_support_resistance
 from src.analysis.trend_reversal import detect_reversal_signals
 from src.analysis.accuracy import evaluate_signals
@@ -162,6 +163,23 @@ def main(dry_run: bool = False):
     # 3.8) 종합 투자 시그널
     sig = compute_composite_signal(indicators, sd or {}, er or {}, relative_strength=rs, trend_reversal=reversal, fundamentals=fund, news_sentiment=news_sentiment, consensus=consensus, semiconductor_momentum=semi_momentum, volatility=vol, candlestick=candle)
 
+    # 3.85) 다축 수렴 분석
+    conv = None
+    try:
+        conv_scores = {
+            "technical_score": sig["technical_score"],
+            "supply_score": sig["supply_score"],
+            "exchange_score": sig["exchange_score"],
+        }
+        for key in ("fundamentals_score", "news_score", "consensus_score",
+                     "semiconductor_score", "volatility_score", "candlestick_score"):
+            if key in sig:
+                conv_scores[key] = sig[key]
+        conv = analyze_convergence(conv_scores)
+        sig = adjust_for_convergence(sig, conv)
+    except Exception as e:
+        print(f"[경고] 수렴 분석 실패: {e}")
+
     # 3.9) 시그널 이력 저장
     latest_price = prices[-1]["close"]
     latest_date = prices[-1]["date"]
@@ -209,7 +227,7 @@ def main(dry_run: bool = False):
         print(f"[경고] 주간 추이 요약 실패: {e}")
 
     # 4) 리포트 생성
-    report = generate_daily_report(indicators, supply_demand=sd, exchange_rate=er, composite_signal=sig, support_resistance=sr, accuracy_summary=accuracy_summary, relative_strength=rs, trend_reversal=reversal, signal_trend=sig_trend, fundamentals=fund, news_sentiment=news_sentiment, news_headlines=news_headlines, consensus=consensus, weekly_summary=weekly, rel_perf=rel_perf, sox_trend=sox_trend, semiconductor_momentum=semi_momentum, volatility=vol, candlestick=candle, watchpoints=wp)
+    report = generate_daily_report(indicators, supply_demand=sd, exchange_rate=er, composite_signal=sig, support_resistance=sr, accuracy_summary=accuracy_summary, relative_strength=rs, trend_reversal=reversal, signal_trend=sig_trend, fundamentals=fund, news_sentiment=news_sentiment, news_headlines=news_headlines, consensus=consensus, weekly_summary=weekly, rel_perf=rel_perf, sox_trend=sox_trend, semiconductor_momentum=semi_momentum, volatility=vol, candlestick=candle, watchpoints=wp, convergence=conv)
 
     # 5) 발송 또는 출력
     if dry_run:

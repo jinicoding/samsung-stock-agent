@@ -484,3 +484,33 @@ def compute_composite_signal(
     if candle_score is not None:
         result["candlestick_score"] = candle_score
     return result
+
+
+def adjust_for_convergence(sig: dict, convergence: dict) -> dict:
+    """수렴 분석 결과에 따라 종합 시그널 점수를 조절한다.
+
+    Args:
+        sig: compute_composite_signal() 반환값.
+        convergence: analyze_convergence() 반환값.
+
+    Returns:
+        sig 복사본에 수렴 조정이 반영된 dict.
+            - strong: 점수 ±10% 강화 (방향 유지)
+            - mixed: 점수 −10% 감쇠 (0 방향으로)
+            - moderate/weak: 조정 없음
+    """
+    level = convergence.get("convergence_level", "mixed")
+    score = sig["score"]
+
+    if level == "strong":
+        score *= 1.10
+    elif level == "mixed":
+        score *= 0.90
+
+    score = _clamp(score)
+
+    result = dict(sig)
+    result["score"] = score
+    result["grade"] = _grade_from_score(score)
+    result["convergence"] = convergence
+    return result

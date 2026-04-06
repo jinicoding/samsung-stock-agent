@@ -694,6 +694,92 @@ class TestVolatilityIntegration:
         assert -100 <= result["score"] <= 100
 
 
+class TestConvergenceAdjustment:
+    """수렴 분석에 따른 시그널 점수 조절 테스트."""
+
+    def test_strong_convergence_amplifies_positive_score(self):
+        """strong 수렴 → 양수 점수가 10% 강화."""
+        from src.analysis.signal import adjust_for_convergence
+        sig = {"score": 50.0, "grade": "매수우세", "weights": {}}
+        conv = {"convergence_level": "strong", "conviction": 80,
+                "dominant_direction": "bullish", "aligned_axes": ["a"] * 7,
+                "conflicting_axes": [], "neutral_axes": [], "axis_directions": {}}
+        result = adjust_for_convergence(sig, conv)
+        assert result["score"] == pytest.approx(55.0, abs=0.1)
+
+    def test_strong_convergence_amplifies_negative_score(self):
+        """strong 수렴 → 음수 점수도 절대값 10% 강화."""
+        from src.analysis.signal import adjust_for_convergence
+        sig = {"score": -50.0, "grade": "매도우세", "weights": {}}
+        conv = {"convergence_level": "strong", "conviction": 80,
+                "dominant_direction": "bearish", "aligned_axes": ["a"] * 7,
+                "conflicting_axes": [], "neutral_axes": [], "axis_directions": {}}
+        result = adjust_for_convergence(sig, conv)
+        assert result["score"] == pytest.approx(-55.0, abs=0.1)
+
+    def test_mixed_convergence_dampens_score(self):
+        """mixed 수렴 → 점수 10% 감쇠."""
+        from src.analysis.signal import adjust_for_convergence
+        sig = {"score": 50.0, "grade": "매수우세", "weights": {}}
+        conv = {"convergence_level": "mixed", "conviction": 20,
+                "dominant_direction": "neutral", "aligned_axes": [],
+                "conflicting_axes": [], "neutral_axes": [], "axis_directions": {}}
+        result = adjust_for_convergence(sig, conv)
+        assert result["score"] == pytest.approx(45.0, abs=0.1)
+
+    def test_moderate_convergence_no_adjustment(self):
+        """moderate 수렴 → 점수 조절 없음."""
+        from src.analysis.signal import adjust_for_convergence
+        sig = {"score": 50.0, "grade": "매수우세", "weights": {}}
+        conv = {"convergence_level": "moderate", "conviction": 55,
+                "dominant_direction": "bullish", "aligned_axes": ["a"] * 5,
+                "conflicting_axes": [], "neutral_axes": [], "axis_directions": {}}
+        result = adjust_for_convergence(sig, conv)
+        assert result["score"] == pytest.approx(50.0, abs=0.1)
+
+    def test_weak_convergence_no_adjustment(self):
+        """weak 수렴 → 점수 조절 없음."""
+        from src.analysis.signal import adjust_for_convergence
+        sig = {"score": 50.0, "grade": "매수우세", "weights": {}}
+        conv = {"convergence_level": "weak", "conviction": 35,
+                "dominant_direction": "bullish", "aligned_axes": ["a"] * 3,
+                "conflicting_axes": [], "neutral_axes": [], "axis_directions": {}}
+        result = adjust_for_convergence(sig, conv)
+        assert result["score"] == pytest.approx(50.0, abs=0.1)
+
+    def test_grade_updated_after_adjustment(self):
+        """점수 조정 후 grade도 재계산."""
+        from src.analysis.signal import adjust_for_convergence
+        sig = {"score": 58.0, "grade": "매수우세", "weights": {}}
+        conv = {"convergence_level": "strong", "conviction": 80,
+                "dominant_direction": "bullish", "aligned_axes": ["a"] * 7,
+                "conflicting_axes": [], "neutral_axes": [], "axis_directions": {}}
+        result = adjust_for_convergence(sig, conv)
+        # 58 * 1.1 = 63.8 → 강력매수신호
+        assert result["grade"] == "강력매수신호"
+
+    def test_convergence_included_in_result(self):
+        """결과에 convergence 데이터가 포함."""
+        from src.analysis.signal import adjust_for_convergence
+        sig = {"score": 50.0, "grade": "매수우세", "weights": {}}
+        conv = {"convergence_level": "strong", "conviction": 80,
+                "dominant_direction": "bullish", "aligned_axes": [],
+                "conflicting_axes": [], "neutral_axes": [], "axis_directions": {}}
+        result = adjust_for_convergence(sig, conv)
+        assert "convergence" in result
+        assert result["convergence"]["convergence_level"] == "strong"
+
+    def test_score_still_clamped_after_adjustment(self):
+        """조정 후에도 -100~+100 범위."""
+        from src.analysis.signal import adjust_for_convergence
+        sig = {"score": 98.0, "grade": "강력매수신호", "weights": {}}
+        conv = {"convergence_level": "strong", "conviction": 90,
+                "dominant_direction": "bullish", "aligned_axes": ["a"] * 8,
+                "conflicting_axes": [], "neutral_axes": [], "axis_directions": {}}
+        result = adjust_for_convergence(sig, conv)
+        assert -100 <= result["score"] <= 100
+
+
 class TestSemiconductorIntegration:
     """반도체 업황 지표가 종합 시그널에 반영되는지 테스트."""
 

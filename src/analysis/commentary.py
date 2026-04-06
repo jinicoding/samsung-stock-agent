@@ -30,6 +30,7 @@ def generate_commentary(
     semiconductor_momentum: int | None = None,
     volatility: dict | None = None,
     candlestick: dict | None = None,
+    convergence: dict | None = None,
 ) -> str:
     """분석 결과를 2~3문장 자연어 코멘터리로 변환한다.
 
@@ -115,6 +116,11 @@ def generate_commentary(
     )
     if semi_sentence:
         sentences.append(semi_sentence)
+
+    # --- 4.96) 수렴 분석 문장 ---
+    conv_sentence = _build_convergence_sentence(convergence or {})
+    if conv_sentence:
+        sentences.append(conv_sentence)
 
     # --- 5) 시그널 추이 문장 ---
     trend_sentence = _build_signal_trend_sentence(signal_trend or {})
@@ -602,6 +608,32 @@ def _build_volatility_sentence(vol: dict) -> str:
 
     if squeeze:
         return "볼린저 밴드폭 수축이 감지되어 변동성 확대에 대비할 필요가 있습니다."
+
+    return ""
+
+
+def _build_convergence_sentence(conv: dict) -> str:
+    """다축 수렴 분석 기반 자연어 문장."""
+    if not conv:
+        return ""
+
+    level = conv.get("convergence_level")
+    direction = conv.get("dominant_direction", "neutral")
+    aligned = conv.get("aligned_axes", [])
+    total_axes = len(aligned) + len(conv.get("conflicting_axes", [])) + len(conv.get("neutral_axes", []))
+    conviction = conv.get("conviction", 0)
+
+    if total_axes == 0:
+        return ""
+
+    dir_kr = {"bullish": "강세", "bearish": "약세", "neutral": "중립"}.get(direction, "중립")
+
+    if level == "strong":
+        return f"{total_axes}축 중 {len(aligned)}축이 {dir_kr}를 가리키며 강한 수렴 — 시그널 신뢰도 높음(확신도 {conviction}%)."
+    elif level == "moderate":
+        return f"{total_axes}축 중 {len(aligned)}축이 {dir_kr} 방향으로 보통 수렴을 보이고 있습니다(확신도 {conviction}%)."
+    elif level == "mixed":
+        return f"분석 축 간 방향이 분산되어 혼조 양상으로 시그널 신뢰도가 낮습니다(확신도 {conviction}%)."
 
     return ""
 

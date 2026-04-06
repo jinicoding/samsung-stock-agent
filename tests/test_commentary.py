@@ -849,3 +849,82 @@ class TestGenerateCommentary:
             self._base_support_resistance(),
         )
         assert "ADX" not in result
+
+    # --- 수렴 분석 코멘터리 테스트 ---
+
+    def _base_convergence(self, **overrides):
+        base = {
+            "convergence_level": "moderate",
+            "dominant_direction": "bullish",
+            "aligned_axes": ["technical_score", "supply_score", "exchange_score",
+                             "fundamental_score", "news_score"],
+            "conflicting_axes": ["volatility_score"],
+            "neutral_axes": ["candlestick_score"],
+            "conviction": 55,
+            "axis_directions": {},
+        }
+        base.update(overrides)
+        return base
+
+    def test_strong_convergence_bullish_mentioned(self):
+        """strong 수렴 + bullish → 강한 수렴/신뢰도 높음 언급."""
+        result = generate_commentary(
+            self._base_indicators(),
+            self._base_supply_demand(),
+            self._base_exchange_rate(),
+            self._base_composite_signal(),
+            self._base_support_resistance(),
+            convergence=self._base_convergence(
+                convergence_level="strong",
+                dominant_direction="bullish",
+                aligned_axes=["a"] * 7,
+                conviction=80,
+            ),
+        )
+        assert "수렴" in result or "신뢰" in result
+
+    def test_strong_convergence_bearish_mentioned(self):
+        """strong 수렴 + bearish → 약세 수렴 언급."""
+        result = generate_commentary(
+            self._base_indicators(),
+            self._base_supply_demand(),
+            self._base_exchange_rate(),
+            self._base_composite_signal(),
+            self._base_support_resistance(),
+            convergence=self._base_convergence(
+                convergence_level="strong",
+                dominant_direction="bearish",
+                aligned_axes=["a"] * 7,
+                conviction=80,
+            ),
+        )
+        assert "수렴" in result or "신뢰" in result
+
+    def test_mixed_convergence_mentioned(self):
+        """mixed 수렴 → 혼조/신뢰도 낮음 언급."""
+        result = generate_commentary(
+            self._base_indicators(),
+            self._base_supply_demand(),
+            self._base_exchange_rate(),
+            self._base_composite_signal(),
+            self._base_support_resistance(),
+            convergence=self._base_convergence(
+                convergence_level="mixed",
+                dominant_direction="neutral",
+                aligned_axes=[],
+                conflicting_axes=["a", "b"],
+                conviction=15,
+            ),
+        )
+        assert "혼조" in result or "신뢰" in result or "분산" in result
+
+    def test_no_convergence_no_mention(self):
+        """convergence=None이면 수렴 관련 문장 없음."""
+        result = generate_commentary(
+            self._base_indicators(),
+            self._base_supply_demand(),
+            self._base_exchange_rate(),
+            self._base_composite_signal(),
+            self._base_support_resistance(),
+        )
+        assert "수렴" not in result

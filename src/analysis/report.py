@@ -682,6 +682,50 @@ def _build_candlestick_section(candle: dict) -> list[str]:
     return lines
 
 
+def _build_convergence_section(conv: dict) -> list[str]:
+    """다축 수렴 분석 결과를 HTML 라인 리스트로."""
+    lines = []
+    lines.append("")
+    lines.append("<b>🔀 다축 수렴 분석</b>")
+
+    level = conv.get("convergence_level", "mixed")
+    direction = conv.get("dominant_direction", "neutral")
+    conviction = conv.get("conviction", 0)
+    aligned = conv.get("aligned_axes", [])
+    conflicting = conv.get("conflicting_axes", [])
+    neutral = conv.get("neutral_axes", [])
+
+    level_kr = {"strong": "강한 수렴", "moderate": "보통 수렴",
+                "weak": "약한 수렴", "mixed": "혼조"}.get(level, level)
+    dir_kr = {"bullish": "강세", "bearish": "약세", "neutral": "중립"}.get(direction, direction)
+
+    level_emoji = {"strong": "🟢", "moderate": "🟡", "weak": "🟠", "mixed": "🔴"}.get(level, "⚪")
+
+    lines.append(f"  수렴 수준: {level_emoji} {level_kr}")
+    lines.append(f"  지배 방향: {dir_kr}")
+    lines.append(f"  확신도: {conviction}%")
+
+    axis_label = {
+        "technical_score": "기술적", "supply_score": "수급",
+        "exchange_score": "환율", "fundamental_score": "펀더멘털",
+        "news_score": "뉴스", "consensus_score": "컨센서스",
+        "semiconductor_score": "반도체", "volatility_score": "변동성",
+        "candlestick_score": "캔들스틱",
+    }
+
+    if aligned:
+        names = [axis_label.get(a, a) for a in aligned]
+        lines.append(f"  일치 축({len(aligned)}): {', '.join(names)}")
+    if conflicting:
+        names = [axis_label.get(a, a) for a in conflicting]
+        lines.append(f"  충돌 축({len(conflicting)}): {', '.join(names)}")
+    if neutral:
+        names = [axis_label.get(a, a) for a in neutral]
+        lines.append(f"  중립 축({len(neutral)}): {', '.join(names)}")
+
+    return lines
+
+
 def _build_consensus_section(cons: dict) -> list[str]:
     """증권사 컨센서스 분석 결과를 HTML 라인 리스트로."""
     lines = []
@@ -1045,6 +1089,7 @@ def generate_daily_report(
     volatility: dict | None = None,
     candlestick: dict | None = None,
     watchpoints: dict | None = None,
+    convergence: dict | None = None,
 ) -> str:
     """기술적 지표 dict를 HTML 텔레그램 메시지로 변환한다.
 
@@ -1124,7 +1169,7 @@ def generate_daily_report(
         fundamentals=fundamentals, news_sentiment=news_sentiment, consensus=consensus,
         weekly_summary=weekly_summary, rel_perf=rel_perf, sox_trend=sox_trend,
         semiconductor_momentum=semiconductor_momentum, volatility=volatility,
-        candlestick=candlestick,
+        candlestick=candlestick, convergence=convergence,
     )
     if commentary:
         lines.append(f"💬 {commentary}")
@@ -1255,6 +1300,10 @@ def generate_daily_report(
     # 반도체 업황 (선택)
     if rel_perf is not None and sox_trend is not None and semiconductor_momentum is not None:
         lines.extend(_build_semiconductor_section(rel_perf, sox_trend, semiconductor_momentum))
+
+    # 수렴 분석 (선택)
+    if convergence is not None:
+        lines.extend(_build_convergence_section(convergence))
 
     # 증권사 컨센서스 (선택)
     if consensus is not None:

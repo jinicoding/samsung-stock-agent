@@ -1772,3 +1772,81 @@ class TestBuildExecutiveSummary:
         summary_pos = report.find("핵심 요약")
         composite_pos = report.find("오늘의 종합 판정")
         assert summary_pos < composite_pos
+
+
+class TestConvergenceSection:
+    """수렴 분석 섹션 테스트."""
+
+    def _convergence(self, **overrides):
+        base = {
+            "convergence_level": "strong",
+            "dominant_direction": "bullish",
+            "aligned_axes": ["technical_score", "supply_score", "exchange_score",
+                             "fundamental_score", "news_score", "consensus_score",
+                             "semiconductor_score"],
+            "conflicting_axes": ["volatility_score"],
+            "neutral_axes": ["candlestick_score"],
+            "conviction": 78,
+            "axis_directions": {
+                "technical_score": "bullish", "supply_score": "bullish",
+                "exchange_score": "bullish", "fundamental_score": "bullish",
+                "news_score": "bullish", "consensus_score": "bullish",
+                "semiconductor_score": "bullish",
+                "volatility_score": "bearish", "candlestick_score": "neutral",
+            },
+        }
+        base.update(overrides)
+        return base
+
+    def test_convergence_section_present(self):
+        """수렴 분석 결과가 리포트에 섹션으로 포함된다."""
+        report = generate_daily_report(
+            _full_indicators(),
+            convergence=self._convergence(),
+        )
+        assert "수렴 분석" in report
+
+    def test_convergence_level_shown(self):
+        """수렴 수준이 표시된다."""
+        report = generate_daily_report(
+            _full_indicators(),
+            convergence=self._convergence(convergence_level="strong"),
+        )
+        assert "강한 수렴" in report or "strong" in report.lower()
+
+    def test_dominant_direction_shown(self):
+        """지배적 방향이 표시된다."""
+        report = generate_daily_report(
+            _full_indicators(),
+            convergence=self._convergence(dominant_direction="bullish"),
+        )
+        assert "강세" in report
+
+    def test_conviction_shown(self):
+        """확신도가 표시된다."""
+        report = generate_daily_report(
+            _full_indicators(),
+            convergence=self._convergence(conviction=78),
+        )
+        assert "78" in report
+
+    def test_aligned_axes_shown(self):
+        """일치 축이 표시된다."""
+        report = generate_daily_report(
+            _full_indicators(),
+            convergence=self._convergence(),
+        )
+        assert "일치" in report or "7" in report
+
+    def test_conflicting_axes_shown(self):
+        """충돌 축이 표시된다."""
+        report = generate_daily_report(
+            _full_indicators(),
+            convergence=self._convergence(conflicting_axes=["volatility_score"]),
+        )
+        assert "충돌" in report or "1" in report
+
+    def test_no_convergence_no_section(self):
+        """convergence=None이면 수렴 분석 섹션 없음."""
+        report = generate_daily_report(_full_indicators())
+        assert "수렴 분석" not in report

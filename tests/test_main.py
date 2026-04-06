@@ -226,6 +226,20 @@ SAMPLE_WATCHPOINTS = {
     ],
 }
 
+SAMPLE_CONVERGENCE = {
+    "convergence_level": "moderate",
+    "dominant_direction": "bullish",
+    "aligned_axes": ["technical_score", "supply_score"],
+    "conflicting_axes": [],
+    "neutral_axes": ["exchange_score"],
+    "conviction": 55,
+    "axis_directions": {
+        "technical_score": "bullish",
+        "supply_score": "bullish",
+        "exchange_score": "neutral",
+    },
+}
+
 SAMPLE_REPORT_HTML = "<b>삼성전자 일일 분석</b>"
 
 SAMPLE_REVERSAL = {
@@ -249,6 +263,8 @@ SAMPLE_REVERSAL = {
 @patch("src.main.evaluate_signals", return_value={"details": [], "summary": SAMPLE_ACCURACY})
 @patch("src.main.analyze_signal_trend", return_value=None)
 @patch("src.main.upsert_signal_history")
+@patch("src.main.adjust_for_convergence", return_value=SAMPLE_SIGNAL)
+@patch("src.main.analyze_convergence", return_value=SAMPLE_CONVERGENCE)
 @patch("src.main.compute_composite_signal", return_value=SAMPLE_SIGNAL)
 @patch("src.main.detect_reversal_signals", return_value=SAMPLE_REVERSAL)
 @patch("src.main.analyze_consensus", return_value=SAMPLE_CONSENSUS)
@@ -291,10 +307,12 @@ def test_pipeline_full(
     mock_tech, mock_sd, mock_er, mock_sr, mock_rs,
     mock_fetch_fund, mock_analyze_fund,
     mock_fetch_cons, mock_analyze_cons,
-    mock_reversal, mock_signal, mock_upsert_sig,
+    mock_reversal, mock_signal,
+    mock_analyze_conv, mock_adjust_conv,
+    mock_upsert_sig,
     mock_sig_trend, mock_eval, mock_report, mock_send,
 ):
-    """전체 파이프라인: 백필→조회→분석→뉴스→컨센서스→지지저항→추세전환→펀더멘털→RS→시그널→기록→정확도→리포트→발송."""
+    """전체 파이프라인: 백필→조회→분석→뉴스→컨센서스→지지저항→추세전환→펀더멘털→RS→시그널→수렴→기록→정확도→리포트→발송."""
     from src.main import main
 
     main()
@@ -340,6 +358,9 @@ def test_pipeline_full(
         volatility=SAMPLE_VOLATILITY,
         candlestick=SAMPLE_CANDLESTICK,
     )
+    # 수렴 분석 호출 확인
+    mock_analyze_conv.assert_called_once()
+    mock_adjust_conv.assert_called_once_with(SAMPLE_SIGNAL, SAMPLE_CONVERGENCE)
     mock_upsert_sig.assert_called_once_with(
         date="2026-03-60", score=35.0, grade="매수우세",
         technical_score=40.0, supply_score=50.0, exchange_score=-10.0,
@@ -362,6 +383,7 @@ def test_pipeline_full(
         volatility=SAMPLE_VOLATILITY,
         candlestick=SAMPLE_CANDLESTICK,
         watchpoints=SAMPLE_WATCHPOINTS,
+        convergence=SAMPLE_CONVERGENCE,
     )
     mock_send.assert_called_once_with(SAMPLE_REPORT_HTML)
 
@@ -371,6 +393,8 @@ def test_pipeline_full(
 @patch("src.main.evaluate_signals", return_value={"details": [], "summary": SAMPLE_ACCURACY})
 @patch("src.main.analyze_signal_trend", return_value=None)
 @patch("src.main.upsert_signal_history")
+@patch("src.main.adjust_for_convergence", return_value=SAMPLE_SIGNAL)
+@patch("src.main.analyze_convergence", return_value=SAMPLE_CONVERGENCE)
 @patch("src.main.compute_composite_signal", return_value=SAMPLE_SIGNAL)
 @patch("src.main.detect_reversal_signals", return_value=SAMPLE_REVERSAL)
 @patch("src.main.analyze_consensus", return_value=SAMPLE_CONSENSUS)
@@ -409,7 +433,9 @@ def test_pipeline_dry_run(
     mock_tech, mock_sd, mock_er, mock_sr, mock_rs,
     mock_fetch_fund, mock_analyze_fund,
     mock_fetch_cons, mock_analyze_cons,
-    mock_reversal, mock_signal, mock_upsert_sig,
+    mock_reversal, mock_signal,
+    mock_analyze_conv, mock_adjust_conv,
+    mock_upsert_sig,
     mock_sig_trend, mock_eval, mock_report, mock_send,
     capsys,
 ):
@@ -429,6 +455,8 @@ def test_pipeline_dry_run(
 @patch("src.main.evaluate_signals", return_value={"details": [], "summary": SAMPLE_ACCURACY})
 @patch("src.main.analyze_signal_trend", return_value=None)
 @patch("src.main.upsert_signal_history")
+@patch("src.main.adjust_for_convergence", return_value=SAMPLE_SIGNAL)
+@patch("src.main.analyze_convergence", return_value=SAMPLE_CONVERGENCE)
 @patch("src.main.compute_composite_signal", return_value=SAMPLE_SIGNAL)
 @patch("src.main.detect_reversal_signals", return_value=SAMPLE_REVERSAL)
 @patch("src.main.analyze_consensus", return_value=SAMPLE_CONSENSUS)
@@ -467,7 +495,9 @@ def test_pipeline_with_rs(
     mock_tech, mock_sd, mock_er, mock_sr, mock_rs,
     mock_fetch_fund, mock_analyze_fund,
     mock_fetch_cons, mock_analyze_cons,
-    mock_reversal, mock_signal, mock_upsert_sig,
+    mock_reversal, mock_signal,
+    mock_analyze_conv, mock_adjust_conv,
+    mock_upsert_sig,
     mock_sig_trend, mock_eval, mock_report, mock_send,
 ):
     """RS + 반도체 + 변동성 + 캔들스틱 분석이 파이프라인에 통합되어 composite_signal과 report에 전달된다."""
@@ -508,6 +538,10 @@ def test_pipeline_with_rs(
     assert report_kwargs[1].get("semiconductor_momentum") == SAMPLE_SEMI_MOMENTUM
     assert report_kwargs[1].get("volatility") == SAMPLE_VOLATILITY
     assert report_kwargs[1].get("candlestick") == SAMPLE_CANDLESTICK
+    assert report_kwargs[1].get("convergence") == SAMPLE_CONVERGENCE
+    # 수렴 분석 호출 확인
+    mock_analyze_conv.assert_called_once()
+    mock_adjust_conv.assert_called_once()
 
 
 @patch("src.main.send_message")
@@ -515,6 +549,8 @@ def test_pipeline_with_rs(
 @patch("src.main.evaluate_signals", return_value={"details": [], "summary": SAMPLE_ACCURACY})
 @patch("src.main.analyze_signal_trend", return_value=None)
 @patch("src.main.upsert_signal_history")
+@patch("src.main.adjust_for_convergence", return_value=SAMPLE_SIGNAL)
+@patch("src.main.analyze_convergence", return_value=SAMPLE_CONVERGENCE)
 @patch("src.main.compute_composite_signal", return_value=SAMPLE_SIGNAL)
 @patch("src.main.detect_reversal_signals", return_value=SAMPLE_REVERSAL)
 @patch("src.main.analyze_consensus", return_value=SAMPLE_CONSENSUS)
@@ -553,7 +589,9 @@ def test_pipeline_kospi_failure_fallback(
     mock_tech, mock_sd, mock_er, mock_sr, mock_rs,
     mock_fetch_fund, mock_analyze_fund,
     mock_fetch_cons, mock_analyze_cons,
-    mock_reversal, mock_signal, mock_upsert_sig,
+    mock_reversal, mock_signal,
+    mock_analyze_conv, mock_adjust_conv,
+    mock_upsert_sig,
     mock_sig_trend, mock_eval, mock_report, mock_send,
 ):
     """KOSPI 수집 실패 시 RS=None으로 폴백하여 파이프라인이 정상 동작한다."""
@@ -593,6 +631,7 @@ def test_pipeline_kospi_failure_fallback(
     assert report_kwargs[1].get("semiconductor_momentum") == SAMPLE_SEMI_MOMENTUM
     assert report_kwargs[1].get("volatility") == SAMPLE_VOLATILITY
     assert report_kwargs[1].get("candlestick") == SAMPLE_CANDLESTICK
+    assert report_kwargs[1].get("convergence") == SAMPLE_CONVERGENCE
 
 
 @patch("src.main.generate_daily_report")

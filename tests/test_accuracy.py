@@ -168,3 +168,135 @@ class TestEmptyData:
         from src.analysis.accuracy import evaluate_signals
         result = evaluate_signals(db)
         assert result["details"][0]["forward_return_1d"] is None
+
+
+# ── Per-Axis Accuracy Tests ─────────────────────────────────────
+
+AXES = [
+    "technical_score", "supply_score", "exchange_score",
+    "fundamentals_score", "news_score", "consensus_score",
+    "semiconductor_score", "volatility_score", "candlestick_score",
+]
+
+
+def _seed_data_with_axes(db):
+    """9축 점수를 포함한 시드 데이터를 삽입한다."""
+    prices = [
+        ("2026-03-10", 58000, 58500, 57500, 58200, 1000000),
+        ("2026-03-11", 58200, 58800, 58000, 58600, 1100000),
+        ("2026-03-12", 58600, 59200, 58400, 59000, 1200000),
+        ("2026-03-13", 59000, 59500, 58800, 59400, 1300000),
+        ("2026-03-14", 59400, 60000, 59200, 59800, 1400000),
+        ("2026-03-17", 59800, 60200, 59600, 60000, 1500000),
+        ("2026-03-18", 60000, 60500, 59800, 60200, 1600000),
+        ("2026-03-19", 60200, 60800, 60000, 60400, 1700000),
+        ("2026-03-20", 60400, 61000, 60200, 60600, 1800000),
+        ("2026-03-21", 60600, 61200, 60400, 60800, 1900000),
+    ]
+    for p in prices:
+        db.upsert_daily(*p)
+
+    # 시그널 1: 03-10, 전체적으로 매수. 가격 상승 → 양수축은 hit, 음수축은 miss
+    db.upsert_signal_history(
+        "2026-03-10", 30.0, "매수우세", 12.0, 10.0, 8.0, 58200,
+        fundamentals_score=5.0, news_score=-3.0, consensus_score=4.0,
+        semiconductor_score=6.0, volatility_score=0.0, candlestick_score=2.0,
+    )
+    # 시그널 2: 03-13, 전체적으로 매도. 가격 상승 → 양수축은 hit, 음수축은 miss
+    db.upsert_signal_history(
+        "2026-03-13", -40.0, "매도우세", -16.0, -14.0, -10.0, 59400,
+        fundamentals_score=-8.0, news_score=5.0, consensus_score=-3.0,
+        semiconductor_score=-7.0, volatility_score=None, candlestick_score=-4.0,
+    )
+
+
+class TestPerAxisAccuracy:
+    """축별(per-axis) 시그널 정확도 추적 테스트."""
+
+    def test_per_axis_section_exists(self, temp_db):
+        _, db = temp_db
+        _seed_data_with_axes(db)
+        from src.analysis.accuracy import evaluate_signals
+        result = evaluate_signals(db)
+        assert "per_axis" in result["summary"]
+
+    def test_per_axis_all_axes_present(self, temp_db):
+        _, db = temp_db
+        _seed_data_with_axes(db)
+        from src.analysis.accuracy import evaluate_signals
+        result = evaluate_signals(db)
+        per_axis = result["summary"]["per_axis"]
+        for axis in AXES:
+            assert axis in per_axis, f"{axis} missing from per_axis"
+
+    def test_per_axis_hit_rate_structure(self, temp_db):
+        _, db = temp_db
+        _seed_data_with_axes(db)
+        from src.analysis.accuracy import evaluate_signals
+        result = evaluate_signals(db)
+        per_axis = result["summary"]["per_axis"]
+        for axis in AXES:
+            for n in (1, 3, 5):
+                assert f"hit_rate_{n}d" in per_axis[axis]
+                assert f"avg_return_{n}d" in per_axis[axis]
+                assert f"evaluated_{n}d" in per_axis[axis]
+
+    def test_technical_score_bullish_hit(self, temp_db):
+        """technical_score: +12(03-10, 상승→hit), -16(03-13, 상승→miss) → 50%."""
+        _, db = temp_db
+        _seed_data_with_axes(db)
+        from src.analysis.accuracy import evaluate_signals
+        result = evaluate_signals(db)
+        tech = result["summary"]["per_axis"]["technical_score"]
+        assert tech["hit_rate_1d"] == pytest.approx(50.0, abs=0.1)
+        assert tech["evaluated_1d"] == 2
+
+    def test_news_score_direction(self, temp_db):
+        """news_score: -3(03-10, 상승→miss), +5(03-13, 상승→hit) → 50%."""
+        _, db = temp_db
+        _seed_data_with_axes(db)
+        from src.analysis.accuracy import evaluate_signals
+        result = evaluate_signals(db)
+        news = result["summary"]["per_axis"]["news_score"]
+        assert news["hit_rate_1d"] == pytest.approx(50.0, abs=0.1)
+        assert news["evaluated_1d"] == 2
+
+    def test_zero_score_excluded(self, temp_db):
+        """volatility_score: 0.0(03-10)은 제외, None(03-13)도 제외 → evaluated=0."""
+        _, db = temp_db
+        _seed_data_with_axes(db)
+        from src.analysis.accuracy import evaluate_signals
+        result = evaluate_signals(db)
+        vol = result["summary"]["per_axis"]["volatility_score"]
+        assert vol["evaluated_1d"] == 0
+        assert vol["hit_rate_1d"] is None
+
+    def test_none_score_excluded(self, temp_db):
+        """volatility_score가 None인 시그널은 평가에서 제외된다."""
+        _, db = temp_db
+        _seed_data_with_axes(db)
+        from src.analysis.accuracy import evaluate_signals
+        result = evaluate_signals(db)
+        vol = result["summary"]["per_axis"]["volatility_score"]
+        assert vol["avg_return_1d"] is None
+
+    def test_per_axis_avg_return(self, temp_db):
+        """technical_score의 avg_return은 두 시그널의 평균 forward return."""
+        _, db = temp_db
+        _seed_data_with_axes(db)
+        from src.analysis.accuracy import evaluate_signals
+        result = evaluate_signals(db)
+        tech = result["summary"]["per_axis"]["technical_score"]
+        # 03-10: (58600-58200)/58200*100 = 0.687%
+        # 03-13: (59800-59400)/59400*100 = 0.673%
+        expected_avg = ((58600 - 58200) / 58200 * 100 + (59800 - 59400) / 59400 * 100) / 2
+        assert tech["avg_return_1d"] == pytest.approx(expected_avg, abs=0.01)
+
+    def test_empty_signals_per_axis(self, temp_db):
+        """시그널이 없을 때 per_axis도 빈 구조."""
+        _, db = temp_db
+        from src.analysis.accuracy import evaluate_signals
+        result = evaluate_signals(db)
+        assert "per_axis" in result["summary"]
+        for axis in AXES:
+            assert result["summary"]["per_axis"][axis]["hit_rate_1d"] is None

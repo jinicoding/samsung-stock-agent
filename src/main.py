@@ -35,6 +35,8 @@ from src.data.fundamentals import fetch_fundamentals
 from src.analysis.fundamentals import analyze_fundamentals
 from src.data.news import fetch_news_headlines, summarize_sentiment
 from src.data.consensus import fetch_consensus, analyze_consensus
+from src.data.global_macro import fetch_nasdaq_index, fetch_vix_index
+from src.analysis.global_macro import analyze_nasdaq_trend, analyze_vix_risk, compute_global_macro_score
 from src.analysis.volatility import compute_volatility
 from src.analysis.candlestick import detect_candlestick_patterns
 from src.analysis.weekly_summary import summarize_weekly
@@ -128,6 +130,26 @@ def main(dry_run: bool = False):
         sox_trend = None
         semi_momentum = None
 
+    # 3.64) 글로벌 매크로 수집 + 분석 (NASDAQ + VIX)
+    nasdaq_trend = None
+    vix_risk = None
+    global_macro_score_val = None
+    try:
+        nasdaq_data = fetch_nasdaq_index()
+        vix_data = fetch_vix_index()
+        if nasdaq_data:
+            nasdaq_closes = [n["close"] for n in nasdaq_data]
+            nasdaq_trend = analyze_nasdaq_trend(nasdaq_closes)
+        if vix_data:
+            vix_closes = [v["close"] for v in vix_data]
+            vix_risk = analyze_vix_risk(vix_closes)
+        global_macro_score_val = compute_global_macro_score(nasdaq_trend, vix_risk)
+    except Exception as e:
+        print(f"[경고] 글로벌 매크로 분석 실패: {e}")
+        nasdaq_trend = None
+        vix_risk = None
+        global_macro_score_val = None
+
     # 3.65) 뉴스 헤드라인 수집 + 감정 분석
     news_headlines = []
     news_sentiment = None
@@ -161,7 +183,7 @@ def main(dry_run: bool = False):
         print(f"[경고] 컨센서스 수집 실패: {e}")
 
     # 3.8) 종합 투자 시그널
-    sig = compute_composite_signal(indicators, sd or {}, er or {}, relative_strength=rs, trend_reversal=reversal, fundamentals=fund, news_sentiment=news_sentiment, consensus=consensus, semiconductor_momentum=semi_momentum, volatility=vol, candlestick=candle)
+    sig = compute_composite_signal(indicators, sd or {}, er or {}, relative_strength=rs, trend_reversal=reversal, fundamentals=fund, news_sentiment=news_sentiment, consensus=consensus, semiconductor_momentum=semi_momentum, volatility=vol, candlestick=candle, global_macro_score=global_macro_score_val)
 
     # 3.85) 다축 수렴 분석
     conv = None
@@ -233,7 +255,7 @@ def main(dry_run: bool = False):
         print(f"[경고] 주간 추이 요약 실패: {e}")
 
     # 4) 리포트 생성
-    report = generate_daily_report(indicators, supply_demand=sd, exchange_rate=er, composite_signal=sig, support_resistance=sr, accuracy_summary=accuracy_summary, relative_strength=rs, trend_reversal=reversal, signal_trend=sig_trend, fundamentals=fund, news_sentiment=news_sentiment, news_headlines=news_headlines, consensus=consensus, weekly_summary=weekly, rel_perf=rel_perf, sox_trend=sox_trend, semiconductor_momentum=semi_momentum, volatility=vol, candlestick=candle, watchpoints=wp, convergence=conv)
+    report = generate_daily_report(indicators, supply_demand=sd, exchange_rate=er, composite_signal=sig, support_resistance=sr, accuracy_summary=accuracy_summary, relative_strength=rs, trend_reversal=reversal, signal_trend=sig_trend, fundamentals=fund, news_sentiment=news_sentiment, news_headlines=news_headlines, consensus=consensus, weekly_summary=weekly, rel_perf=rel_perf, sox_trend=sox_trend, semiconductor_momentum=semi_momentum, volatility=vol, candlestick=candle, watchpoints=wp, convergence=conv, nasdaq_trend=nasdaq_trend, vix_risk=vix_risk, global_macro_score=global_macro_score_val)
 
     # 5) 발송 또는 출력
     if dry_run:

@@ -1090,6 +1090,9 @@ def generate_daily_report(
     candlestick: dict | None = None,
     watchpoints: dict | None = None,
     convergence: dict | None = None,
+    nasdaq_trend: dict | None = None,
+    vix_risk: dict | None = None,
+    global_macro_score: int | None = None,
 ) -> str:
     """기술적 지표 dict를 HTML 텔레그램 메시지로 변환한다.
 

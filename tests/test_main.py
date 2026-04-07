@@ -240,6 +240,36 @@ SAMPLE_CONVERGENCE = {
     },
 }
 
+SAMPLE_NASDAQ = [
+    {"date": f"2026-03-{d:02d}", "close": 16000.0 + d * 20.0}
+    for d in range(1, 61)
+]
+
+SAMPLE_VIX = [
+    {"date": f"2026-03-{d:02d}", "close": 18.0 + d * 0.1}
+    for d in range(1, 61)
+]
+
+SAMPLE_NASDAQ_TREND = {
+    "trend": "상승",
+    "change_5d_pct": 1.5,
+    "change_20d_pct": 4.0,
+    "ma5": 17100.0,
+    "ma20": 16800.0,
+    "current": 17200.0,
+    "momentum_strength": 0.18,
+}
+
+SAMPLE_VIX_RISK = {
+    "risk_level": "경계",
+    "current": 24.0,
+    "vix_trend": "보합",
+    "change_pct": 2.0,
+    "interpretation": "시장 불확실성이 높아지고 있어 주의 필요. 변동성이 횡보 중.",
+}
+
+SAMPLE_GLOBAL_MACRO_SCORE = 15
+
 SAMPLE_REPORT_HTML = "<b>삼성전자 일일 분석</b>"
 
 SAMPLE_REVERSAL = {
@@ -290,6 +320,11 @@ SAMPLE_REVERSAL = {
 @patch("src.main.fetch_news_headlines", return_value=SAMPLE_NEWS_HEADLINES)
 @patch("src.main.compute_volatility", return_value=SAMPLE_VOLATILITY)
 @patch("src.main.detect_candlestick_patterns", return_value=SAMPLE_CANDLESTICK)
+@patch("src.main.compute_global_macro_score", return_value=SAMPLE_GLOBAL_MACRO_SCORE)
+@patch("src.main.analyze_vix_risk", return_value=SAMPLE_VIX_RISK)
+@patch("src.main.analyze_nasdaq_trend", return_value=SAMPLE_NASDAQ_TREND)
+@patch("src.main.fetch_vix_index", return_value=SAMPLE_VIX)
+@patch("src.main.fetch_nasdaq_index", return_value=SAMPLE_NASDAQ)
 @patch("src.main.backfill_supply_demand")
 @patch("src.main.backfill_prices")
 @patch("src.main.init_db")
@@ -299,6 +334,8 @@ SAMPLE_REVERSAL = {
 def test_pipeline_full(
     mock_watchpoints, mock_summarize_weekly, mock_sig_hist,
     mock_init, mock_bf_prices, mock_bf_sd,
+    mock_fetch_nasdaq, mock_fetch_vix,
+    mock_nasdaq_trend, mock_vix_risk, mock_global_macro_score,
     mock_candlestick, mock_volatility,
     mock_fetch_news, mock_summarize_news,
     mock_fetch_hynix, mock_fetch_sox,
@@ -348,6 +385,12 @@ def test_pipeline_full(
     mock_rel_perf.assert_called_once()
     mock_sox_trend.assert_called_once()
     mock_semi_momentum.assert_called_once_with(SAMPLE_REL_PERF, SAMPLE_SOX_TREND)
+    # 글로벌 매크로 수집·분석 호출 확인
+    mock_fetch_nasdaq.assert_called_once()
+    mock_fetch_vix.assert_called_once()
+    mock_nasdaq_trend.assert_called_once()
+    mock_vix_risk.assert_called_once()
+    mock_global_macro_score.assert_called_once_with(SAMPLE_NASDAQ_TREND, SAMPLE_VIX_RISK)
     mock_signal.assert_called_once_with(
         SAMPLE_INDICATORS, SAMPLE_SD, SAMPLE_ER,
         relative_strength=SAMPLE_RS, trend_reversal=SAMPLE_REVERSAL,
@@ -357,6 +400,7 @@ def test_pipeline_full(
         semiconductor_momentum=SAMPLE_SEMI_MOMENTUM,
         volatility=SAMPLE_VOLATILITY,
         candlestick=SAMPLE_CANDLESTICK,
+        global_macro_score=SAMPLE_GLOBAL_MACRO_SCORE,
     )
     # 수렴 분석 호출 확인
     mock_analyze_conv.assert_called_once()
@@ -390,6 +434,9 @@ def test_pipeline_full(
         candlestick=SAMPLE_CANDLESTICK,
         watchpoints=SAMPLE_WATCHPOINTS,
         convergence=SAMPLE_CONVERGENCE,
+        nasdaq_trend=SAMPLE_NASDAQ_TREND,
+        vix_risk=SAMPLE_VIX_RISK,
+        global_macro_score=SAMPLE_GLOBAL_MACRO_SCORE,
     )
     mock_send.assert_called_once_with(SAMPLE_REPORT_HTML)
 
@@ -426,11 +473,18 @@ def test_pipeline_full(
 @patch("src.main.fetch_news_headlines", return_value=SAMPLE_NEWS_HEADLINES)
 @patch("src.main.compute_volatility", return_value=SAMPLE_VOLATILITY)
 @patch("src.main.detect_candlestick_patterns", return_value=SAMPLE_CANDLESTICK)
+@patch("src.main.compute_global_macro_score", return_value=SAMPLE_GLOBAL_MACRO_SCORE)
+@patch("src.main.analyze_vix_risk", return_value=SAMPLE_VIX_RISK)
+@patch("src.main.analyze_nasdaq_trend", return_value=SAMPLE_NASDAQ_TREND)
+@patch("src.main.fetch_vix_index", return_value=SAMPLE_VIX)
+@patch("src.main.fetch_nasdaq_index", return_value=SAMPLE_NASDAQ)
 @patch("src.main.backfill_supply_demand")
 @patch("src.main.backfill_prices")
 @patch("src.main.init_db")
 def test_pipeline_dry_run(
     mock_init, mock_bf_prices, mock_bf_sd,
+    mock_fetch_nasdaq, mock_fetch_vix,
+    mock_nasdaq_trend, mock_vix_risk, mock_global_macro_score,
     mock_candlestick, mock_volatility,
     mock_fetch_news, mock_summarize_news,
     mock_fetch_hynix, mock_fetch_sox,
@@ -488,11 +542,18 @@ def test_pipeline_dry_run(
 @patch("src.main.fetch_news_headlines", return_value=SAMPLE_NEWS_HEADLINES)
 @patch("src.main.compute_volatility", return_value=SAMPLE_VOLATILITY)
 @patch("src.main.detect_candlestick_patterns", return_value=SAMPLE_CANDLESTICK)
+@patch("src.main.compute_global_macro_score", return_value=SAMPLE_GLOBAL_MACRO_SCORE)
+@patch("src.main.analyze_vix_risk", return_value=SAMPLE_VIX_RISK)
+@patch("src.main.analyze_nasdaq_trend", return_value=SAMPLE_NASDAQ_TREND)
+@patch("src.main.fetch_vix_index", return_value=SAMPLE_VIX)
+@patch("src.main.fetch_nasdaq_index", return_value=SAMPLE_NASDAQ)
 @patch("src.main.backfill_supply_demand")
 @patch("src.main.backfill_prices")
 @patch("src.main.init_db")
 def test_pipeline_with_rs(
     mock_init, mock_bf_prices, mock_bf_sd,
+    mock_fetch_nasdaq, mock_fetch_vix,
+    mock_nasdaq_trend, mock_vix_risk, mock_global_macro_score,
     mock_candlestick, mock_volatility,
     mock_fetch_news, mock_summarize_news,
     mock_fetch_hynix, mock_fetch_sox,
@@ -506,7 +567,7 @@ def test_pipeline_with_rs(
     mock_upsert_sig,
     mock_sig_trend, mock_eval, mock_report, mock_send,
 ):
-    """RS + 반도체 + 변동성 + 캔들스틱 분석이 파이프라인에 통합되어 composite_signal과 report에 전달된다."""
+    """RS + 반도체 + 변동성 + 캔들스틱 + 글로벌매크로 분석이 파이프라인에 통합되어 composite_signal과 report에 전달된다."""
     from src.main import main
 
     main()
@@ -521,7 +582,13 @@ def test_pipeline_with_rs(
     mock_fetch_hynix.assert_called_once()
     mock_fetch_sox.assert_called_once()
     mock_semi_momentum.assert_called_once()
-    # composite_signal에 RS와 reversal과 fundamentals와 뉴스와 컨센서스와 반도체와 변동성과 캔들스틱이 전달됨
+    # 글로벌 매크로 수집·분석 호출 확인
+    mock_fetch_nasdaq.assert_called_once()
+    mock_fetch_vix.assert_called_once()
+    mock_nasdaq_trend.assert_called_once()
+    mock_vix_risk.assert_called_once()
+    mock_global_macro_score.assert_called_once_with(SAMPLE_NASDAQ_TREND, SAMPLE_VIX_RISK)
+    # composite_signal에 RS와 reversal과 fundamentals와 뉴스와 컨센서스와 반도체와 변동성과 캔들스틱과 글로벌매크로가 전달됨
     mock_signal.assert_called_once_with(
         SAMPLE_INDICATORS, SAMPLE_SD, SAMPLE_ER,
         relative_strength=SAMPLE_RS, trend_reversal=SAMPLE_REVERSAL,
@@ -531,6 +598,7 @@ def test_pipeline_with_rs(
         semiconductor_momentum=SAMPLE_SEMI_MOMENTUM,
         volatility=SAMPLE_VOLATILITY,
         candlestick=SAMPLE_CANDLESTICK,
+        global_macro_score=SAMPLE_GLOBAL_MACRO_SCORE,
     )
     # report에 RS와 reversal과 fundamentals와 뉴스와 컨센서스와 반도체와 변동성과 캔들스틱이 전달됨
     mock_report.assert_called_once()
@@ -545,6 +613,9 @@ def test_pipeline_with_rs(
     assert report_kwargs[1].get("volatility") == SAMPLE_VOLATILITY
     assert report_kwargs[1].get("candlestick") == SAMPLE_CANDLESTICK
     assert report_kwargs[1].get("convergence") == SAMPLE_CONVERGENCE
+    assert report_kwargs[1].get("nasdaq_trend") == SAMPLE_NASDAQ_TREND
+    assert report_kwargs[1].get("vix_risk") == SAMPLE_VIX_RISK
+    assert report_kwargs[1].get("global_macro_score") == SAMPLE_GLOBAL_MACRO_SCORE
     # 수렴 분석 호출 확인
     mock_analyze_conv.assert_called_once()
     mock_adjust_conv.assert_called_once()
@@ -582,11 +653,18 @@ def test_pipeline_with_rs(
 @patch("src.main.fetch_news_headlines", return_value=SAMPLE_NEWS_HEADLINES)
 @patch("src.main.compute_volatility", return_value=SAMPLE_VOLATILITY)
 @patch("src.main.detect_candlestick_patterns", return_value=SAMPLE_CANDLESTICK)
+@patch("src.main.compute_global_macro_score", return_value=SAMPLE_GLOBAL_MACRO_SCORE)
+@patch("src.main.analyze_vix_risk", return_value=SAMPLE_VIX_RISK)
+@patch("src.main.analyze_nasdaq_trend", return_value=SAMPLE_NASDAQ_TREND)
+@patch("src.main.fetch_vix_index", return_value=SAMPLE_VIX)
+@patch("src.main.fetch_nasdaq_index", return_value=SAMPLE_NASDAQ)
 @patch("src.main.backfill_supply_demand")
 @patch("src.main.backfill_prices")
 @patch("src.main.init_db")
 def test_pipeline_kospi_failure_fallback(
     mock_init, mock_bf_prices, mock_bf_sd,
+    mock_fetch_nasdaq, mock_fetch_vix,
+    mock_nasdaq_trend, mock_vix_risk, mock_global_macro_score,
     mock_candlestick, mock_volatility,
     mock_fetch_news, mock_summarize_news,
     mock_fetch_hynix, mock_fetch_sox,
@@ -616,7 +694,11 @@ def test_pipeline_kospi_failure_fallback(
     # 반도체 수집은 KOSPI와 독립 — 여전히 호출됨
     mock_fetch_hynix.assert_called_once()
     mock_fetch_sox.assert_called_once()
-    # composite_signal에 RS=None 전달, reversal과 fundamentals와 뉴스와 컨센서스와 반도체와 변동성과 캔들스틱 전달
+    # 글로벌 매크로도 KOSPI와 독립 — 여전히 호출됨
+    mock_fetch_nasdaq.assert_called_once()
+    mock_fetch_vix.assert_called_once()
+    mock_global_macro_score.assert_called_once()
+    # composite_signal에 RS=None 전달, 글로벌 매크로 포함
     mock_signal.assert_called_once_with(
         SAMPLE_INDICATORS, SAMPLE_SD, SAMPLE_ER,
         relative_strength=None, trend_reversal=SAMPLE_REVERSAL,
@@ -626,8 +708,9 @@ def test_pipeline_kospi_failure_fallback(
         semiconductor_momentum=SAMPLE_SEMI_MOMENTUM,
         volatility=SAMPLE_VOLATILITY,
         candlestick=SAMPLE_CANDLESTICK,
+        global_macro_score=SAMPLE_GLOBAL_MACRO_SCORE,
     )
-    # report에 RS=None, reversal과 fundamentals와 뉴스와 컨센서스와 반도체와 변동성과 캔들스틱 전달
+    # report에 RS=None, 글로벌 매크로 포함
     report_kwargs = mock_report.call_args
     assert report_kwargs[1].get("relative_strength") is None
     assert report_kwargs[1].get("trend_reversal") == SAMPLE_REVERSAL
@@ -638,6 +721,9 @@ def test_pipeline_kospi_failure_fallback(
     assert report_kwargs[1].get("volatility") == SAMPLE_VOLATILITY
     assert report_kwargs[1].get("candlestick") == SAMPLE_CANDLESTICK
     assert report_kwargs[1].get("convergence") == SAMPLE_CONVERGENCE
+    assert report_kwargs[1].get("nasdaq_trend") == SAMPLE_NASDAQ_TREND
+    assert report_kwargs[1].get("vix_risk") == SAMPLE_VIX_RISK
+    assert report_kwargs[1].get("global_macro_score") == SAMPLE_GLOBAL_MACRO_SCORE
 
 
 @patch("src.main.generate_daily_report")

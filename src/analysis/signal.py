@@ -3,7 +3,8 @@
 기술적 분석(시장온도), 수급 판정, 환율 추세를 하나로 종합하여
 -100~+100 점수와 5단계 판정을 반환한다.
 
-가중치: 기술적 40%, 수급 40%, 환율 20%
+가중치: 기술적 40%, 수급 40%, 환율 20% (기본 3축)
+최대 10축 분석 체계: 기술적, 수급, 환율, 상대강도, 펀더멘털, 뉴스, 컨센서스, 반도체, 변동성/캔들스틱, 글로벌매크로
 적응형 가중치: accuracy_summary 제공 시 축별 적중률 기반 ±30% 동적 조정.
 """
 
@@ -21,6 +22,7 @@ _AXIS_TO_ACCURACY_KEY: dict[str, str] = {
     "semiconductor": "semiconductor_score",
     "volatility": "volatility_score",
     "candlestick": "candlestick_score",
+    "global_macro": "global_macro_score",
 }
 
 
@@ -416,6 +418,7 @@ def compute_composite_signal(
     semiconductor_momentum: int | None = None,
     volatility: dict | None = None,
     candlestick: dict | None = None,
+    global_macro_score: int | None = None,
     accuracy_summary: dict | None = None,
 ) -> dict:
     """종합 투자 시그널을 계산한다.
@@ -458,6 +461,7 @@ def compute_composite_signal(
     has_semi = semiconductor_momentum is not None
     has_vol = volatility is not None
     has_candle = candlestick is not None
+    has_macro = global_macro_score is not None
 
     rs_score = _score_relative_strength(relative_strength) if has_rs else None
     fund_score = _score_fundamentals(fundamentals) if has_fund else None
@@ -505,6 +509,8 @@ def compute_composite_signal(
         extra_axes["volatility"] = 5
     if has_candle:
         extra_axes["candlestick"] = 5
+    if has_macro:
+        extra_axes["global_macro"] = 10
 
     if extra_axes:
         extra_total = sum(extra_axes.values())
@@ -547,6 +553,8 @@ def compute_composite_signal(
         score_map["volatility"] = vol_score
     if has_candle:
         score_map["candlestick"] = candle_score
+    if has_macro:
+        score_map["global_macro"] = _clamp(float(global_macro_score))
 
     composite = sum(score_map[k] * weights[k] / 100 for k in score_map)
 
@@ -580,6 +588,8 @@ def compute_composite_signal(
         result["volatility_score"] = vol_score
     if candle_score is not None:
         result["candlestick_score"] = candle_score
+    if has_macro:
+        result["global_macro_score"] = _clamp(float(global_macro_score))
     return result
 
 

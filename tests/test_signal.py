@@ -867,6 +867,7 @@ def _accuracy_summary(overrides: dict | None = None) -> dict:
         "technical_score", "supply_score", "exchange_score",
         "fundamentals_score", "news_score", "consensus_score",
         "semiconductor_score", "volatility_score", "candlestick_score",
+        "global_macro_score",
     ):
         per_axis[axis] = {
             "hit_rate_5d": 50.0,
@@ -988,3 +989,102 @@ class TestAdaptWeights:
             accuracy_summary=summary,
         )
         assert result.get("adapted_weights") is True
+
+
+class TestGlobalMacroIntegration:
+    """글로벌 매크로 분석이 종합 시그널에 반영되는지 테스트."""
+
+    def test_positive_macro_boosts_score(self):
+        """양수 글로벌 매크로 스코어 → 종합 점수 상승."""
+        base = compute_composite_signal(_tech(), _supply(), _fx())
+        boosted = compute_composite_signal(
+            _tech(), _supply(), _fx(), global_macro_score=60,
+        )
+        assert boosted["score"] > base["score"]
+
+    def test_negative_macro_lowers_score(self):
+        """음수 글로벌 매크로 스코어 → 종합 점수 하락."""
+        base = compute_composite_signal(_tech(), _supply(), _fx())
+        lowered = compute_composite_signal(
+            _tech(), _supply(), _fx(), global_macro_score=-60,
+        )
+        assert lowered["score"] < base["score"]
+
+    def test_none_macro_no_effect(self):
+        """global_macro_score=None이면 기존 동작 유지."""
+        base = compute_composite_signal(_tech(), _supply(), _fx())
+        result = compute_composite_signal(
+            _tech(), _supply(), _fx(), global_macro_score=None,
+        )
+        assert result["score"] == pytest.approx(base["score"])
+        assert "global_macro_score" not in result
+
+    def test_global_macro_score_in_result(self):
+        """결과에 global_macro_score 키 포함."""
+        result = compute_composite_signal(
+            _tech(), _supply(), _fx(), global_macro_score=40,
+        )
+        assert "global_macro_score" in result
+        assert result["global_macro_score"] == 40
+
+    def test_global_macro_weight_is_10(self):
+        """글로벌 매크로 축 가중치는 10%."""
+        result = compute_composite_signal(
+            _tech(), _supply(), _fx(), global_macro_score=30,
+        )
+        assert result["weights"]["global_macro"] == 10
+
+    def test_weights_sum_to_100_with_macro(self):
+        """글로벌 매크로 포함 시 가중치 합 100%."""
+        result = compute_composite_signal(
+            _tech(), _supply(), _fx(), global_macro_score=30,
+        )
+        assert sum(result["weights"].values()) == 100
+
+    def test_weights_sum_to_100_all_axes(self):
+        """모든 축 + 글로벌 매크로 포함 시 가중치 합 100% (10축 체계)."""
+        rs = {"rs_trend": "neutral", "alpha_1d": 0.0}
+        result = compute_composite_signal(
+            _tech(), _supply(), _fx(),
+            relative_strength=rs, fundamentals=_fund(),
+            news_sentiment=_news(), consensus=_cons(),
+            semiconductor_momentum=30,
+            volatility=_vol(),
+            candlestick={"score": 10},
+            global_macro_score=20,
+        )
+        assert sum(result["weights"].values()) == 100
+        assert result["weights"]["global_macro"] == 10
+
+    def test_score_clamped_with_macro(self):
+        """글로벌 매크로 포함 시에도 -100~+100 범위."""
+        tech = _tech(rsi=10, macd_histogram=1000, bb_pctb=0.0, price_vs_ma5_pct=5.0)
+        result = compute_composite_signal(
+            tech, _supply("buy_dominant"), _fx("원화약세", 2.0),
+            global_macro_score=100,
+        )
+        assert -100 <= result["score"] <= 100
+
+    def test_zero_macro_minimal_effect(self):
+        """글로벌 매크로 0 → 점수 변화 미미 (가중치 재분배만 영향)."""
+        base = compute_composite_signal(_tech(), _supply(), _fx())
+        result = compute_composite_signal(
+            _tech(), _supply(), _fx(), global_macro_score=0,
+        )
+        # 가중치 재분배로 약간의 차이는 가능하지만 큰 변화 없음
+        assert abs(result["score"] - base["score"]) < 10
+
+    def test_adapt_weights_includes_global_macro(self):
+        """적응형 가중치 시스템이 global_macro 축을 포함."""
+        summary = _accuracy_summary({
+            "global_macro_score": {"hit_rate_5d": 90.0, "evaluated_5d": 10},
+            "technical_score": {"hit_rate_5d": 30.0, "evaluated_5d": 10},
+        })
+        result = compute_composite_signal(
+            _tech(), _supply(), _fx(),
+            global_macro_score=30,
+            accuracy_summary=summary,
+        )
+        w = result["weights"]
+        assert sum(w.values()) == 100
+        assert "global_macro" in w

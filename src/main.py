@@ -182,8 +182,13 @@ def main(dry_run: bool = False):
     except Exception as e:
         print(f"[경고] 컨센서스 수집 실패: {e}")
 
-    # 3.8) 종합 투자 시그널
-    sig = compute_composite_signal(indicators, sd or {}, er or {}, relative_strength=rs, trend_reversal=reversal, fundamentals=fund, news_sentiment=news_sentiment, consensus=consensus, semiconductor_momentum=semi_momentum, volatility=vol, candlestick=candle, global_macro_score=global_macro_score_val)
+    # 3.8) 시그널 정확도 평가 (적응형 가중치를 위해 시그널 계산 전에 실행)
+    from src.data import database as db_module
+    accuracy_result = evaluate_signals(db_module)
+    accuracy_summary = accuracy_result["summary"]
+
+    # 3.8.5) 종합 투자 시그널
+    sig = compute_composite_signal(indicators, sd or {}, er or {}, relative_strength=rs, trend_reversal=reversal, fundamentals=fund, news_sentiment=news_sentiment, consensus=consensus, semiconductor_momentum=semi_momentum, volatility=vol, candlestick=candle, global_macro_score=global_macro_score_val, accuracy_summary=accuracy_summary)
 
     # 3.85) 다축 수렴 분석
     conv = None
@@ -223,12 +228,7 @@ def main(dry_run: bool = False):
         global_macro_score=sig.get("global_macro_score"),
     )
 
-    # 3.10) 시그널 정확도 평가
-    from src.data import database as db_module
-    accuracy_result = evaluate_signals(db_module)
-    accuracy_summary = accuracy_result["summary"]
-
-    # 3.11) 시그널 추이 분석
+    # 3.10) 시그널 추이 분석
     sig_trend = analyze_signal_trend(db_module, days=5)
 
     # 3.11.5) 핵심 관찰 포인트

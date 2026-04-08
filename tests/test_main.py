@@ -401,6 +401,7 @@ def test_pipeline_full(
         volatility=SAMPLE_VOLATILITY,
         candlestick=SAMPLE_CANDLESTICK,
         global_macro_score=SAMPLE_GLOBAL_MACRO_SCORE,
+        accuracy_summary=SAMPLE_ACCURACY,
     )
     # 수렴 분석 호출 확인
     mock_analyze_conv.assert_called_once()
@@ -600,6 +601,7 @@ def test_pipeline_with_rs(
         volatility=SAMPLE_VOLATILITY,
         candlestick=SAMPLE_CANDLESTICK,
         global_macro_score=SAMPLE_GLOBAL_MACRO_SCORE,
+        accuracy_summary=SAMPLE_ACCURACY,
     )
     # report에 RS와 reversal과 fundamentals와 뉴스와 컨센서스와 반도체와 변동성과 캔들스틱이 전달됨
     mock_report.assert_called_once()
@@ -699,7 +701,7 @@ def test_pipeline_kospi_failure_fallback(
     mock_fetch_nasdaq.assert_called_once()
     mock_fetch_vix.assert_called_once()
     mock_global_macro_score.assert_called_once()
-    # composite_signal에 RS=None 전달, 글로벌 매크로 포함
+    # composite_signal에 RS=None 전달, 글로벌 매크로 포함, accuracy_summary 전달
     mock_signal.assert_called_once_with(
         SAMPLE_INDICATORS, SAMPLE_SD, SAMPLE_ER,
         relative_strength=None, trend_reversal=SAMPLE_REVERSAL,
@@ -710,6 +712,7 @@ def test_pipeline_kospi_failure_fallback(
         volatility=SAMPLE_VOLATILITY,
         candlestick=SAMPLE_CANDLESTICK,
         global_macro_score=SAMPLE_GLOBAL_MACRO_SCORE,
+        accuracy_summary=SAMPLE_ACCURACY,
     )
     # report에 RS=None, 글로벌 매크로 포함
     report_kwargs = mock_report.call_args

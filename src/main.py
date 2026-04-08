@@ -194,7 +194,8 @@ def main(dry_run: bool = False):
             "exchange_score": sig["exchange_score"],
         }
         for key in ("fundamentals_score", "news_score", "consensus_score",
-                     "semiconductor_score", "volatility_score", "candlestick_score"):
+                     "semiconductor_score", "volatility_score", "candlestick_score",
+                     "global_macro_score"):
             if key in sig:
                 conv_scores[key] = sig[key]
         conv = analyze_convergence(conv_scores)
@@ -219,6 +220,7 @@ def main(dry_run: bool = False):
         semiconductor_score=sig.get("semiconductor_score"),
         volatility_score=sig.get("volatility_score"),
         candlestick_score=sig.get("candlestick_score"),
+        global_macro_score=sig.get("global_macro_score"),
     )
 
     # 3.10) 시그널 정확도 평가

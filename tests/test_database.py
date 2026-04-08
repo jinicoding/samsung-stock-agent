@@ -310,3 +310,91 @@ def test_migrate_adds_columns(temp_db):
     assert rows[0]["fundamentals_score"] is None
     # 새 행은 값이 있음
     assert rows[1]["fundamentals_score"] == 30.0
+
+
+# ── signal_history 10축 (global_macro_score) ──────────────────
+
+def test_upsert_signal_history_10axes(temp_db):
+    """10축 점수 전체를 저장하고 조회할 수 있다."""
+    db_path, db = temp_db
+    db.init_db()
+    db.upsert_signal_history(
+        date="2026-04-08",
+        score=45.0,
+        grade="매수우세",
+        technical_score=50.0,
+        supply_score=40.0,
+        exchange_score=10.0,
+        price=58000.0,
+        fundamentals_score=30.0,
+        news_score=20.0,
+        consensus_score=60.0,
+        semiconductor_score=45.0,
+        volatility_score=-15.0,
+        candlestick_score=25.0,
+        global_macro_score=35.0,
+    )
+    rows = db.get_signal_history(10)
+    assert len(rows) == 1
+    r = rows[0]
+    assert r["global_macro_score"] == 35.0
+
+
+def test_upsert_signal_history_global_macro_none(temp_db):
+    """global_macro_score를 전달하지 않으면 NULL로 저장된다."""
+    db_path, db = temp_db
+    db.init_db()
+    db.upsert_signal_history(
+        date="2026-04-08",
+        score=20.0,
+        grade="중립",
+        technical_score=10.0,
+        supply_score=15.0,
+        exchange_score=5.0,
+        price=56000.0,
+    )
+    rows = db.get_signal_history(10)
+    assert len(rows) == 1
+    assert rows[0]["global_macro_score"] is None
+
+
+def test_migrate_adds_global_macro_score(temp_db):
+    """기존 9축 테이블에 global_macro_score 컬럼이 마이그레이션으로 추가된다."""
+    db_path, db = temp_db
+    # 9축 스키마로 테이블 생성
+    conn = sqlite3.connect(db_path)
+    conn.execute("""
+        CREATE TABLE signal_history (
+            date              TEXT PRIMARY KEY,
+            score             REAL NOT NULL,
+            grade             TEXT NOT NULL,
+            technical_score   REAL NOT NULL,
+            supply_score      REAL NOT NULL,
+            exchange_score    REAL NOT NULL,
+            price             REAL NOT NULL,
+            fundamentals_score  REAL DEFAULT NULL,
+            news_score          REAL DEFAULT NULL,
+            consensus_score     REAL DEFAULT NULL,
+            semiconductor_score REAL DEFAULT NULL,
+            volatility_score    REAL DEFAULT NULL,
+            candlestick_score   REAL DEFAULT NULL
+        )
+    """)
+    conn.execute(
+        "INSERT INTO signal_history VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        ("2026-04-07", 10.0, "중립", 5.0, 5.0, 0.0, 55000.0,
+         None, None, None, None, None, None),
+    )
+    conn.commit()
+    conn.close()
+    # init_db()가 마이그레이션 수행
+    db.init_db()
+    db.upsert_signal_history(
+        date="2026-04-08", score=20.0, grade="매수우세",
+        technical_score=10.0, supply_score=10.0, exchange_score=0.0,
+        price=56000.0, global_macro_score=35.0,
+    )
+    rows = db.get_signal_history(10)
+    assert len(rows) == 2
+    assert rows[0]["global_macro_score"] is None
+    assert rows[1]["global_macro_score"] == 35.0

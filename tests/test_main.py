@@ -415,6 +415,7 @@ def test_pipeline_full(
         semiconductor_score=None,
         volatility_score=None,
         candlestick_score=None,
+        global_macro_score=None,
     )
     mock_eval.assert_called_once()
     mock_report.assert_called_once_with(

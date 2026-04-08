@@ -8,6 +8,7 @@ AXES = (
     "technical_score", "supply_score", "exchange_score",
     "fundamentals_score", "news_score", "consensus_score",
     "semiconductor_score", "volatility_score", "candlestick_score",
+    "global_macro_score",
 )
 
 

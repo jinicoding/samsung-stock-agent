@@ -928,3 +928,113 @@ class TestGenerateCommentary:
             self._base_support_resistance(),
         )
         assert "수렴" not in result
+
+    # --- 글로벌 매크로 코멘터리 테스트 ---
+
+    def _base_nasdaq_trend(self, **overrides):
+        base = {
+            "trend": "상승",
+            "momentum": 0.6,
+            "ma5": 17500.0,
+            "ma20": 17000.0,
+            "latest": 17600.0,
+        }
+        base.update(overrides)
+        return base
+
+    def _base_vix_risk(self, **overrides):
+        base = {
+            "risk_level": "안정",
+            "vix_latest": 15.0,
+            "vix_trend": "하락",
+            "interpretation": "시장 안정",
+        }
+        base.update(overrides)
+        return base
+
+    def test_global_macro_bullish_mentioned(self):
+        """NASDAQ 상승 + VIX 안정 → 글로벌 기술주 우호적 언급."""
+        result = generate_commentary(
+            self._base_indicators(),
+            self._base_supply_demand(),
+            self._base_exchange_rate(),
+            self._base_composite_signal(),
+            self._base_support_resistance(),
+            nasdaq_trend=self._base_nasdaq_trend(trend="상승"),
+            vix_risk=self._base_vix_risk(risk_level="안정"),
+        )
+        assert "글로벌" in result and "우호" in result
+
+    def test_global_macro_bearish_mentioned(self):
+        """NASDAQ 하락 + VIX 공포 → 글로벌 리스크 확대 언급."""
+        result = generate_commentary(
+            self._base_indicators(),
+            self._base_supply_demand(),
+            self._base_exchange_rate(),
+            self._base_composite_signal(),
+            self._base_support_resistance(),
+            nasdaq_trend=self._base_nasdaq_trend(trend="하락"),
+            vix_risk=self._base_vix_risk(risk_level="공포", vix_latest=35.0, vix_trend="상승"),
+        )
+        assert "글로벌" in result and ("리스크" in result or "부담" in result)
+
+    def test_global_macro_neutral_omitted(self):
+        """NASDAQ 보합 + VIX 안정 → 글로벌 매크로 문장 생략."""
+        result = generate_commentary(
+            self._base_indicators(),
+            self._base_supply_demand(),
+            self._base_exchange_rate(),
+            self._base_composite_signal(),
+            self._base_support_resistance(),
+            nasdaq_trend=self._base_nasdaq_trend(trend="보합"),
+            vix_risk=self._base_vix_risk(risk_level="안정"),
+        )
+        assert "글로벌" not in result
+
+    def test_global_macro_none_no_mention(self):
+        """nasdaq_trend=None, vix_risk=None이면 글로벌 매크로 문장 없음."""
+        result = generate_commentary(
+            self._base_indicators(),
+            self._base_supply_demand(),
+            self._base_exchange_rate(),
+            self._base_composite_signal(),
+            self._base_support_resistance(),
+        )
+        assert "글로벌" not in result
+
+    def test_global_macro_nasdaq_only(self):
+        """nasdaq_trend만 있고 vix_risk=None → 글로벌 매크로 문장 없음."""
+        result = generate_commentary(
+            self._base_indicators(),
+            self._base_supply_demand(),
+            self._base_exchange_rate(),
+            self._base_composite_signal(),
+            self._base_support_resistance(),
+            nasdaq_trend=self._base_nasdaq_trend(trend="상승"),
+        )
+        assert "글로벌" not in result
+
+    def test_global_macro_vix_only(self):
+        """vix_risk만 있고 nasdaq_trend=None → 글로벌 매크로 문장 없음."""
+        result = generate_commentary(
+            self._base_indicators(),
+            self._base_supply_demand(),
+            self._base_exchange_rate(),
+            self._base_composite_signal(),
+            self._base_support_resistance(),
+            vix_risk=self._base_vix_risk(risk_level="공포"),
+        )
+        assert "글로벌" not in result
+
+    def test_global_macro_nasdaq_up_vix_caution(self):
+        """NASDAQ 상승 + VIX 경계 → 우호적이나 경계 문장."""
+        result = generate_commentary(
+            self._base_indicators(),
+            self._base_supply_demand(),
+            self._base_exchange_rate(),
+            self._base_composite_signal(),
+            self._base_support_resistance(),
+            nasdaq_trend=self._base_nasdaq_trend(trend="상승"),
+            vix_risk=self._base_vix_risk(risk_level="경계", vix_latest=25.0),
+        )
+        assert "글로벌" in result

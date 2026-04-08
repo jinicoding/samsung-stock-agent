@@ -1173,6 +1173,7 @@ def generate_daily_report(
         weekly_summary=weekly_summary, rel_perf=rel_perf, sox_trend=sox_trend,
         semiconductor_momentum=semiconductor_momentum, volatility=volatility,
         candlestick=candlestick, convergence=convergence,
+        nasdaq_trend=nasdaq_trend, vix_risk=vix_risk,
     )
     if commentary:
         lines.append(f"💬 {commentary}")

@@ -31,6 +31,8 @@ def generate_commentary(
     volatility: dict | None = None,
     candlestick: dict | None = None,
     convergence: dict | None = None,
+    nasdaq_trend: dict | None = None,
+    vix_risk: dict | None = None,
 ) -> str:
     """분석 결과를 2~3문장 자연어 코멘터리로 변환한다.
 
@@ -121,6 +123,11 @@ def generate_commentary(
     conv_sentence = _build_convergence_sentence(convergence or {})
     if conv_sentence:
         sentences.append(conv_sentence)
+
+    # --- 4.97) 글로벌 매크로 문장 ---
+    macro_sentence = _build_global_macro_sentence(nasdaq_trend or {}, vix_risk or {})
+    if macro_sentence:
+        sentences.append(macro_sentence)
 
     # --- 5) 시그널 추이 문장 ---
     trend_sentence = _build_signal_trend_sentence(signal_trend or {})
@@ -635,6 +642,45 @@ def _build_convergence_sentence(conv: dict) -> str:
     elif level == "mixed":
         return f"분석 축 간 방향이 분산되어 혼조 양상으로 시그널 신뢰도가 낮습니다(확신도 {conviction}%)."
 
+    return ""
+
+
+def _build_global_macro_sentence(nasdaq: dict, vix: dict) -> str:
+    """글로벌 매크로(NASDAQ 추세 + VIX 리스크) 기반 자연어 문장."""
+    if not nasdaq or not vix:
+        return ""
+
+    trend = nasdaq.get("trend")
+    risk = vix.get("risk_level")
+
+    if not trend or not risk:
+        return ""
+
+    # NASDAQ 상승 + VIX 안정 → 우호적
+    if trend == "상승" and risk == "안정":
+        return "글로벌 기술주 환경이 우호적으로 외국인 수급에 긍정적입니다."
+
+    # NASDAQ 상승 + VIX 경계 → 우호적이나 경계
+    if trend == "상승" and risk == "경계":
+        return "글로벌 기술주가 상승세이나 VIX 경계 수준으로 변동성 확대에 유의할 필요가 있습니다."
+
+    # NASDAQ 하락 + VIX 공포 → 리스크 확대
+    if trend == "하락" and risk == "공포":
+        return "글로벌 리스크 확대로 외국인 수급에 부담이 될 수 있습니다."
+
+    # NASDAQ 하락 + VIX 경계 → 부정적
+    if trend == "하락" and risk == "경계":
+        return "글로벌 기술주 약세와 VIX 경계 수준이 외국인 투자심리에 부담 요인입니다."
+
+    # NASDAQ 하락 + VIX 안정 → 경계
+    if trend == "하락" and risk == "안정":
+        return "글로벌 기술주 약세에도 VIX가 안정적이어서 영향은 제한적일 수 있습니다."
+
+    # NASDAQ 상승 + VIX 공포 → 혼조
+    if trend == "상승" and risk == "공포":
+        return "글로벌 기술주가 반등 시도 중이나 VIX 공포 수준으로 변동성 리스크가 높습니다."
+
+    # 보합/중립 → 생략
     return ""
 
 

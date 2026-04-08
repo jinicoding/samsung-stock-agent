@@ -1,18 +1,15 @@
 ## Session Plan
 
-Day 17에서 10축 분석 체계 완성을 선언했으나, 코드를 정밀 검증한 결과 글로벌 매크로(10축)가 **signal.py 가중합에만 반영**되고 나머지 6개 접점에서 누락되어 있다:
-- report.py: 파라미터만 받고 HTML 섹션 미생성, 종합 시그널 점수 표시에서도 빠짐
-- commentary.py: 글로벌 매크로 파라미터·문장 생성 함수 없음
-- database.py: signal_history에 global_macro_score 컬럼 없음
-- accuracy.py: AXES 튜플에 global_macro_score 없음 → 축별 적중률 추적 불가
-- main.py: conv_scores에 global_macro_score 미포함 → 수렴 분석에서 제외
+자기진단 결과 두 가지 핵심 결함을 발견했다:
 
-이번 세션에서 이 미완성 통합을 완료하여 10축이 데이터 수집→분석→시그널→수렴→DB→정확도→리포트→코멘터리 전체를 관통하게 한다.
+1. **적응형 가중치 미작동 버그**: Day 16에서 구축한 `adapt_weights()`가 실제 파이프라인에서 완전히 사장되어 있다. `main.py:186`에서 `compute_composite_signal()` 호출 시 `accuracy_summary` 파라미터를 전달하지 않으며, `evaluate_signals()`가 시그널 계산 이후(line 228)에 실행되어 시간 순서도 뒤바뀌어 있다. Day 16의 핵심 기능이 dead code인 상태.
 
-### Task 1: 글로벌 매크로 10축 통합 — DB·정확도·수렴 연결
-Files: src/data/database.py, src/analysis/accuracy.py, src/main.py, tests/test_database.py
-Description: (1) database.py의 signal_history 테이블에 global_macro_score 컬럼 추가 (init_db에 ALTER TABLE IF NOT EXISTS 패턴). upsert_signal_history()에 global_macro_score keyword 파라미터 추가, INSERT OR REPLACE 쿼리에 포함. get_signal_history() SELECT에 global_macro_score 추가. (2) accuracy.py의 AXES 튜플에 "global_macro_score" 추가하여 축별 적중률 추적 대상에 포함. (3) main.py의 upsert_signal_history() 호출(라인 208-222)에 global_macro_score 전달. main.py의 conv_scores(라인 191-199)에 "global_macro_score" 키 추가. 테스트를 먼저 작성하고 구현한다.
+2. **코멘터리에 글로벌 매크로 누락**: Day 17에서 글로벌 매크로를 리포트·시그널에 통합했지만, `commentary.py`에는 글로벌 매크로 관련 코드가 전혀 없다. 10축 중 유일하게 코멘터리에서 빠진 축.
 
-### Task 2: 글로벌 매크로 리포트·코멘터리 완성 — 투자자 가시화
-Files: src/analysis/report.py, src/analysis/commentary.py, tests/test_report.py, tests/test_commentary.py
-Description: (1) report.py에 _build_global_macro_section(nasdaq_trend, vix_risk, global_macro_score) 함수 추가: NASDAQ 추세(방향·모멘텀), VIX 리스크 수준, 매크로 스코어를 HTML 섹션으로 렌더링. generate_daily_report() 본문의 반도체 업황 섹션 아래에 글로벌 매크로 섹션 호출 추가. (2) _build_composite_signal_section()에 global_macro_score 라인 추가 (candlestick_score 아래). (3) commentary.py의 generate_commentary()에 nasdaq_trend, vix_risk, global_macro_score 파라미터 추가. _build_global_macro_sentence() 헬퍼 구현: NASDAQ 상승+VIX 안정→"글로벌 환경 우호적", NASDAQ 하락+VIX 급등→"글로벌 리스크 확대" 등. report.py의 generate_commentary() 호출(라인 1169-1176)에 글로벌 매크로 인자 전달. 테스트를 먼저 작성하고 구현한다.
+### Task 1: 적응형 가중치 파이프라인 버그 수정 — accuracy_summary가 시그널 계산에 전달되지 않는 문제
+Files: src/main.py, tests/test_main.py
+Description: Day 16에서 구축한 적응형 가중치 시스템(`signal.py`의 `adapt_weights`)이 실제 파이프라인에서 작동하지 않고 있다. 원인: (1) `main.py:228`의 `evaluate_signals()` 호출이 `compute_composite_signal()`(line 186) 이후에 위치하여, 정확도 데이터가 시그널 계산 시점에 존재하지 않음. (2) `compute_composite_signal()` 호출에 `accuracy_summary` 키워드 인자가 누락됨. 수정: `evaluate_signals()` 호출(+ `from src.data import database as db_module` import)을 `compute_composite_signal()` 호출 직전으로 이동하고, `accuracy_summary=accuracy_summary`를 전달한다. 테스트에서 accuracy_summary가 시그널 계산에 전달되어 적응형 가중치가 실제로 작동하는지 검증한다.
+
+### Task 2: 코멘터리에 글로벌 매크로 해석 추가 — 10축 코멘터리 완성
+Files: src/analysis/commentary.py, src/analysis/report.py, tests/test_commentary.py
+Description: `commentary.py`의 `generate_commentary()`에 `nasdaq_trend`, `vix_risk`, `global_macro_score` 파라미터를 추가하고, 글로벌 매크로 환경에 따른 자연어 해석 문장을 생성하는 `_build_global_macro_sentence()` 헬퍼를 구현한다. 시나리오별 문장: NASDAQ 상승세+VIX 안정→"글로벌 기술주 환경이 우호적", NASDAQ 하락+VIX 급등→"글로벌 리스크 확대로 외국인 수급에 부담", 중립→생략. `report.py`의 `generate_commentary()` 호출부(line 1169-1176)에도 글로벌 매크로 파라미터를 전달한다. 테스트에서 다양한 매크로 시나리오(강세/약세/중립/데이터 없음)의 코멘터리 생성을 검증한다.

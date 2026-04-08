@@ -1,15 +1,9 @@
 ## Session Plan
 
-자기진단 결과 두 가지 핵심 결함을 발견했다:
-
-1. **적응형 가중치 미작동 버그**: Day 16에서 구축한 `adapt_weights()`가 실제 파이프라인에서 완전히 사장되어 있다. `main.py:186`에서 `compute_composite_signal()` 호출 시 `accuracy_summary` 파라미터를 전달하지 않으며, `evaluate_signals()`가 시그널 계산 이후(line 228)에 실행되어 시간 순서도 뒤바뀌어 있다. Day 16의 핵심 기능이 dead code인 상태.
-
-2. **코멘터리에 글로벌 매크로 누락**: Day 17에서 글로벌 매크로를 리포트·시그널에 통합했지만, `commentary.py`에는 글로벌 매크로 관련 코드가 전혀 없다. 10축 중 유일하게 코멘터리에서 빠진 축.
-
-### Task 1: 적응형 가중치 파이프라인 버그 수정 — accuracy_summary가 시그널 계산에 전달되지 않는 문제
-Files: src/main.py, tests/test_main.py
-Description: Day 16에서 구축한 적응형 가중치 시스템(`signal.py`의 `adapt_weights`)이 실제 파이프라인에서 작동하지 않고 있다. 원인: (1) `main.py:228`의 `evaluate_signals()` 호출이 `compute_composite_signal()`(line 186) 이후에 위치하여, 정확도 데이터가 시그널 계산 시점에 존재하지 않음. (2) `compute_composite_signal()` 호출에 `accuracy_summary` 키워드 인자가 누락됨. 수정: `evaluate_signals()` 호출(+ `from src.data import database as db_module` import)을 `compute_composite_signal()` 호출 직전으로 이동하고, `accuracy_summary=accuracy_summary`를 전달한다. 테스트에서 accuracy_summary가 시그널 계산에 전달되어 적응형 가중치가 실제로 작동하는지 검증한다.
-
-### Task 2: 코멘터리에 글로벌 매크로 해석 추가 — 10축 코멘터리 완성
+### Task 1: 글로벌 매크로 코멘터리 누락 버그 수정 — NASDAQ·VIX 자연어 해설 추가
 Files: src/analysis/commentary.py, src/analysis/report.py, tests/test_commentary.py
-Description: `commentary.py`의 `generate_commentary()`에 `nasdaq_trend`, `vix_risk`, `global_macro_score` 파라미터를 추가하고, 글로벌 매크로 환경에 따른 자연어 해석 문장을 생성하는 `_build_global_macro_sentence()` 헬퍼를 구현한다. 시나리오별 문장: NASDAQ 상승세+VIX 안정→"글로벌 기술주 환경이 우호적", NASDAQ 하락+VIX 급등→"글로벌 리스크 확대로 외국인 수급에 부담", 중립→생략. `report.py`의 `generate_commentary()` 호출부(line 1169-1176)에도 글로벌 매크로 파라미터를 전달한다. 테스트에서 다양한 매크로 시나리오(강세/약세/중립/데이터 없음)의 코멘터리 생성을 검증한다.
+Description: 10번째 축인 글로벌 매크로(NASDAQ 추세 + VIX 리스크)가 종합 시그널·리포트에는 통합되었으나 자연어 코멘터리(commentary.py)에 반영되지 않는 버그를 수정한다. generate_commentary() 함수에 nasdaq_trend와 vix_risk 파라미터를 추가하고, _build_global_macro_sentence() 헬퍼를 구현한다. 시나리오별 문장: NASDAQ 상승+VIX 안정→"글로벌 기술주 환경이 우호적", NASDAQ 하락+VIX 급등→"글로벌 리스크 확대로 외국인 수급에 부담", 중립→생략. report.py의 generate_commentary() 호출부(line 1169-1176)에도 글로벌 매크로 파라미터를 전달한다. 테스트에서 다양한 매크로 시나리오(강세/약세/중립/데이터 없음)의 코멘터리 생성을 검증한다.
+
+### Task 2: 축별 정확도 대시보드를 리포트에 통합 — 투자자 신뢰도 강화
+Files: src/analysis/report.py, tests/test_report.py
+Description: 현재 정확도 섹션은 전체 적중률(1/3/5일)만 표시한다. accuracy_summary["per_axis"]에 이미 축별 적중률·평균수익률 데이터가 있으므로, _build_accuracy_section()을 확장하여 각 축(기술적·수급·환율 등)의 5일 적중률을 한 눈에 볼 수 있는 대시보드로 표시한다. 적중률이 70% 이상인 축은 "높음", 50% 미만은 "낮음"으로 라벨링하여 투자자가 어떤 분석 축을 더 신뢰할 수 있는지 즉시 판단할 수 있도록 한다. 적응형 가중치가 적용된 경우(composite_signal에 adapted_weights=True) 가중치 변동 사실도 종합시그널 섹션에 표기하여 "왜 이번 시그널의 가중치가 달라졌는지" 투자자가 이해할 수 있도록 한다.

@@ -968,6 +968,40 @@ def _build_semiconductor_section(
     return lines
 
 
+def _build_global_macro_section(
+    nasdaq_trend: dict, vix_risk: dict, macro_score: int,
+) -> list[str]:
+    """글로벌 매크로 현황을 HTML 라인 리스트로."""
+    lines = []
+    lines.append("")
+    lines.append("<b>🌍 글로벌 매크로</b>")
+
+    # NASDAQ 추세
+    trend = nasdaq_trend.get("trend", "보합")
+    ma_pos = nasdaq_trend.get("ma_position", "근접")
+    change_pct = nasdaq_trend.get("change_pct", 0)
+    trend_emoji = "📈" if trend == "상승" else "📉" if trend == "하락" else "➡️"
+    lines.append(f"  NASDAQ: {trend_emoji} {trend} ({change_pct:+.1f}%) | MA 대비 {ma_pos}")
+
+    # VIX 리스크
+    level = vix_risk.get("level", "안정")
+    vix_val = vix_risk.get("value")
+    vix_emoji = {"안정": "🟢", "경계": "🟡", "공포": "🔴", "극단": "🔴"}.get(level, "⚪")
+    val_str = f" ({vix_val:.1f})" if vix_val is not None else ""
+    lines.append(f"  VIX: {vix_emoji} {level}{val_str}")
+
+    # 매크로 스코어
+    if macro_score >= 30:
+        s_emoji = "🟢"
+    elif macro_score <= -30:
+        s_emoji = "🔴"
+    else:
+        s_emoji = "🟡"
+    lines.append(f"  매크로 스코어: {s_emoji} {macro_score:+d}점")
+
+    return lines
+
+
 def _build_executive_summary(
     composite_signal: dict | None = None,
     signal_trend: dict | None = None,
@@ -1353,6 +1387,10 @@ def generate_daily_report(
     # 반도체 업황 (선택)
     if rel_perf is not None and sox_trend is not None and semiconductor_momentum is not None:
         lines.extend(_build_semiconductor_section(rel_perf, sox_trend, semiconductor_momentum))
+
+    # 글로벌 매크로 (선택)
+    if nasdaq_trend is not None and vix_risk is not None and global_macro_score is not None:
+        lines.extend(_build_global_macro_section(nasdaq_trend, vix_risk, global_macro_score))
 
     # 수렴 분석 (선택)
     if convergence is not None:

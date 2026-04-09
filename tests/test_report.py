@@ -1910,3 +1910,131 @@ class TestConvergenceSection:
         """convergence=None이면 수렴 분석 섹션 없음."""
         report = generate_daily_report(_full_indicators())
         assert "수렴 분석" not in report
+
+
+class TestGlobalMacroSection:
+    """글로벌 매크로 리포트 섹션 테스트."""
+
+    def test_no_macro_no_section(self):
+        """매크로 데이터 없으면 섹션 없음."""
+        report = generate_daily_report(_full_indicators())
+        assert "글로벌 매크로" not in report
+
+    def test_macro_section_present(self):
+        """매크로 데이터가 있으면 섹션이 포함."""
+        report = generate_daily_report(
+            _full_indicators(),
+            nasdaq_trend={"trend": "상승", "ma_position": "위", "change_pct": 1.2},
+            vix_risk={"level": "안정", "value": 14.5},
+            global_macro_score=35,
+        )
+        assert "글로벌 매크로" in report
+
+    def test_nasdaq_trend_shown(self):
+        """NASDAQ 추세 정보가 표시됨."""
+        report = generate_daily_report(
+            _full_indicators(),
+            nasdaq_trend={"trend": "상승", "ma_position": "위", "change_pct": 1.2},
+            vix_risk={"level": "안정", "value": 14.5},
+            global_macro_score=35,
+        )
+        assert "NASDAQ" in report
+        assert "상승" in report
+
+    def test_vix_risk_shown(self):
+        """VIX 리스크 수준이 표시됨."""
+        report = generate_daily_report(
+            _full_indicators(),
+            nasdaq_trend={"trend": "하락", "ma_position": "아래", "change_pct": -2.0},
+            vix_risk={"level": "공포", "value": 32.5},
+            global_macro_score=-40,
+        )
+        assert "VIX" in report
+        assert "공포" in report
+
+    def test_macro_score_shown(self):
+        """매크로 스코어가 표시됨."""
+        report = generate_daily_report(
+            _full_indicators(),
+            nasdaq_trend={"trend": "보합", "ma_position": "근접", "change_pct": 0.1},
+            vix_risk={"level": "경계", "value": 22.0},
+            global_macro_score=-15,
+        )
+        assert "-15" in report
+
+    def test_vix_extreme_level(self):
+        """VIX 극단 수준 표시."""
+        report = generate_daily_report(
+            _full_indicators(),
+            nasdaq_trend={"trend": "하락", "ma_position": "아래", "change_pct": -5.0},
+            vix_risk={"level": "극단", "value": 45.0},
+            global_macro_score=-80,
+        )
+        assert "극단" in report
+
+    def test_partial_macro_none_nasdaq(self):
+        """nasdaq_trend=None이면 섹션 없음."""
+        report = generate_daily_report(
+            _full_indicators(),
+            nasdaq_trend=None,
+            vix_risk={"level": "안정", "value": 14.5},
+            global_macro_score=35,
+        )
+        assert "글로벌 매크로" not in report
+
+    def test_partial_macro_none_vix(self):
+        """vix_risk=None이면 섹션 없음."""
+        report = generate_daily_report(
+            _full_indicators(),
+            nasdaq_trend={"trend": "상승", "ma_position": "위", "change_pct": 1.2},
+            vix_risk=None,
+            global_macro_score=35,
+        )
+        assert "글로벌 매크로" not in report
+
+    def test_partial_macro_none_score(self):
+        """global_macro_score=None이면 섹션 없음."""
+        report = generate_daily_report(
+            _full_indicators(),
+            nasdaq_trend={"trend": "상승", "ma_position": "위", "change_pct": 1.2},
+            vix_risk={"level": "안정", "value": 14.5},
+            global_macro_score=None,
+        )
+        assert "글로벌 매크로" not in report
+
+    def test_macro_after_semiconductor(self):
+        """글로벌 매크로 섹션이 반도체 섹션 뒤에 위치."""
+        report = generate_daily_report(
+            _full_indicators(),
+            rel_perf=_rel_perf_sample(),
+            sox_trend=_sox_trend_sample(),
+            semiconductor_momentum=45,
+            nasdaq_trend={"trend": "상승", "ma_position": "위", "change_pct": 1.2},
+            vix_risk={"level": "안정", "value": 14.5},
+            global_macro_score=35,
+        )
+        semi_pos = report.index("반도체 업황")
+        macro_pos = report.index("글로벌 매크로")
+        assert macro_pos > semi_pos
+
+    def test_macro_before_convergence(self):
+        """글로벌 매크로 섹션이 수렴 분석 섹션 앞에 위치."""
+        conv = {
+            "convergence_level": "strong",
+            "dominant_direction": "bullish",
+            "conviction": 80,
+            "aligned_axes": ["technical_score"],
+            "conflicting_axes": [],
+            "neutral_axes": [],
+            "axis_directions": {},
+        }
+        report = generate_daily_report(
+            _full_indicators(),
+            convergence=conv,
+            nasdaq_trend={"trend": "상승", "ma_position": "위", "change_pct": 1.2},
+            vix_risk={"level": "안정", "value": 14.5},
+            global_macro_score=35,
+        )
+        macro_pos = report.index("글로벌 매크로")
+        conv_pos = report.index("수렴 분석")
+        assert macro_pos < conv_pos

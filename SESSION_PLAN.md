@@ -1,9 +1,29 @@
 ## Session Plan
 
-### Task 1: 글로벌 매크로 코멘터리 누락 버그 수정 — NASDAQ·VIX 자연어 해설 추가
-Files: src/analysis/commentary.py, src/analysis/report.py, tests/test_commentary.py
-Description: 10번째 축인 글로벌 매크로(NASDAQ 추세 + VIX 리스크)가 종합 시그널·리포트에는 통합되었으나 자연어 코멘터리(commentary.py)에 반영되지 않는 버그를 수정한다. generate_commentary() 함수에 nasdaq_trend와 vix_risk 파라미터를 추가하고, _build_global_macro_sentence() 헬퍼를 구현한다. 시나리오별 문장: NASDAQ 상승+VIX 안정→"글로벌 기술주 환경이 우호적", NASDAQ 하락+VIX 급등→"글로벌 리스크 확대로 외국인 수급에 부담", 중립→생략. report.py의 generate_commentary() 호출부(line 1169-1176)에도 글로벌 매크로 파라미터를 전달한다. 테스트에서 다양한 매크로 시나리오(강세/약세/중립/데이터 없음)의 코멘터리 생성을 검증한다.
-
-### Task 2: 축별 정확도 대시보드를 리포트에 통합 — 투자자 신뢰도 강화
+### Task 1: 축별 정확도 대시보드를 리포트에 통합 — 적응형 가중치 투명성 확보
 Files: src/analysis/report.py, tests/test_report.py
-Description: 현재 정확도 섹션은 전체 적중률(1/3/5일)만 표시한다. accuracy_summary["per_axis"]에 이미 축별 적중률·평균수익률 데이터가 있으므로, _build_accuracy_section()을 확장하여 각 축(기술적·수급·환율 등)의 5일 적중률을 한 눈에 볼 수 있는 대시보드로 표시한다. 적중률이 70% 이상인 축은 "높음", 50% 미만은 "낮음"으로 라벨링하여 투자자가 어떤 분석 축을 더 신뢰할 수 있는지 즉시 판단할 수 있도록 한다. 적응형 가중치가 적용된 경우(composite_signal에 adapted_weights=True) 가중치 변동 사실도 종합시그널 섹션에 표기하여 "왜 이번 시그널의 가중치가 달라졌는지" 투자자가 이해할 수 있도록 한다.
+Description:
+현재 `_build_accuracy_section()`은 전체 1/3/5일 적중률만 표시한다.
+이를 확장하여:
+1. 축별(10축) 5일 적중률을 테이블 형태로 표시 (accuracy_summary['per_axis'] 활용)
+2. 적중률 수준 라벨: 70%+ "🟢높음", 50-70% "🟡보통", <50% "🔴낮음"
+3. 적응형 가중치 활성 시 `adapted_weights=True`가 composite_signal에 있으면 "⚡ 적응형 가중치 활성" 표시
+4. `build_daily_report()` 시그니처에 `composite_signal` dict를 전달받아 adapted_weights 여부 확인
+5. 축 이름 한글 매핑: technical→기술적, supply→수급, exchange→환율 등
+테스트: per_axis 데이터가 있을 때 축별 적중률이 출력에 포함되는지 검증
+
+### Task 2: 방향성 반영 비대칭 예상 거래 범위 — 시그널 기반 가격 시나리오
+Files: src/analysis/watchpoints.py, src/analysis/report.py, tests/test_watchpoints.py
+Description:
+현재 `compute_daily_range()`는 current_price ± ATR 대칭형이다.
+시그널 점수를 활용하여 비대칭 범위를 생성한다:
+1. `compute_daily_range()`에 `signal_score: float | None = None` 파라미터 추가
+2. signal_score가 있으면 방향 편향 계산: bias_ratio = (signal_score / 100) * 0.3
+   - 매수 신호(+) → 상단 확장, 하단 축소
+   - 매도 신호(-) → 하단 확장, 상단 축소
+   - expected_high = price + ATR * (0.5 + bias_ratio), expected_low = price - ATR * (0.5 - bias_ratio)
+3. 결과에 `bias_direction` ("상승편향" | "하락편향" | "중립") 추가
+4. 리포트의 watchpoints 섹션에 방향 편향 정보 표시
+5. `build_watchpoints()`에도 signal_score 전달 경로 추가
+6. main.py에서 signal score를 watchpoints로 전달
+테스트: signal_score +50일 때 expected_high가 대칭보다 높고 expected_low가 대칭보다 높은지 검증

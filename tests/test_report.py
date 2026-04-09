@@ -812,6 +812,54 @@ class TestAccuracyInReport:
         report = generate_daily_report(_full_indicators(), accuracy_summary=acc)
         assert "20" in report  # total_signals = 20
 
+    def test_accuracy_per_axis_displayed(self):
+        """per_axis 데이터가 있으면 축별 적중률이 출력에 포함된다."""
+        acc = _accuracy_summary_sufficient()
+        report = generate_daily_report(_full_indicators(), accuracy_summary=acc)
+        assert "축별 5일 적중률" in report
+        assert "기술적" in report  # technical_score → 기술적
+        assert "수급" in report    # supply_score → 수급
+        assert "환율" in report    # exchange_score → 환율
+
+    def test_accuracy_per_axis_level_labels(self):
+        """적중률 수준별 라벨이 올바르게 표시된다."""
+        acc = _accuracy_summary_sufficient()
+        report = generate_daily_report(_full_indicators(), accuracy_summary=acc)
+        # technical_score: 75% → 🟢높음
+        assert "🟢높음" in report
+        # supply_score: 62% → 🟡보통
+        assert "🟡보통" in report
+        # exchange_score: 45% → 🔴낮음
+        assert "🔴낮음" in report
+
+    def test_accuracy_adapted_weights_shown(self):
+        """composite_signal에 adapted_weights=True이면 표시된다."""
+        acc = _accuracy_summary_sufficient()
+        cs = _composite_signal_bullish()
+        cs["adapted_weights"] = True
+        report = generate_daily_report(
+            _full_indicators(), accuracy_summary=acc, composite_signal=cs,
+        )
+        assert "적응형 가중치 활성" in report
+
+    def test_accuracy_no_adapted_weights_label(self):
+        """adapted_weights가 없으면 적응형 가중치 라벨이 없다."""
+        acc = _accuracy_summary_sufficient()
+        cs = _composite_signal_bullish()
+        report = generate_daily_report(
+            _full_indicators(), accuracy_summary=acc, composite_signal=cs,
+        )
+        assert "적응형 가중치 활성" not in report
+
+    def test_accuracy_per_axis_skips_insufficient(self):
+        """evaluated_5d < 5인 축은 표시되지 않는다."""
+        acc = _accuracy_summary_sufficient()
+        report = generate_daily_report(_full_indicators(), accuracy_summary=acc)
+        # consensus_score has evaluated_5d=2, should not appear
+        assert "컨센서스" not in report
+        # fundamentals_score has evaluated_5d=0, should not appear
+        assert "펀더멘털" not in report
+
 
 class TestClassifyStochastic:
     """스토캐스틱 상태 판단 테스트."""
@@ -920,6 +968,18 @@ def _accuracy_summary_sufficient() -> dict:
         "evaluated_signals_1d": 18,
         "evaluated_signals_3d": 15,
         "evaluated_signals_5d": 10,
+        "per_axis": {
+            "technical_score": {"hit_rate_5d": 75.0, "evaluated_5d": 8},
+            "supply_score": {"hit_rate_5d": 62.0, "evaluated_5d": 8},
+            "exchange_score": {"hit_rate_5d": 45.0, "evaluated_5d": 6},
+            "fundamentals_score": {"hit_rate_5d": None, "evaluated_5d": 0},
+            "news_score": {"hit_rate_5d": 55.0, "evaluated_5d": 5},
+            "consensus_score": {"hit_rate_5d": None, "evaluated_5d": 2},
+            "semiconductor_score": {"hit_rate_5d": 70.0, "evaluated_5d": 5},
+            "volatility_score": {"hit_rate_5d": 50.0, "evaluated_5d": 5},
+            "candlestick_score": {"hit_rate_5d": 40.0, "evaluated_5d": 5},
+            "global_macro_score": {"hit_rate_5d": 80.0, "evaluated_5d": 5},
+        },
     }
 
 

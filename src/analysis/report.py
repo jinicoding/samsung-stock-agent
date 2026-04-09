@@ -452,11 +452,40 @@ def _build_support_resistance_section(sr: dict, current_price: float) -> list[st
     return lines
 
 
-def _build_accuracy_section(acc: dict) -> list[str]:
+_AXIS_KR_NAME: dict[str, str] = {
+    "technical_score": "기술적",
+    "supply_score": "수급",
+    "exchange_score": "환율",
+    "fundamentals_score": "펀더멘털",
+    "news_score": "뉴스",
+    "consensus_score": "컨센서스",
+    "semiconductor_score": "반도체",
+    "volatility_score": "변동성",
+    "candlestick_score": "캔들스틱",
+    "global_macro_score": "글로벌매크로",
+}
+
+
+def _hit_rate_label(rate: float) -> str:
+    """적중률 수준 라벨."""
+    if rate >= 70:
+        return "🟢높음"
+    if rate >= 50:
+        return "🟡보통"
+    return "🔴낮음"
+
+
+def _build_accuracy_section(
+    acc: dict, composite_signal: dict | None = None,
+) -> list[str]:
     """시그널 정확도 통계를 HTML 라인 리스트로."""
     lines = []
     lines.append("")
     lines.append("<b>🎯 시그널 정확도</b>")
+
+    # 적응형 가중치 활성 표시
+    if composite_signal and composite_signal.get("adapted_weights"):
+        lines.append("  ⚡ 적응형 가중치 활성")
 
     # 데이터 부족 판단: 1일 기준 evaluated_signals가 5 미만이면 축적 중
     eval_1d = acc.get("evaluated_signals_1d", 0)
@@ -475,6 +504,26 @@ def _build_accuracy_section(acc: dict) -> list[str]:
         hit_str = f"{hit:.1f}%" if hit is not None else "N/A"
         ret_str = f"{ret:+.2f}%" if ret is not None else "N/A"
         lines.append(f"  {n}일 적중률: {hit_str} | 평균 수익률: {ret_str} ({count}건)")
+
+    # 축별 5일 적중률 테이블
+    per_axis = acc.get("per_axis", {})
+    axis_rows = []
+    for axis_key, kr_name in _AXIS_KR_NAME.items():
+        axis_data = per_axis.get(axis_key, {})
+        evaluated = axis_data.get("evaluated_5d", 0)
+        if evaluated < 5:
+            continue
+        hit = axis_data.get("hit_rate_5d")
+        if hit is None:
+            continue
+        axis_rows.append((kr_name, hit, evaluated))
+
+    if axis_rows:
+        lines.append("")
+        lines.append("  <b>축별 5일 적중률</b>")
+        for kr_name, hit, evaluated in axis_rows:
+            label = _hit_rate_label(hit)
+            lines.append(f"  {kr_name}: {hit:.0f}% {label} ({evaluated}건)")
 
     return lines
 
@@ -1319,6 +1368,6 @@ def generate_daily_report(
 
     # 시그널 정확도 (선택)
     if accuracy_summary is not None:
-        lines.extend(_build_accuracy_section(accuracy_summary))
+        lines.extend(_build_accuracy_section(accuracy_summary, composite_signal))
 
     return "\n".join(lines)

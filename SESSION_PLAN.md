@@ -1,29 +1,25 @@
 ## Session Plan
 
-### Task 1: 축별 정확도 대시보드를 리포트에 통합 — 적응형 가중치 투명성 확보
+### Task 1: 글로벌 매크로 리포트 섹션 추가 — NASDAQ·VIX 현황 HTML 표시
 Files: src/analysis/report.py, tests/test_report.py
 Description:
-현재 `_build_accuracy_section()`은 전체 1/3/5일 적중률만 표시한다.
-이를 확장하여:
-1. 축별(10축) 5일 적중률을 테이블 형태로 표시 (accuracy_summary['per_axis'] 활용)
-2. 적중률 수준 라벨: 70%+ "🟢높음", 50-70% "🟡보통", <50% "🔴낮음"
-3. 적응형 가중치 활성 시 `adapted_weights=True`가 composite_signal에 있으면 "⚡ 적응형 가중치 활성" 표시
-4. `build_daily_report()` 시그니처에 `composite_signal` dict를 전달받아 adapted_weights 여부 확인
-5. 축 이름 한글 매핑: technical→기술적, supply→수급, exchange→환율 등
-테스트: per_axis 데이터가 있을 때 축별 적중률이 출력에 포함되는지 검증
+10축 중 글로벌 매크로만 유일하게 리포트에 독립 섹션이 없다.
+`nasdaq_trend`, `vix_risk`, `global_macro_score`가 `generate_daily_report()`에 전달되지만
+코멘터리에만 반영될 뿐 리포트 본문에 HTML 섹션이 빠져 있다.
+`_build_global_macro_section()` 함수를 구현하여:
+1. NASDAQ 추세(상승/하락/보합, MA 대비 위치)
+2. VIX 리스크 수준(안정/경계/공포/극단)
+3. 매크로 스코어(-100~+100)
+를 한눈에 보여주는 HTML 섹션을 추가한다.
+반도체 업황 섹션(`_build_semiconductor_section`) 다음, 수렴 분석 섹션 앞에 배치한다.
+테스트를 먼저 작성한다.
 
-### Task 2: 방향성 반영 비대칭 예상 거래 범위 — 시그널 기반 가격 시나리오
-Files: src/analysis/watchpoints.py, src/analysis/report.py, tests/test_watchpoints.py
+### Task 2: 리포트 섹션 간결화 — 중복 정보 제거 및 핵심 지표 압축
+Files: src/analysis/report.py, tests/test_report.py
 Description:
-현재 `compute_daily_range()`는 current_price ± ATR 대칭형이다.
-시그널 점수를 활용하여 비대칭 범위를 생성한다:
-1. `compute_daily_range()`에 `signal_score: float | None = None` 파라미터 추가
-2. signal_score가 있으면 방향 편향 계산: bias_ratio = (signal_score / 100) * 0.3
-   - 매수 신호(+) → 상단 확장, 하단 축소
-   - 매도 신호(-) → 하단 확장, 상단 축소
-   - expected_high = price + ATR * (0.5 + bias_ratio), expected_low = price - ATR * (0.5 - bias_ratio)
-3. 결과에 `bias_direction` ("상승편향" | "하락편향" | "중립") 추가
-4. 리포트의 watchpoints 섹션에 방향 편향 정보 표시
-5. `build_watchpoints()`에도 signal_score 전달 경로 추가
-6. main.py에서 signal score를 watchpoints로 전달
-테스트: signal_score +50일 때 expected_high가 대칭보다 높고 expected_low가 대칭보다 높은지 검증
+10축 분석 체계가 완성되면서 리포트가 과도하게 길어져 Telegram 4096자 제한에 걸릴
+가능성이 높고 가독성이 떨어진다. 각 분석 섹션의 HTML을 감사하여:
+1. 수치와 라벨이 코멘터리와 본문에서 이중 표시되는 부분 식별
+2. 각 섹션의 핵심 정보 1~2줄로 압축 가능한 부분 리팩토링
+3. 데이터가 없거나 중립인 축은 섹션 자체를 생략하여 리포트 길이를 줄인다
+기존 테스트가 깨지지 않도록 주의하며, 압축 전후 예상 길이 비교 테스트를 추가한다.

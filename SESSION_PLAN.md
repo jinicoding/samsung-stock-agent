@@ -1,25 +1,9 @@
 ## Session Plan
 
-### Task 1: 글로벌 매크로 리포트 섹션 추가 — NASDAQ·VIX 현황 HTML 표시
-Files: src/analysis/report.py, tests/test_report.py
-Description:
-10축 중 글로벌 매크로만 유일하게 리포트에 독립 섹션이 없다.
-`nasdaq_trend`, `vix_risk`, `global_macro_score`가 `generate_daily_report()`에 전달되지만
-코멘터리에만 반영될 뿐 리포트 본문에 HTML 섹션이 빠져 있다.
-`_build_global_macro_section()` 함수를 구현하여:
-1. NASDAQ 추세(상승/하락/보합, MA 대비 위치)
-2. VIX 리스크 수준(안정/경계/공포/극단)
-3. 매크로 스코어(-100~+100)
-를 한눈에 보여주는 HTML 섹션을 추가한다.
-반도체 업황 섹션(`_build_semiconductor_section`) 다음, 수렴 분석 섹션 앞에 배치한다.
-테스트를 먼저 작성한다.
+### Task 1: 멀티타임프레임 분석 모듈 구축 — 주봉 추세 맥락 추가
+Files: src/analysis/timeframe.py, tests/test_timeframe.py
+Description: 일봉 OHLCV 데이터를 주봉으로 리샘플링하여 주간 추세(MA5w/MA13w, RSI_weekly, 주봉 추세방향)를 산출하는 모듈을 구축한다. 현재 시스템은 일봉 데이터만 분석하여 "나무만 보고 숲을 못 보는" 한계가 있다. 주봉 추세가 상승인데 일봉이 과매도이면 매수 기회, 주봉도 하락이면 추가 하락 경계 — 이런 멀티타임프레임 맥락을 제공해야 실전 투자자에게 유용하다. 일봉 데이터(최소 60일)를 주봉으로 변환하고, 주봉 MA(5주/13주)·RSI(14주)·추세방향을 계산하여 일봉 시그널과의 정합성(alignment)을 판정한다. 테스트를 먼저 작성하고 구현한다.
 
-### Task 2: 리포트 섹션 간결화 — 중복 정보 제거 및 핵심 지표 압축
-Files: src/analysis/report.py, tests/test_report.py
-Description:
-10축 분석 체계가 완성되면서 리포트가 과도하게 길어져 Telegram 4096자 제한에 걸릴
-가능성이 높고 가독성이 떨어진다. 각 분석 섹션의 HTML을 감사하여:
-1. 수치와 라벨이 코멘터리와 본문에서 이중 표시되는 부분 식별
-2. 각 섹션의 핵심 정보 1~2줄로 압축 가능한 부분 리팩토링
-3. 데이터가 없거나 중립인 축은 섹션 자체를 생략하여 리포트 길이를 줄인다
-기존 테스트가 깨지지 않도록 주의하며, 압축 전후 예상 길이 비교 테스트를 추가한다.
+### Task 2: 멀티타임프레임 분석을 종합 시그널·리포트·코멘터리·파이프라인에 통합
+Files: src/analysis/signal.py, src/analysis/report.py, src/analysis/commentary.py, src/main.py, tests/test_signal.py, tests/test_report.py, tests/test_commentary.py
+Description: Task 1에서 구축한 멀티타임프레임 분석을 파이프라인 전체에 통합한다. (1) signal.py: 주봉-일봉 정합성(alignment)에 따라 종합 시그널의 확신도를 조절 — aligned이면 시그널 강화(+15%), conflicting이면 약화(-15%). 별도 축이 아닌 기존 시그널의 필터/증폭기로 작동. (2) report.py: 주봉 추세 섹션 HTML 추가 (주봉 MA 위치, RSI, 추세방향, 일봉과의 정합성). (3) commentary.py: 멀티타임프레임 맥락 자연어 해설 추가. (4) main.py: 파이프라인에서 timeframe 분석 호출 및 결과 전달. 모든 변경에 대해 테스트 추가.

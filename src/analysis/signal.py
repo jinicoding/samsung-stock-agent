@@ -406,6 +406,22 @@ def _reversal_bonus(trend_reversal: dict) -> float:
     return 0.0
 
 
+def _apply_timeframe_filter(score: float, alignment: dict) -> float:
+    """멀티타임프레임 정합성에 따라 종합 점수를 필터/증폭한다.
+
+    별도 축이 아닌 기존 시그널의 필터/증폭기로 작동:
+    - aligned_bullish/divergent_bullish → +15% 증폭
+    - aligned_bearish/divergent_bearish → -15% 감쇠
+    - neutral → 변동 없음
+    """
+    label = alignment.get("alignment", "neutral")
+    if label in ("aligned_bullish", "divergent_bullish"):
+        return score * 1.15
+    if label in ("aligned_bearish", "divergent_bearish"):
+        return score * 0.85
+    return score
+
+
 def compute_composite_signal(
     technical: dict,
     supply_demand: dict,
@@ -420,6 +436,7 @@ def compute_composite_signal(
     candlestick: dict | None = None,
     global_macro_score: int | None = None,
     accuracy_summary: dict | None = None,
+    timeframe_alignment: dict | None = None,
 ) -> dict:
     """종합 투자 시그널을 계산한다.
 
@@ -561,6 +578,10 @@ def compute_composite_signal(
     # 추세 전환 컨버전스 보너스/페널티
     if trend_reversal is not None:
         composite += _reversal_bonus(trend_reversal)
+
+    # 멀티타임프레임 정합성: 기존 시그널의 필터/증폭기
+    if timeframe_alignment is not None:
+        composite = _apply_timeframe_filter(composite, timeframe_alignment)
 
     composite = _clamp(composite)
 

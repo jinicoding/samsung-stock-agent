@@ -40,6 +40,7 @@ from src.analysis.global_macro import analyze_nasdaq_trend, analyze_vix_risk, co
 from src.analysis.volatility import compute_volatility
 from src.analysis.candlestick import detect_candlestick_patterns
 from src.analysis.weekly_summary import summarize_weekly
+from src.analysis.timeframe import compute_weekly_indicators, assess_timeframe_alignment
 from src.analysis.watchpoints import build_watchpoints
 from src.delivery.telegram_bot import send_message
 
@@ -73,6 +74,20 @@ def main(dry_run: bool = False):
     indicators = compute_technical_indicators(prices)
     sd = analyze_supply_demand(trading, ownership) if trading else None
     er = analyze_exchange_rate(rates, prices) if rates else None
+
+    # 3.4) 멀티타임프레임 분석 (주봉 지표 + 일봉-주봉 정합성)
+    weekly_indicators = None
+    timeframe_alignment = None
+    try:
+        weekly_indicators = compute_weekly_indicators(prices)
+        daily_rsi = indicators.get("rsi_14")
+        timeframe_alignment = assess_timeframe_alignment(
+            weekly_indicators.get("weekly_trend"),
+            weekly_indicators.get("rsi_weekly"),
+            daily_rsi,
+        )
+    except Exception as e:
+        print(f"[경고] 멀티타임프레임 분석 실패: {e}")
 
     # 3.45) 변동성 분석
     vol = None
@@ -188,7 +203,7 @@ def main(dry_run: bool = False):
     accuracy_summary = accuracy_result["summary"]
 
     # 3.8.5) 종합 투자 시그널
-    sig = compute_composite_signal(indicators, sd or {}, er or {}, relative_strength=rs, trend_reversal=reversal, fundamentals=fund, news_sentiment=news_sentiment, consensus=consensus, semiconductor_momentum=semi_momentum, volatility=vol, candlestick=candle, global_macro_score=global_macro_score_val, accuracy_summary=accuracy_summary)
+    sig = compute_composite_signal(indicators, sd or {}, er or {}, relative_strength=rs, trend_reversal=reversal, fundamentals=fund, news_sentiment=news_sentiment, consensus=consensus, semiconductor_momentum=semi_momentum, volatility=vol, candlestick=candle, global_macro_score=global_macro_score_val, accuracy_summary=accuracy_summary, timeframe_alignment=timeframe_alignment)
 
     # 3.85) 다축 수렴 분석
     conv = None
@@ -257,7 +272,7 @@ def main(dry_run: bool = False):
         print(f"[경고] 주간 추이 요약 실패: {e}")
 
     # 4) 리포트 생성
-    report = generate_daily_report(indicators, supply_demand=sd, exchange_rate=er, composite_signal=sig, support_resistance=sr, accuracy_summary=accuracy_summary, relative_strength=rs, trend_reversal=reversal, signal_trend=sig_trend, fundamentals=fund, news_sentiment=news_sentiment, news_headlines=news_headlines, consensus=consensus, weekly_summary=weekly, rel_perf=rel_perf, sox_trend=sox_trend, semiconductor_momentum=semi_momentum, volatility=vol, candlestick=candle, watchpoints=wp, convergence=conv, nasdaq_trend=nasdaq_trend, vix_risk=vix_risk, global_macro_score=global_macro_score_val)
+    report = generate_daily_report(indicators, supply_demand=sd, exchange_rate=er, composite_signal=sig, support_resistance=sr, accuracy_summary=accuracy_summary, relative_strength=rs, trend_reversal=reversal, signal_trend=sig_trend, fundamentals=fund, news_sentiment=news_sentiment, news_headlines=news_headlines, consensus=consensus, weekly_summary=weekly, rel_perf=rel_perf, sox_trend=sox_trend, semiconductor_momentum=semi_momentum, volatility=vol, candlestick=candle, watchpoints=wp, convergence=conv, nasdaq_trend=nasdaq_trend, vix_risk=vix_risk, global_macro_score=global_macro_score_val, timeframe_alignment=timeframe_alignment, weekly_indicators=weekly_indicators)
 
     # 5) 발송 또는 출력
     if dry_run:

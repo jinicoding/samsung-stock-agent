@@ -1088,3 +1088,82 @@ class TestGlobalMacroIntegration:
         w = result["weights"]
         assert sum(w.values()) == 100
         assert "global_macro" in w
+
+
+class TestTimeframeIntegration:
+    """멀티타임프레임 정합성 통합 테스트."""
+
+    def test_aligned_bullish_boosts_score(self):
+        """aligned_bullish이면 종합 점수가 +15% 증폭."""
+        alignment = {
+            "alignment": "aligned_bullish",
+            "interpretation": "주봉 상승 추세에서 일봉 과매도",
+            "score_modifier": 0.5,
+        }
+        base = compute_composite_signal(_tech(), _supply(), _fx())
+        boosted = compute_composite_signal(
+            _tech(), _supply(), _fx(), timeframe_alignment=alignment,
+        )
+        # aligned_bullish → score * 1.15
+        assert boosted["score"] >= base["score"]
+
+    def test_aligned_bearish_reduces_score(self):
+        """aligned_bearish이면 종합 점수가 -15% 감쇠."""
+        alignment = {
+            "alignment": "aligned_bearish",
+            "interpretation": "주봉 하락 추세에서 일봉 과매수",
+            "score_modifier": -0.5,
+        }
+        tech = _tech(rsi=35, macd_histogram=200, bb_pctb=0.2)
+        base = compute_composite_signal(tech, _supply(), _fx())
+        reduced = compute_composite_signal(
+            tech, _supply(), _fx(), timeframe_alignment=alignment,
+        )
+        assert reduced["score"] <= base["score"]
+
+    def test_neutral_no_change(self):
+        """neutral 정합성이면 점수 변동 없음."""
+        alignment = {
+            "alignment": "neutral",
+            "interpretation": "데이터 부족",
+            "score_modifier": 0.0,
+        }
+        base = compute_composite_signal(_tech(), _supply(), _fx())
+        same = compute_composite_signal(
+            _tech(), _supply(), _fx(), timeframe_alignment=alignment,
+        )
+        assert abs(same["score"] - base["score"]) < 0.01
+
+    def test_none_alignment_no_change(self):
+        """timeframe_alignment=None이면 기존과 동일."""
+        base = compute_composite_signal(_tech(), _supply(), _fx())
+        same = compute_composite_signal(
+            _tech(), _supply(), _fx(), timeframe_alignment=None,
+        )
+        assert abs(same["score"] - base["score"]) < 0.01
+
+    def test_weights_sum_100(self):
+        """타임프레임 추가해도 가중치 합은 100."""
+        alignment = {
+            "alignment": "divergent_bullish",
+            "interpretation": "주봉 상승 추세 유지",
+            "score_modifier": 0.2,
+        }
+        result = compute_composite_signal(
+            _tech(), _supply(), _fx(), timeframe_alignment=alignment,
+        )
+        assert sum(result["weights"].values()) == 100
+
+    def test_score_clamped(self):
+        """타임프레임 증폭 후에도 -100~+100 범위."""
+        alignment = {
+            "alignment": "aligned_bullish",
+            "interpretation": "test",
+            "score_modifier": 0.5,
+        }
+        tech = _tech(rsi=10, macd_histogram=1000, bb_pctb=0.0, price_vs_ma5_pct=5.0)
+        result = compute_composite_signal(
+            tech, _supply(judgment="buy_dominant"),
+            _fx(trend="원화약세"), timeframe_alignment=alignment,
+        )
+        assert -100 <= result["score"] <= 100

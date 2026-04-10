@@ -1038,3 +1038,61 @@ class TestGenerateCommentary:
             vix_risk=self._base_vix_risk(risk_level="경계", vix_latest=25.0),
         )
         assert "글로벌" in result
+
+    def test_timeframe_aligned_bullish_sentence(self):
+        """주봉 상승 추세 + aligned_bullish → 주봉 관련 문장 포함."""
+        alignment = {
+            "alignment": "aligned_bullish",
+            "interpretation": "주봉 상승 추세에서 일봉 과매도",
+            "score_modifier": 0.5,
+        }
+        weekly_ind = {
+            "ma5w": 55000, "ma13w": 54000,
+            "rsi_weekly": 55.0, "weekly_trend": "up",
+            "weekly_close": 55500, "weekly_data_weeks": 15,
+        }
+        result = generate_commentary(
+            self._base_indicators(),
+            self._base_supply_demand(),
+            self._base_exchange_rate(),
+            self._base_composite_signal(),
+            self._base_support_resistance(),
+            timeframe_alignment=alignment,
+            weekly_indicators=weekly_ind,
+        )
+        assert "주봉" in result
+
+    def test_timeframe_aligned_bearish_sentence(self):
+        """주봉 하락 추세 + aligned_bearish → 하락 관련 문장."""
+        alignment = {
+            "alignment": "aligned_bearish",
+            "interpretation": "주봉 하락 추세에서 일봉 과매수",
+            "score_modifier": -0.5,
+        }
+        weekly_ind = {
+            "ma5w": 53000, "ma13w": 54000,
+            "rsi_weekly": 35.0, "weekly_trend": "down",
+            "weekly_close": 52500, "weekly_data_weeks": 15,
+        }
+        result = generate_commentary(
+            self._base_indicators(),
+            self._base_supply_demand(),
+            self._base_exchange_rate(),
+            self._base_composite_signal(),
+            self._base_support_resistance(),
+            timeframe_alignment=alignment,
+            weekly_indicators=weekly_ind,
+        )
+        assert "주봉" in result
+
+    def test_timeframe_none_no_sentence(self):
+        """타임프레임 데이터 없으면 주봉 문장 없음."""
+        result = generate_commentary(
+            self._base_indicators(),
+            self._base_supply_demand(),
+            self._base_exchange_rate(),
+            self._base_composite_signal(),
+            self._base_support_resistance(),
+        )
+        assert "주봉 상승" not in result
+        assert "주봉 하락" not in result

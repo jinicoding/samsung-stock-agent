@@ -33,6 +33,8 @@ def generate_commentary(
     convergence: dict | None = None,
     nasdaq_trend: dict | None = None,
     vix_risk: dict | None = None,
+    timeframe_alignment: dict | None = None,
+    weekly_indicators: dict | None = None,
 ) -> str:
     """분석 결과를 2~3문장 자연어 코멘터리로 변환한다.
 
@@ -71,6 +73,11 @@ def generate_commentary(
     reversal_sentence = _build_reversal_sentence(trend_reversal or {})
     if reversal_sentence:
         sentences.append(reversal_sentence)
+
+    # --- 1.8) 멀티타임프레임 정합성 문장 ---
+    tf_sentence = _build_timeframe_sentence(timeframe_alignment or {}, weekly_indicators or {})
+    if tf_sentence:
+        sentences.append(tf_sentence)
 
     # --- 2) 보조 경고/참고 문장: RSI, 볼린저, 지지/저항 ---
     caution = _build_caution_sentence(indicators, sr)
@@ -700,6 +707,34 @@ def _build_adx_sentence(indicators: dict) -> str:
         return f"ADX {adx:.0f}으로 {direction} 추세가 뚜렷하게 형성되어 있습니다."
     elif adx < 20:
         return f"ADX {adx:.0f}으로 뚜렷한 추세가 부재하여 횡보 구간으로 판단되며 방향성 확인이 필요합니다."
+
+    return ""
+
+
+def _build_timeframe_sentence(alignment: dict, weekly_ind: dict) -> str:
+    """멀티타임프레임 정합성 기반 자연어 문장."""
+    if not alignment or not weekly_ind:
+        return ""
+
+    label = alignment.get("alignment", "neutral")
+    trend = weekly_ind.get("weekly_trend")
+    ma5w = weekly_ind.get("ma5w")
+    ma13w = weekly_ind.get("ma13w")
+
+    if trend is None or ma5w is None or ma13w is None:
+        return ""
+
+    trend_kr = {"up": "상승", "down": "하락", "sideways": "횡보"}.get(trend, "횡보")
+    ma_order = "정배열" if ma5w > ma13w else "역배열" if ma5w < ma13w else "수렴"
+
+    if label == "aligned_bullish":
+        return f"주봉 {trend_kr} 추세(MA5w/MA13w {ma_order})에서 일봉 과매도로 추세 방향 매수 기회가 포착됩니다."
+    if label == "aligned_bearish":
+        return f"주봉 {trend_kr} 추세(MA5w/MA13w {ma_order})에서 일봉 과매수로 추가 하락에 경계가 필요합니다."
+    if label == "divergent_bullish":
+        return f"주봉 {trend_kr} 추세(MA5w/MA13w {ma_order})가 유지되어 단기 조정 시 지지가 기대됩니다."
+    if label == "divergent_bearish":
+        return f"주봉 {trend_kr} 추세(MA5w/MA13w {ma_order})가 지속되어 반등 시에도 저항이 예상됩니다."
 
     return ""
 

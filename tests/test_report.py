@@ -2038,3 +2038,70 @@ class TestGlobalMacroSection:
         macro_pos = report.index("글로벌 매크로")
         conv_pos = report.index("수렴 분석")
         assert macro_pos < conv_pos
+
+
+class TestTimeframeSection:
+    """멀티타임프레임 분석 섹션 테스트."""
+
+    def test_timeframe_section_present(self):
+        """timeframe 데이터가 주어지면 주봉 섹션 포함."""
+        alignment = {
+            "alignment": "aligned_bullish",
+            "interpretation": "주봉 상승 추세에서 일봉 과매도",
+            "score_modifier": 0.5,
+        }
+        weekly_ind = {
+            "ma5w": 55000, "ma13w": 54000,
+            "rsi_weekly": 55.0, "weekly_trend": "up",
+            "weekly_close": 55500, "weekly_data_weeks": 15,
+        }
+        report = generate_daily_report(
+            _full_indicators(),
+            timeframe_alignment=alignment,
+            weekly_indicators=weekly_ind,
+        )
+        assert "멀티타임프레임" in report or "주봉" in report
+
+    def test_timeframe_section_absent_when_none(self):
+        """timeframe 데이터 없으면 섹션 없음."""
+        report = generate_daily_report(_full_indicators())
+        assert "멀티타임프레임" not in report
+
+    def test_timeframe_section_shows_ma_values(self):
+        """주봉 MA5w, MA13w 값이 표시됨."""
+        alignment = {
+            "alignment": "divergent_bullish",
+            "interpretation": "주봉 상승 추세 유지",
+            "score_modifier": 0.2,
+        }
+        weekly_ind = {
+            "ma5w": 55000, "ma13w": 54000,
+            "rsi_weekly": 55.0, "weekly_trend": "up",
+            "weekly_close": 55500, "weekly_data_weeks": 15,
+        }
+        report = generate_daily_report(
+            _full_indicators(),
+            timeframe_alignment=alignment,
+            weekly_indicators=weekly_ind,
+        )
+        assert "MA5w" in report
+        assert "MA13w" in report
+
+    def test_timeframe_alignment_displayed(self):
+        """정합성 판정(aligned/divergent/neutral)이 리포트에 표시됨."""
+        alignment = {
+            "alignment": "aligned_bearish",
+            "interpretation": "주봉 하락 추세에서 일봉 과매수",
+            "score_modifier": -0.5,
+        }
+        weekly_ind = {
+            "ma5w": 53000, "ma13w": 54000,
+            "rsi_weekly": 35.0, "weekly_trend": "down",
+            "weekly_close": 52500, "weekly_data_weeks": 15,
+        }
+        report = generate_daily_report(
+            _full_indicators(),
+            timeframe_alignment=alignment,
+            weekly_indicators=weekly_ind,
+        )
+        assert "하락" in report or "bearish" in report or "약세" in report

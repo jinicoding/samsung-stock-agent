@@ -402,6 +402,7 @@ def test_pipeline_full(
         candlestick=SAMPLE_CANDLESTICK,
         global_macro_score=SAMPLE_GLOBAL_MACRO_SCORE,
         accuracy_summary=SAMPLE_ACCURACY,
+        timeframe_alignment=None,
     )
     # 수렴 분석 호출 확인
     mock_analyze_conv.assert_called_once()
@@ -439,6 +440,8 @@ def test_pipeline_full(
         nasdaq_trend=SAMPLE_NASDAQ_TREND,
         vix_risk=SAMPLE_VIX_RISK,
         global_macro_score=SAMPLE_GLOBAL_MACRO_SCORE,
+        timeframe_alignment=None,
+        weekly_indicators=None,
     )
     mock_send.assert_called_once_with(SAMPLE_REPORT_HTML)
 
@@ -602,6 +605,7 @@ def test_pipeline_with_rs(
         candlestick=SAMPLE_CANDLESTICK,
         global_macro_score=SAMPLE_GLOBAL_MACRO_SCORE,
         accuracy_summary=SAMPLE_ACCURACY,
+        timeframe_alignment=None,
     )
     # report에 RS와 reversal과 fundamentals와 뉴스와 컨센서스와 반도체와 변동성과 캔들스틱이 전달됨
     mock_report.assert_called_once()
@@ -713,6 +717,7 @@ def test_pipeline_kospi_failure_fallback(
         candlestick=SAMPLE_CANDLESTICK,
         global_macro_score=SAMPLE_GLOBAL_MACRO_SCORE,
         accuracy_summary=SAMPLE_ACCURACY,
+        timeframe_alignment=None,
     )
     # report에 RS=None, 글로벌 매크로 포함
     report_kwargs = mock_report.call_args

@@ -1151,6 +1151,50 @@ def _build_watchpoints_section(watchpoints: dict, current_price: float) -> list[
     return lines
 
 
+def _build_timeframe_section(alignment: dict, weekly_ind: dict) -> list[str]:
+    """멀티타임프레임 분석 섹션을 생성한다."""
+    lines = ["", "<b>🔭 멀티타임프레임 분석</b>"]
+
+    trend = weekly_ind.get("weekly_trend")
+    ma5w = weekly_ind.get("ma5w")
+    ma13w = weekly_ind.get("ma13w")
+    rsi_w = weekly_ind.get("rsi_weekly")
+    n_weeks = weekly_ind.get("weekly_data_weeks", 0)
+
+    trend_kr = {"up": "상승 ↑", "down": "하락 ↓", "sideways": "횡보 →"}.get(
+        trend or "", "N/A",
+    )
+    lines.append(f"  주봉 추세: {trend_kr} ({n_weeks}주 데이터)")
+
+    if ma5w is not None and ma13w is not None:
+        ma_order = "정배열" if ma5w > ma13w else "역배열" if ma5w < ma13w else "수렴"
+        lines.append(f"  MA5w: {_format_price(ma5w)} | MA13w: {_format_price(ma13w)} ({ma_order})")
+
+    if rsi_w is not None:
+        lines.append(f"  RSI(주봉): {rsi_w:.1f}")
+
+    label = alignment.get("alignment", "neutral")
+    interp = alignment.get("interpretation", "")
+    modifier = alignment.get("score_modifier", 0)
+
+    label_kr = {
+        "aligned_bullish": "🟢 강세 정합",
+        "aligned_bearish": "🔴 약세 정합",
+        "divergent_bullish": "🟡 강세 발산",
+        "divergent_bearish": "🟡 약세 발산",
+        "neutral": "⚪ 중립",
+    }.get(label, "⚪ 중립")
+
+    mod_str = f"+{modifier:.1f}" if modifier >= 0 else f"{modifier:.1f}"
+    lines.append(f"  일봉-주봉 정합성: {label_kr} (보정: {mod_str})")
+
+    if interp:
+        lines.append(f"  → {interp}")
+
+    lines.append("")
+    return lines
+
+
 def generate_daily_report(
     indicators: dict,
     supply_demand: dict | None = None,
@@ -1176,6 +1220,8 @@ def generate_daily_report(
     nasdaq_trend: dict | None = None,
     vix_risk: dict | None = None,
     global_macro_score: int | None = None,
+    timeframe_alignment: dict | None = None,
+    weekly_indicators: dict | None = None,
 ) -> str:
     """기술적 지표 dict를 HTML 텔레그램 메시지로 변환한다.
 
@@ -1257,6 +1303,8 @@ def generate_daily_report(
         semiconductor_momentum=semiconductor_momentum, volatility=volatility,
         candlestick=candlestick, convergence=convergence,
         nasdaq_trend=nasdaq_trend, vix_risk=vix_risk,
+        timeframe_alignment=timeframe_alignment,
+        weekly_indicators=weekly_indicators,
     )
     if commentary:
         lines.append(f"💬 {commentary}")
@@ -1367,6 +1415,10 @@ def generate_daily_report(
     # 추세 전환 감지 (선택)
     if trend_reversal is not None:
         lines.extend(_build_trend_reversal_section(trend_reversal))
+
+    # 멀티타임프레임 분석 (선택)
+    if timeframe_alignment is not None and weekly_indicators is not None:
+        lines.extend(_build_timeframe_section(timeframe_alignment, weekly_indicators))
 
     # 펀더멘털 분석 (선택)
     if fundamentals is not None:

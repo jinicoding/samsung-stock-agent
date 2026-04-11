@@ -443,6 +443,7 @@ def test_pipeline_full(
         timeframe_alignment=None,
         weekly_indicators=None,
         scenario=ANY,
+        pattern_match=None,
     )
     mock_send.assert_called_once_with(SAMPLE_REPORT_HTML)
 

@@ -1195,6 +1195,45 @@ def _build_timeframe_section(alignment: dict, weekly_ind: dict) -> list[str]:
     return lines
 
 
+def _build_pattern_match_section(pm: dict) -> list[str]:
+    """유사 패턴 검색 결과 섹션을 생성한다."""
+    lines = ["", "<b>🔍 유사 패턴 분석</b>"]
+    summary = pm.get("summary", {})
+    count = summary.get("match_count", 0)
+    if count == 0:
+        lines.append("  유사 패턴을 찾지 못했습니다.")
+        lines.append("")
+        return lines
+
+    lines.append(f"  최근 시그널과 유사한 과거 {count}개 패턴 분석:")
+    lines.append("")
+
+    for m in pm.get("matches", [])[:5]:
+        sim_pct = m["similarity"] * 100
+        fr = m.get("forward_returns", {})
+        r1 = fr.get("1d")
+        r3 = fr.get("3d")
+        r5 = fr.get("5d")
+        r1_str = f"{r1:+.1%}" if r1 is not None else "N/A"
+        r3_str = f"{r3:+.1%}" if r3 is not None else "N/A"
+        r5_str = f"{r5:+.1%}" if r5 is not None else "N/A"
+        lines.append(f"  📅 {m['date']} (유사도 {sim_pct:.0f}%)")
+        lines.append(f"     이후 수익률: 1일 {r1_str} | 3일 {r3_str} | 5일 {r5_str}")
+
+    lines.append("")
+    avg1 = summary.get("avg_return_1d")
+    avg3 = summary.get("avg_return_3d")
+    avg5 = summary.get("avg_return_5d")
+    up1 = summary.get("up_ratio_1d")
+    up5 = summary.get("up_ratio_5d")
+    if avg1 is not None:
+        lines.append(f"  평균: 1일 {avg1:+.1%} | 3일 {avg3:+.1%} | 5일 {avg5:+.1%}" if avg3 is not None and avg5 is not None else f"  평균 1일 수익률: {avg1:+.1%}")
+    if up1 is not None and up5 is not None:
+        lines.append(f"  상승 확률: 1일 {up1:.0%} | 5일 {up5:.0%}")
+    lines.append("")
+    return lines
+
+
 def _build_scenario_section(scenario: dict) -> list[str]:
     """가격 시나리오 분석 섹션을 생성한다."""
     lines = ["", "<b>🎯 가격 시나리오</b>"]
@@ -1251,6 +1290,7 @@ def generate_daily_report(
     timeframe_alignment: dict | None = None,
     weekly_indicators: dict | None = None,
     scenario: dict | None = None,
+    pattern_match: dict | None = None,
 ) -> str:
     """기술적 지표 dict를 HTML 텔레그램 메시지로 변환한다.
 
@@ -1317,6 +1357,10 @@ def generate_daily_report(
     if scenario is not None:
         lines.extend(_build_scenario_section(scenario))
 
+    # 0.25) 유사 패턴 분석
+    if pattern_match is not None:
+        lines.extend(_build_pattern_match_section(pattern_match))
+
     # 0.3) 시그널 추이 (종합 시그널 바로 아래)
     if signal_trend is not None:
         lines.extend(_build_signal_trend_section(signal_trend))
@@ -1339,6 +1383,7 @@ def generate_daily_report(
         timeframe_alignment=timeframe_alignment,
         weekly_indicators=weekly_indicators,
         scenario=scenario,
+        pattern_match=pattern_match,
     )
     if commentary:
         lines.append(f"💬 {commentary}")

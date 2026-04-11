@@ -42,6 +42,7 @@ from src.analysis.candlestick import detect_candlestick_patterns
 from src.analysis.weekly_summary import summarize_weekly
 from src.analysis.timeframe import compute_weekly_indicators, assess_timeframe_alignment
 from src.analysis.watchpoints import build_watchpoints
+from src.analysis.pattern_match import find_similar_patterns
 from src.delivery.telegram_bot import send_message
 
 
@@ -258,6 +259,23 @@ def main(dry_run: bool = False):
         global_macro_score=sig.get("global_macro_score"),
     )
 
+    # 3.95) 유사 패턴 검색
+    pm = None
+    try:
+        current_scores = {
+            "technical_score": sig["technical_score"],
+            "supply_score": sig["supply_score"],
+            "exchange_score": sig["exchange_score"],
+        }
+        for key in ("fundamentals_score", "news_score", "consensus_score",
+                     "semiconductor_score", "volatility_score", "candlestick_score",
+                     "global_macro_score"):
+            if key in sig:
+                current_scores[key] = sig[key]
+        pm = find_similar_patterns(current_scores, db_module)
+    except Exception as e:
+        print(f"[경고] 유사 패턴 검색 실패: {e}")
+
     # 3.10) 시그널 추이 분석
     sig_trend = analyze_signal_trend(db_module, days=5)
 
@@ -287,7 +305,7 @@ def main(dry_run: bool = False):
         print(f"[경고] 주간 추이 요약 실패: {e}")
 
     # 4) 리포트 생성
-    report = generate_daily_report(indicators, supply_demand=sd, exchange_rate=er, composite_signal=sig, support_resistance=sr, accuracy_summary=accuracy_summary, relative_strength=rs, trend_reversal=reversal, signal_trend=sig_trend, fundamentals=fund, news_sentiment=news_sentiment, news_headlines=news_headlines, consensus=consensus, weekly_summary=weekly, rel_perf=rel_perf, sox_trend=sox_trend, semiconductor_momentum=semi_momentum, volatility=vol, candlestick=candle, watchpoints=wp, convergence=conv, nasdaq_trend=nasdaq_trend, vix_risk=vix_risk, global_macro_score=global_macro_score_val, timeframe_alignment=timeframe_alignment, weekly_indicators=weekly_indicators, scenario=scenario)
+    report = generate_daily_report(indicators, supply_demand=sd, exchange_rate=er, composite_signal=sig, support_resistance=sr, accuracy_summary=accuracy_summary, relative_strength=rs, trend_reversal=reversal, signal_trend=sig_trend, fundamentals=fund, news_sentiment=news_sentiment, news_headlines=news_headlines, consensus=consensus, weekly_summary=weekly, rel_perf=rel_perf, sox_trend=sox_trend, semiconductor_momentum=semi_momentum, volatility=vol, candlestick=candle, watchpoints=wp, convergence=conv, nasdaq_trend=nasdaq_trend, vix_risk=vix_risk, global_macro_score=global_macro_score_val, timeframe_alignment=timeframe_alignment, weekly_indicators=weekly_indicators, scenario=scenario, pattern_match=pm)
 
     # 5) 발송 또는 출력
     if dry_run:

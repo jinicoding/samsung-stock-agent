@@ -1195,6 +1195,34 @@ def _build_timeframe_section(alignment: dict, weekly_ind: dict) -> list[str]:
     return lines
 
 
+def _build_scenario_section(scenario: dict) -> list[str]:
+    """가격 시나리오 분석 섹션을 생성한다."""
+    lines = ["", "<b>🎯 가격 시나리오</b>"]
+    dominant = scenario.get("dominant_scenario", "기본")
+    lines.append(f"  주도 시나리오: <b>{dominant}</b>")
+    lines.append("")
+    for s in scenario.get("scenarios", []):
+        label = s["label"]
+        conv = s.get("conviction", "보통")
+        trigger = s.get("trigger", "")
+        icon = {"상승": "📈", "기본": "📊", "하락": "📉"}.get(label, "•")
+        if "target" in s:
+            lines.append(f"  {icon} {label} (확신: {conv}): 목표 {_format_price(s['target'])}원")
+        elif "range" in s:
+            r = s["range"]
+            lines.append(f"  {icon} {label} (확신: {conv}): {_format_price(r[0])}~{_format_price(r[1])}원")
+        if trigger:
+            lines.append(f"     └ {trigger}")
+    comment = scenario.get("risk_reward_comment")
+    if comment:
+        lines.append(f"  ⚖️ {comment}")
+    key_level = scenario.get("key_level")
+    if key_level is not None:
+        lines.append(f"  핵심 가격대: {_format_price(key_level)}원")
+    lines.append("")
+    return lines
+
+
 def generate_daily_report(
     indicators: dict,
     supply_demand: dict | None = None,
@@ -1222,6 +1250,7 @@ def generate_daily_report(
     global_macro_score: int | None = None,
     timeframe_alignment: dict | None = None,
     weekly_indicators: dict | None = None,
+    scenario: dict | None = None,
 ) -> str:
     """기술적 지표 dict를 HTML 텔레그램 메시지로 변환한다.
 
@@ -1284,6 +1313,10 @@ def generate_daily_report(
     if composite_signal is not None:
         lines.extend(_build_composite_signal_section(composite_signal))
 
+    # 0.2) 가격 시나리오
+    if scenario is not None:
+        lines.extend(_build_scenario_section(scenario))
+
     # 0.3) 시그널 추이 (종합 시그널 바로 아래)
     if signal_trend is not None:
         lines.extend(_build_signal_trend_section(signal_trend))
@@ -1305,6 +1338,7 @@ def generate_daily_report(
         nasdaq_trend=nasdaq_trend, vix_risk=vix_risk,
         timeframe_alignment=timeframe_alignment,
         weekly_indicators=weekly_indicators,
+        scenario=scenario,
     )
     if commentary:
         lines.append(f"💬 {commentary}")

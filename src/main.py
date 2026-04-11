@@ -223,6 +223,21 @@ def main(dry_run: bool = False):
     except Exception as e:
         print(f"[경고] 수렴 분석 실패: {e}")
 
+    # 3.87) 시나리오 분석
+    scenario = None
+    try:
+        from src.analysis.scenario import build_price_scenarios
+        scenario = build_price_scenarios(
+            current_price=prices[-1]["close"],
+            support_resistance=sr or {},
+            volatility=vol or {},
+            composite_signal=sig,
+            timeframe_alignment=timeframe_alignment or {},
+            convergence=conv or {},
+        )
+    except Exception as e:
+        print(f"[경고] 시나리오 분석 실패: {e}")
+
     # 3.9) 시그널 이력 저장
     latest_price = prices[-1]["close"]
     latest_date = prices[-1]["date"]
@@ -272,7 +287,7 @@ def main(dry_run: bool = False):
         print(f"[경고] 주간 추이 요약 실패: {e}")
 
     # 4) 리포트 생성
-    report = generate_daily_report(indicators, supply_demand=sd, exchange_rate=er, composite_signal=sig, support_resistance=sr, accuracy_summary=accuracy_summary, relative_strength=rs, trend_reversal=reversal, signal_trend=sig_trend, fundamentals=fund, news_sentiment=news_sentiment, news_headlines=news_headlines, consensus=consensus, weekly_summary=weekly, rel_perf=rel_perf, sox_trend=sox_trend, semiconductor_momentum=semi_momentum, volatility=vol, candlestick=candle, watchpoints=wp, convergence=conv, nasdaq_trend=nasdaq_trend, vix_risk=vix_risk, global_macro_score=global_macro_score_val, timeframe_alignment=timeframe_alignment, weekly_indicators=weekly_indicators)
+    report = generate_daily_report(indicators, supply_demand=sd, exchange_rate=er, composite_signal=sig, support_resistance=sr, accuracy_summary=accuracy_summary, relative_strength=rs, trend_reversal=reversal, signal_trend=sig_trend, fundamentals=fund, news_sentiment=news_sentiment, news_headlines=news_headlines, consensus=consensus, weekly_summary=weekly, rel_perf=rel_perf, sox_trend=sox_trend, semiconductor_momentum=semi_momentum, volatility=vol, candlestick=candle, watchpoints=wp, convergence=conv, nasdaq_trend=nasdaq_trend, vix_risk=vix_risk, global_macro_score=global_macro_score_val, timeframe_alignment=timeframe_alignment, weekly_indicators=weekly_indicators, scenario=scenario)
 
     # 5) 발송 또는 출력
     if dry_run:

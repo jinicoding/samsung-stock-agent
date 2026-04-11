@@ -1,6 +1,6 @@
 """main.py 일일 파이프라인 흐름 테스트 (DB/API 모킹)."""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import ANY, MagicMock, patch
 
 import pytest
 
@@ -442,6 +442,7 @@ def test_pipeline_full(
         global_macro_score=SAMPLE_GLOBAL_MACRO_SCORE,
         timeframe_alignment=None,
         weekly_indicators=None,
+        scenario=ANY,
     )
     mock_send.assert_called_once_with(SAMPLE_REPORT_HTML)
 

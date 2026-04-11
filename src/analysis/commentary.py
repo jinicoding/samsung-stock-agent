@@ -35,6 +35,7 @@ def generate_commentary(
     vix_risk: dict | None = None,
     timeframe_alignment: dict | None = None,
     weekly_indicators: dict | None = None,
+    scenario: dict | None = None,
 ) -> str:
     """분석 결과를 2~3문장 자연어 코멘터리로 변환한다.
 
@@ -135,6 +136,11 @@ def generate_commentary(
     macro_sentence = _build_global_macro_sentence(nasdaq_trend or {}, vix_risk or {})
     if macro_sentence:
         sentences.append(macro_sentence)
+
+    # --- 4.98) 시나리오 분석 문장 ---
+    scenario_sentence = _build_scenario_sentence(scenario or {})
+    if scenario_sentence:
+        sentences.append(scenario_sentence)
 
     # --- 5) 시그널 추이 문장 ---
     trend_sentence = _build_signal_trend_sentence(signal_trend or {})
@@ -737,6 +743,23 @@ def _build_timeframe_sentence(alignment: dict, weekly_ind: dict) -> str:
         return f"주봉 {trend_kr} 추세(MA5w/MA13w {ma_order})가 지속되어 반등 시에도 저항이 예상됩니다."
 
     return ""
+
+
+def _build_scenario_sentence(scenario: dict) -> str:
+    """시나리오 분석 기반 자연어 문장."""
+    if not scenario:
+        return ""
+    dominant = scenario.get("dominant_scenario")
+    comment = scenario.get("risk_reward_comment", "")
+    if not dominant:
+        return ""
+    label_map = {"상승": "상승 시나리오가 우세하며", "하락": "하락 시나리오가 우세하며", "기본": "박스권 횡보가 예상되며"}
+    prefix = label_map.get(dominant, "")
+    if not prefix:
+        return ""
+    if comment:
+        return f"시나리오 분석에서 {prefix} {comment}입니다."
+    return f"시나리오 분석에서 {prefix} 방향성 확인이 필요합니다."
 
 
 def _join_parts(parts: list[str]) -> str:

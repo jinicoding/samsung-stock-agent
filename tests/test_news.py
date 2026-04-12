@@ -105,6 +105,15 @@ class TestFetchNewsHeadlines:
         assert headlines == []
 
     @patch("src.data.news.requests.get")
+    def test_list_response_format(self, mock_get):
+        """실제 Naver API는 [{"total": N, "items": [...]}] 형태를 반환한다."""
+        list_response = [{"total": 4, "items": SAMPLE_API_RESPONSE["items"]}]
+        mock_get.return_value = _mock_response(list_response)
+        headlines = fetch_news_headlines()
+        assert len(headlines) == 4
+        assert headlines[0]["title"] == "삼성전자, 1분기 실적개선 기대감에 상승"
+
+    @patch("src.data.news.requests.get")
     def test_custom_count(self, mock_get):
         mock_get.return_value = _mock_response(SAMPLE_API_RESPONSE)
         fetch_news_headlines(count=10)

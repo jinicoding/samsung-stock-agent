@@ -63,7 +63,12 @@ def fetch_news_headlines(count: int = 20) -> list[dict]:
         logger.warning("뉴스 수집 실패: %s", e)
         return []
 
-    items = data.get("items", [])
+    if isinstance(data, list) and data and isinstance(data[0], dict):
+        items = data[0].get("items", [])
+    elif isinstance(data, dict):
+        items = data.get("items", [])
+    else:
+        items = []
     headlines = []
     for item in items:
         title = html.unescape(item.get("title", ""))

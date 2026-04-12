@@ -164,6 +164,26 @@ class TestFetchConsensus:
         assert len(result["researches"]) == 2
 
     @patch("src.data.consensus.requests.get")
+    def test_fetch_comma_separated_price(self, mock_get):
+        """실제 API는 '288,000' 형태의 쉼표 포함 문자열을 반환한다."""
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {
+            "consensusInfo": {
+                "priceTargetMean": "288,000",
+                "recommMean": "4.00",
+            },
+            "researches": [],
+        }
+        mock_resp.raise_for_status = MagicMock()
+        mock_get.return_value = mock_resp
+
+        result = fetch_consensus()
+        assert result is not None
+        assert result["target_price"] == 288000.0
+        assert result["recommendation"] == 4.0
+
+    @patch("src.data.consensus.requests.get")
     def test_fetch_failure_returns_none(self, mock_get):
         """API 실패 시 None 반환."""
         mock_get.side_effect = Exception("네트워크 오류")

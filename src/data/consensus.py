@@ -69,8 +69,10 @@ def fetch_consensus() -> dict | None:
         return None
 
     try:
-        target_price = float(consensus_info.get("priceTargetMean", 0))
-        recommendation = float(consensus_info.get("recommMean", 0))
+        raw_target = str(consensus_info.get("priceTargetMean", "0")).replace(",", "")
+        raw_recomm = str(consensus_info.get("recommMean", "0")).replace(",", "")
+        target_price = float(raw_target)
+        recommendation = float(raw_recomm)
     except (ValueError, TypeError):
         logger.warning("컨센서스 데이터 파싱 실패")
         return None

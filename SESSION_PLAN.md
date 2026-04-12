@@ -1,17 +1,19 @@
 ## Session Plan
 
-Day 21 (2026-04-11 15:30) — 유사 패턴 검색: 과거가 말해주는 미래
+Day 22 (2026-04-12 11:30) — 6세션 미뤄온 dry-run 검증 + 행동 가능한 리포트
 
 ### 자기 평가 요약
 
-10축 분석 체계 + 멀티타임프레임 필터 + 시나리오 분석까지 완성. 862개 테스트 모두 통과. 커뮤니티 이슈 없음, 버그 없음.
+11축 분석 체계 + 시나리오 + 유사 패턴 검색까지 완성. 880개 테스트 모두 통과. 커뮤니티 이슈 없음, 테스트 실패 없음.
 
-**핵심 갭**: signal_history에 10축 점수가 날짜별로 축적되고 있으나, 이 데이터를 활용한 유사 패턴 검색이 없다. 투자자가 가장 궁금한 "지금과 비슷했던 과거에는 어떻게 됐나?"에 답할 수 없는 상태다. 시나리오 분석이 "앞으로 어떻게 될 수 있나"를 보여준다면, 유사 패턴 분석은 "비슷한 상황에서 실제로 어떻게 됐나"를 실증적으로 보여준다 — 시나리오의 신뢰도를 뒷받침하는 증거 계층이다.
+**핵심 문제**: Day 16 이후 매 세션 "다음은 실제 데이터 dry-run 검증"을 반복했지만 한 번도 실행하지 않았다. 테스트가 880개 통과해도 실제 API 호출 → DB 저장 → 분석 → 리포트 생성의 end-to-end 흐름은 검증되지 않은 상태다. 모듈 단위 테스트와 실전 파이프라인 검증은 별개다(Day 18 교훈). 11축 체계가 실제로 작동하는지 확인하지 않으면 모든 분석이 탁상공론이다.
 
-### Task 1: 유사 패턴 검색 모듈 구축 (Historical Pattern Matching)
-Files: tests/test_pattern_match.py (신규), src/analysis/pattern_match.py (신규)
-Description: signal_history DB에 축적된 10축 점수 이력을 활용하여, 현재 시그널 프로파일과 유사한 과거 날짜를 찾고 이후 주가 변동을 보여주는 모듈을 구축한다. `find_similar_patterns(current_scores, db, top_n=5)` 함수: (1) 10축 점수 벡터를 정규화(-100~+100 → 0~1)하여 유클리드 거리 기반 유사도 계산, (2) 최근 N일(기본 7일)은 자기 상관 방지를 위해 제외, (3) 상위 top_n개 유사 날짜 추출, (4) 각 유사 날짜 이후 1/3/5일 실제 수익률 조회(prices 테이블 활용), (5) 유사 패턴 전체의 평균 수익률·상승 확률(방향 일치율)·최대/최소 수익률 요약 통계 반환. 반환 형식: `{"matches": [{"date", "distance", "similarity", "scores", "forward_returns": {"1d", "3d", "5d"}}], "summary": {"avg_return_1d", "avg_return_3d", "avg_return_5d", "up_ratio_1d", "up_ratio_3d", "up_ratio_5d", "match_count"}}`. NULL 축이 있는 과거 레코드는 해당 축을 거리 계산에서 제외(가용 축만으로 정규화). 데이터 부족(이력 < 20일) 시 None 반환. 테스트를 먼저 작성한다 — 유사도 계산 정확성, NULL 축 처리, 자기상관 제외, forward return 계산, 데이터 부족 엣지케이스 포함 최소 12개 테스트.
+**2차 갭**: 리포트에 점수·판정·시나리오가 풍부하지만 "오늘 어떤 가격대를 주시해야 하는가"가 한눈에 들어오지 않는다. 투자자가 리포트를 읽고 즉시 행동 기준(가격 트리거)을 세울 수 있어야 진짜 유용한 분석이다.
 
-### Task 2: 유사 패턴 검색을 리포트·코멘터리·파이프라인에 통합
-Files: src/analysis/report.py, src/analysis/commentary.py, src/main.py, tests/test_report.py, tests/test_commentary.py, tests/test_main.py
-Description: Task 1에서 구축한 pattern_match 모듈을 일일 파이프라인에 통합한다. 확립된 2단계 패턴(모듈 구축→파이프라인 통합)을 따른다. (1) main.py: 시그널 이력 저장 직후에 find_similar_patterns() 호출 — 현재 시그널의 10축 점수 dict와 db 모듈을 전달. 결과를 generate_daily_report()와 generate_commentary()에 pattern_match 파라미터로 전달. (2) report.py: `_build_pattern_match_section(pattern_match)` 함수 추가 — 시나리오 분석 섹션 바로 아래에 배치. 유사 날짜 목록(날짜·유사도%·이후 수익률)을 HTML 테이블로 렌더링하고, 요약 통계(평균 수익률·상승 확률)를 강조 표시. match_count가 0이면 섹션 생략. (3) commentary.py: `_build_pattern_match_sentence(pattern_match)` 함수 추가 — "과거 유사 구간 5회 중 4회(80%) 상승, 평균 +1.2% (3일)" 형태의 1문장 생성. (4) 테스트: 기존 report/commentary/main 테스트에 pattern_match 관련 케이스 추가. (5) 배관 검증(Day 18 교훈): main.py에서 find_similar_patterns → generate_daily_report/generate_commentary까지 데이터 흐름 end-to-end 확인.
+### Task 1: 전체 파이프라인 dry-run 검증 및 런타임 버그 수정
+Files: src/main.py, src/data/*.py, src/analysis/*.py
+Description: `python3 -m src.main --dry-run`으로 실제 실행하여 런타임 에러, 데이터 흐름 단절, None 전파 문제를 발견하고 수정한다. API 호출이 실패하는 경우에도 파이프라인이 끝까지 실행되어 리포트가 생성되는지 확인한다. 발견되는 모든 버그를 즉시 수정하고, 수정마다 pytest를 돌려 회귀를 방지한다. 6세션 연속 미뤄온 가장 기본적인 검증이며 더 이상 미룰 수 없다.
+
+### Task 2: 리포트 상단에 "오늘의 핵심 가격대" 요약 섹션 추가
+Files: tests/test_report.py, src/analysis/report.py, src/main.py
+Description: watchpoints의 시나리오 레벨(지지/저항)과 scenario의 목표가, volatility의 ATR을 결합하여, 리포트 최상단(Executive Summary 바로 아래)에 "오늘의 핵심 가격대" 1~2줄 섹션을 추가한다. 형식 예: "▲ 돌파 관찰: 55,200원 | ▼ 이탈 경계: 52,800원 | 예상 변동폭: ±1,200원". 기존 build_watchpoints()와 build_price_scenarios()의 반환값에서 nearest_resistance, nearest_support, ATR을 추출하여 렌더링한다. 새 함수 `_build_price_level_summary(watchpoints, scenario, volatility)` 추가. 데이터 부족 시 섹션 생략. 테스트를 먼저 작성한다.

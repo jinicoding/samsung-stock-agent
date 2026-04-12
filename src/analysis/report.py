@@ -1262,6 +1262,28 @@ def _build_scenario_section(scenario: dict) -> list[str]:
     return lines
 
 
+def _build_health_section(health: dict) -> list[str]:
+    """데이터 수집 상태 섹션을 생성한다."""
+    lines = ["", "<b>📡 데이터 상태</b>"]
+    ok = health["ok"]
+    total = health["total"]
+    lines.append(f"정상 수집: {ok}/{total}")
+
+    failed = health.get("failed_sources", [])
+    if failed:
+        lines.append(f"⚠️ 수집 실패: {', '.join(failed)}")
+
+    stale = health.get("stale_sources", [])
+    if stale:
+        lines.append(f"⏰ 데이터 미갱신: {', '.join(stale)}")
+
+    if not failed and not stale:
+        lines.append("✅ 모든 데이터 정상")
+
+    lines.append("")
+    return lines
+
+
 def generate_daily_report(
     indicators: dict,
     supply_demand: dict | None = None,
@@ -1291,6 +1313,7 @@ def generate_daily_report(
     weekly_indicators: dict | None = None,
     scenario: dict | None = None,
     pattern_match: dict | None = None,
+    data_health: dict | None = None,
 ) -> str:
     """기술적 지표 dict를 HTML 텔레그램 메시지로 변환한다.
 
@@ -1538,5 +1561,9 @@ def generate_daily_report(
     # 시그널 정확도 (선택)
     if accuracy_summary is not None:
         lines.extend(_build_accuracy_section(accuracy_summary, composite_signal))
+
+    # 데이터 상태 (선택)
+    if data_health is not None:
+        lines.extend(_build_health_section(data_health))
 
     return "\n".join(lines)

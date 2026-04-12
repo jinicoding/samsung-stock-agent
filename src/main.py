@@ -43,23 +43,31 @@ from src.analysis.weekly_summary import summarize_weekly
 from src.analysis.timeframe import compute_weekly_indicators, assess_timeframe_alignment
 from src.analysis.watchpoints import build_watchpoints
 from src.analysis.pattern_match import find_similar_patterns
+from src.data.health import DataHealthTracker
 from src.delivery.telegram_bot import send_message
 
 
 def main(dry_run: bool = False):
     """일일 파이프라인: 백필 → 분석 → 리포트 → 발송."""
+    # 0) 데이터 상태 추적기 생성
+    health = DataHealthTracker()
+
     # 1) DB 초기화 + 데이터 백필
     init_db()
 
     try:
         backfill_prices()
+        health.record("주가", True)
     except Exception as e:
         print(f"[경고] 주가 백필 실패: {e}")
+        health.record("주가", False)
 
     try:
         backfill_supply_demand()
+        health.record("수급", True)
     except Exception as e:
         print(f"[경고] 수급 백필 실패: {e}")
+        health.record("수급", False)
 
     # 2) DB에서 데이터 조회
     prices = get_prices(60)
@@ -67,9 +75,14 @@ def main(dry_run: bool = False):
         print("주가 데이터가 없습니다. 리포트를 생성하지 않습니다.")
         return
 
+    # 주가/수급 latest_date 갱신
+    health.record("주가", True, latest_date=prices[-1]["date"])
+
     trading = get_foreign_trading(20)
     ownership = get_foreign_ownership(20)
     rates = get_exchange_rates(30)
+    if rates:
+        health.record("환율", True, latest_date=rates[-1]["date"])
 
     # 3) 분석 실행
     indicators = compute_technical_indicators(prices)
@@ -112,6 +125,7 @@ def main(dry_run: bool = False):
     try:
         kospi_data = fetch_kospi_ohlcv()
         if kospi_data:
+            health.record("KOSPI", True)
             samsung_closes = [p["close"] for p in prices]
             kospi_closes = [k["close"] for k in kospi_data]
             # 길이를 짧은 쪽에 맞춤 (날짜 정렬 기준 최근 N일)
@@ -119,8 +133,11 @@ def main(dry_run: bool = False):
             rs = compute_relative_strength(
                 samsung_closes[-min_len:], kospi_closes[-min_len:]
             )
+        else:
+            health.record("KOSPI", False)
     except Exception as e:
         print(f"[경고] KOSPI/RS 분석 실패: {e}")
+        health.record("KOSPI", False)
 
     # 3.63) 반도체 업황 수집 + 분석
     rel_perf = None
@@ -140,11 +157,13 @@ def main(dry_run: bool = False):
             sox_closes = [s["close"] for s in sox_data]
             sox_trend = compute_sox_trend(sox_closes)
         semi_momentum = compute_semiconductor_momentum(rel_perf, sox_trend)
+        health.record("반도체", True)
     except Exception as e:
         print(f"[경고] 반도체 업황 분석 실패: {e}")
         rel_perf = None
         sox_trend = None
         semi_momentum = None
+        health.record("반도체", False)
 
     # 3.64) 글로벌 매크로 수집 + 분석 (NASDAQ + VIX)
     nasdaq_trend = None
@@ -160,11 +179,13 @@ def main(dry_run: bool = False):
             vix_closes = [v["close"] for v in vix_data]
             vix_risk = analyze_vix_risk(vix_closes)
         global_macro_score_val = compute_global_macro_score(nasdaq_trend, vix_risk)
+        health.record("매크로", True)
     except Exception as e:
         print(f"[경고] 글로벌 매크로 분석 실패: {e}")
         nasdaq_trend = None
         vix_risk = None
         global_macro_score_val = None
+        health.record("매크로", False)
 
     # 3.65) 뉴스 헤드라인 수집 + 감정 분석
     news_headlines = []
@@ -173,8 +194,12 @@ def main(dry_run: bool = False):
         news_headlines = fetch_news_headlines()
         if news_headlines:
             news_sentiment = summarize_sentiment(news_headlines)
+            health.record("뉴스", True)
+        else:
+            health.record("뉴스", False)
     except Exception as e:
         print(f"[경고] 뉴스 수집 실패: {e}")
+        health.record("뉴스", False)
 
     # 3.7) 추세 전환 감지
     reversal = detect_reversal_signals(indicators, sr)
@@ -195,8 +220,12 @@ def main(dry_run: bool = False):
         if raw_consensus:
             current_price = prices[-1]["close"]
             consensus = analyze_consensus(raw_consensus, current_price)
+            health.record("컨센서스", True)
+        else:
+            health.record("컨센서스", False)
     except Exception as e:
         print(f"[경고] 컨센서스 수집 실패: {e}")
+        health.record("컨센서스", False)
 
     # 3.8) 시그널 정확도 평가 (적응형 가중치를 위해 시그널 계산 전에 실행)
     from src.data import database as db_module
@@ -305,7 +334,7 @@ def main(dry_run: bool = False):
         print(f"[경고] 주간 추이 요약 실패: {e}")
 
     # 4) 리포트 생성
-    report = generate_daily_report(indicators, supply_demand=sd, exchange_rate=er, composite_signal=sig, support_resistance=sr, accuracy_summary=accuracy_summary, relative_strength=rs, trend_reversal=reversal, signal_trend=sig_trend, fundamentals=fund, news_sentiment=news_sentiment, news_headlines=news_headlines, consensus=consensus, weekly_summary=weekly, rel_perf=rel_perf, sox_trend=sox_trend, semiconductor_momentum=semi_momentum, volatility=vol, candlestick=candle, watchpoints=wp, convergence=conv, nasdaq_trend=nasdaq_trend, vix_risk=vix_risk, global_macro_score=global_macro_score_val, timeframe_alignment=timeframe_alignment, weekly_indicators=weekly_indicators, scenario=scenario, pattern_match=pm)
+    report = generate_daily_report(indicators, supply_demand=sd, exchange_rate=er, composite_signal=sig, support_resistance=sr, accuracy_summary=accuracy_summary, relative_strength=rs, trend_reversal=reversal, signal_trend=sig_trend, fundamentals=fund, news_sentiment=news_sentiment, news_headlines=news_headlines, consensus=consensus, weekly_summary=weekly, rel_perf=rel_perf, sox_trend=sox_trend, semiconductor_momentum=semi_momentum, volatility=vol, candlestick=candle, watchpoints=wp, convergence=conv, nasdaq_trend=nasdaq_trend, vix_risk=vix_risk, global_macro_score=global_macro_score_val, timeframe_alignment=timeframe_alignment, weekly_indicators=weekly_indicators, scenario=scenario, pattern_match=pm, data_health=health.summary())
 
     # 5) 발송 또는 출력
     if dry_run:

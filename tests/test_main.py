@@ -331,8 +331,9 @@ SAMPLE_REVERSAL = {
 @patch("src.main.get_signal_history", return_value=[])
 @patch("src.main.summarize_weekly", return_value=None)
 @patch("src.main.build_watchpoints", return_value=SAMPLE_WATCHPOINTS)
+@patch("src.main.compute_daily_delta", return_value=None)
 def test_pipeline_full(
-    mock_watchpoints, mock_summarize_weekly, mock_sig_hist,
+    mock_daily_delta, mock_watchpoints, mock_summarize_weekly, mock_sig_hist,
     mock_init, mock_bf_prices, mock_bf_sd,
     mock_fetch_nasdaq, mock_fetch_vix,
     mock_nasdaq_trend, mock_vix_risk, mock_global_macro_score,
@@ -445,6 +446,7 @@ def test_pipeline_full(
         scenario=ANY,
         pattern_match=None,
         data_health=ANY,
+        daily_delta=None,
     )
     mock_send.assert_called_once_with(SAMPLE_REPORT_HTML)
 

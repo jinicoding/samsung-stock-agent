@@ -37,6 +37,7 @@ def generate_commentary(
     weekly_indicators: dict | None = None,
     scenario: dict | None = None,
     pattern_match: dict | None = None,
+    daily_delta: dict | None = None,
 ) -> str:
     """분석 결과를 2~3문장 자연어 코멘터리로 변환한다.
 
@@ -147,6 +148,11 @@ def generate_commentary(
     pattern_sentence = _build_pattern_match_sentence(pattern_match or {})
     if pattern_sentence:
         sentences.append(pattern_sentence)
+
+    # --- 4.995) 일일 델타 문장 ---
+    delta_sentence = _build_delta_sentence(daily_delta or {})
+    if delta_sentence:
+        sentences.append(delta_sentence)
 
     # --- 5) 시그널 추이 문장 ---
     trend_sentence = _build_signal_trend_sentence(signal_trend or {})
@@ -791,3 +797,49 @@ def _join_parts(parts: list[str]) -> str:
     if len(parts) == 2:
         return f"{parts[0]} {parts[1]}"
     return f"{parts[0]} {parts[1]} {parts[2]}"
+
+
+_DELTA_KR = {
+    "technical_score": "기술적",
+    "supply_score": "수급",
+    "exchange_score": "환율",
+    "fundamentals_score": "펀더멘털",
+    "news_score": "뉴스",
+    "consensus_score": "컨센서스",
+    "semiconductor_score": "반도체",
+    "volatility_score": "변동성",
+    "candlestick_score": "캔들스틱",
+    "global_macro_score": "매크로",
+}
+
+
+def _build_delta_sentence(delta: dict) -> str:
+    if not delta:
+        return ""
+
+    alerts = delta.get("alerts", [])
+    if not alerts:
+        return ""
+
+    flips = [a for a in alerts if a["type"] == "signal_flip" and a["axis"] != "overall"]
+    moves = [a for a in alerts if a["type"] == "significant_move" and a["axis"] != "overall"]
+
+    if flips:
+        alert = flips[0]
+        axis = alert["axis"]
+        kr = _DELTA_KR.get(axis, axis)
+        ad = delta.get("axes_delta", {}).get(axis, {})
+        change = ad.get("change", 0)
+        direction = "매수 전환" if change > 0 else "매도 전환"
+        return f"전일 대비 {kr} 점수가 {change:+.1f}점 변동하여 {direction} 시그널로 전환되었습니다."
+
+    if moves:
+        alert = moves[0]
+        axis = alert["axis"]
+        kr = _DELTA_KR.get(axis, axis)
+        ad = delta.get("axes_delta", {}).get(axis, {})
+        change = ad.get("change", 0)
+        direction = "급등" if change > 0 else "급락"
+        return f"전일 대비 {kr} 점수가 {change:+.1f}점 {direction}하여 주목할 필요가 있습니다."
+
+    return ""

@@ -1002,6 +1002,64 @@ def _build_global_macro_section(
     return lines
 
 
+_DELTA_AXIS_NAMES = {
+    "technical_score": "기술적",
+    "supply_score": "수급",
+    "exchange_score": "환율",
+    "fundamentals_score": "펀더멘털",
+    "news_score": "뉴스",
+    "consensus_score": "컨센서스",
+    "semiconductor_score": "반도체",
+    "volatility_score": "변동성",
+    "candlestick_score": "캔들스틱",
+    "global_macro_score": "매크로",
+}
+
+
+def _build_daily_delta_section(delta: dict) -> list[str]:
+    lines: list[str] = []
+    lines.append("")
+    lines.append("<b>📊 오늘의 변화</b>")
+
+    overall = delta.get("overall", {})
+    change = overall.get("change", 0)
+    prev_score = overall.get("prev_score", 0)
+    curr_score = overall.get("curr_score", 0)
+    bar_len = min(abs(int(change)), 10)
+    bar_char = "▓" if change >= 0 else "░"
+    spark = bar_char * bar_len if bar_len > 0 else "–"
+    arrow = "⬆️" if change > 0 else "⬇️" if change < 0 else ""
+    lines.append(f"  종합: {prev_score:+.1f} → {curr_score:+.1f} ({change:+.1f}) {spark} {arrow}")
+
+    prev_grade = overall.get("prev_grade", "")
+    curr_grade = overall.get("curr_grade", "")
+    if prev_grade and curr_grade and prev_grade != curr_grade:
+        lines.append(f"  등급: {prev_grade} → {curr_grade}")
+
+    alerts = delta.get("alerts", [])
+    if not alerts:
+        lines.append("  주요 변화 없음")
+        return lines
+
+    for alert in alerts:
+        atype = alert.get("type", "")
+        axis = alert.get("axis", "")
+        detail = alert.get("detail", "")
+        kr_name = _DELTA_AXIS_NAMES.get(axis, axis)
+
+        if atype == "signal_flip":
+            lines.append(f"  🔄 {kr_name}: {detail}")
+        elif atype == "significant_move":
+            ax_delta = delta.get("axes_delta", {}).get(axis, {})
+            ch = ax_delta.get("change", 0)
+            emoji = "⬆️" if ch > 0 else "⬇️"
+            lines.append(f"  {emoji} {kr_name}: {detail}")
+        elif atype == "grade_change":
+            lines.append(f"  🔄 등급 전환: {detail}")
+
+    return lines
+
+
 def _build_executive_summary(
     composite_signal: dict | None = None,
     signal_trend: dict | None = None,
@@ -1314,6 +1372,7 @@ def generate_daily_report(
     scenario: dict | None = None,
     pattern_match: dict | None = None,
     data_health: dict | None = None,
+    daily_delta: dict | None = None,
 ) -> str:
     """기술적 지표 dict를 HTML 텔레그램 메시지로 변환한다.
 
@@ -1368,7 +1427,12 @@ def generate_daily_report(
         trend_reversal=trend_reversal,
     ))
 
-    # 0.05) 핵심 관찰 포인트 (Executive Summary 바로 아래)
+    # 0.02) 오늘의 변화 (Executive Summary 바로 아래)
+    if daily_delta is not None:
+        lines.extend(_build_daily_delta_section(daily_delta))
+        lines.append("")
+
+    # 0.05) 핵심 관찰 포인트
     if watchpoints is not None:
         lines.extend(_build_watchpoints_section(watchpoints, price))
 
@@ -1407,6 +1471,7 @@ def generate_daily_report(
         weekly_indicators=weekly_indicators,
         scenario=scenario,
         pattern_match=pattern_match,
+        daily_delta=daily_delta,
     )
     if commentary:
         lines.append(f"💬 {commentary}")

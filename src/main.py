@@ -43,6 +43,7 @@ from src.analysis.weekly_summary import summarize_weekly
 from src.analysis.timeframe import compute_weekly_indicators, assess_timeframe_alignment
 from src.analysis.watchpoints import build_watchpoints
 from src.analysis.pattern_match import find_similar_patterns
+from src.analysis.daily_delta import compute_daily_delta
 from src.data.health import DataHealthTracker
 from src.delivery.telegram_bot import send_message
 
@@ -288,6 +289,13 @@ def main(dry_run: bool = False):
         global_macro_score=sig.get("global_macro_score"),
     )
 
+    # 3.92) 일일 델타 분석
+    daily_delta = None
+    try:
+        daily_delta = compute_daily_delta()
+    except Exception as e:
+        print(f"[경고] 일일 델타 분석 실패: {e}")
+
     # 3.95) 유사 패턴 검색
     pm = None
     try:
@@ -334,7 +342,7 @@ def main(dry_run: bool = False):
         print(f"[경고] 주간 추이 요약 실패: {e}")
 
     # 4) 리포트 생성
-    report = generate_daily_report(indicators, supply_demand=sd, exchange_rate=er, composite_signal=sig, support_resistance=sr, accuracy_summary=accuracy_summary, relative_strength=rs, trend_reversal=reversal, signal_trend=sig_trend, fundamentals=fund, news_sentiment=news_sentiment, news_headlines=news_headlines, consensus=consensus, weekly_summary=weekly, rel_perf=rel_perf, sox_trend=sox_trend, semiconductor_momentum=semi_momentum, volatility=vol, candlestick=candle, watchpoints=wp, convergence=conv, nasdaq_trend=nasdaq_trend, vix_risk=vix_risk, global_macro_score=global_macro_score_val, timeframe_alignment=timeframe_alignment, weekly_indicators=weekly_indicators, scenario=scenario, pattern_match=pm, data_health=health.summary())
+    report = generate_daily_report(indicators, supply_demand=sd, exchange_rate=er, composite_signal=sig, support_resistance=sr, accuracy_summary=accuracy_summary, relative_strength=rs, trend_reversal=reversal, signal_trend=sig_trend, fundamentals=fund, news_sentiment=news_sentiment, news_headlines=news_headlines, consensus=consensus, weekly_summary=weekly, rel_perf=rel_perf, sox_trend=sox_trend, semiconductor_momentum=semi_momentum, volatility=vol, candlestick=candle, watchpoints=wp, convergence=conv, nasdaq_trend=nasdaq_trend, vix_risk=vix_risk, global_macro_score=global_macro_score_val, timeframe_alignment=timeframe_alignment, weekly_indicators=weekly_indicators, scenario=scenario, pattern_match=pm, data_health=health.summary(), daily_delta=daily_delta)
 
     # 5) 발송 또는 출력
     if dry_run:

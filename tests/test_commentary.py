@@ -1096,3 +1096,64 @@ class TestGenerateCommentary:
         )
         assert "주봉 상승" not in result
         assert "주봉 하락" not in result
+
+    def test_daily_delta_sentence_significant_move(self):
+        """유의미한 변동이 있으면 델타 문장이 생성됨."""
+        delta = {
+            "axes_delta": {
+                "supply_score": {"prev": -10, "curr": 15, "change": 25},
+            },
+            "alerts": [
+                {"type": "significant_move", "axis": "supply_score",
+                 "detail": "supply_score +25.0점 변동"},
+            ],
+            "overall": {
+                "prev_score": 20.0, "curr_score": 35.0, "change": 15.0,
+                "prev_grade": "약매수", "curr_grade": "매수",
+            },
+        }
+        result = generate_commentary(
+            self._base_indicators(),
+            self._base_supply_demand(),
+            self._base_exchange_rate(),
+            self._base_composite_signal(),
+            self._base_support_resistance(),
+            daily_delta=delta,
+        )
+        assert "전일 대비" in result
+
+    def test_daily_delta_sentence_signal_flip(self):
+        """방향 전환 알림이 있으면 전환 문장 생성됨."""
+        delta = {
+            "axes_delta": {
+                "technical_score": {"prev": -5, "curr": 10, "change": 15},
+            },
+            "alerts": [
+                {"type": "signal_flip", "axis": "technical_score",
+                 "detail": "technical_score bearish→bullish (-5.0 → +10.0)"},
+            ],
+            "overall": {
+                "prev_score": 10.0, "curr_score": 25.0, "change": 15.0,
+                "prev_grade": "약매수", "curr_grade": "매수",
+            },
+        }
+        result = generate_commentary(
+            self._base_indicators(),
+            self._base_supply_demand(),
+            self._base_exchange_rate(),
+            self._base_composite_signal(),
+            self._base_support_resistance(),
+            daily_delta=delta,
+        )
+        assert "전환" in result
+
+    def test_daily_delta_none_no_sentence(self):
+        """daily_delta가 None이면 델타 문장 없음."""
+        result = generate_commentary(
+            self._base_indicators(),
+            self._base_supply_demand(),
+            self._base_exchange_rate(),
+            self._base_composite_signal(),
+            self._base_support_resistance(),
+        )
+        assert "전일 대비" not in result

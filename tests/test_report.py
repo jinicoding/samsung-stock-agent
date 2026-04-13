@@ -2105,3 +2105,64 @@ class TestTimeframeSection:
             weekly_indicators=weekly_ind,
         )
         assert "하락" in report or "bearish" in report or "약세" in report
+
+
+class TestDailyDeltaSection:
+    """daily_delta 섹션 렌더링 테스트."""
+
+    def test_daily_delta_section_rendered(self):
+        """daily_delta가 전달되면 '오늘의 변화' 섹션이 렌더링됨."""
+        delta = {
+            "axes_delta": {
+                "supply_score": {"prev": -10, "curr": 15, "change": 25},
+            },
+            "alerts": [
+                {"type": "significant_move", "axis": "supply_score",
+                 "detail": "supply_score +25.0점 변동"},
+            ],
+            "overall": {
+                "prev_score": 20.0, "curr_score": 35.0, "change": 15.0,
+                "prev_grade": "약매수", "curr_grade": "매수",
+            },
+        }
+        report = generate_daily_report(_full_indicators(), daily_delta=delta)
+        assert "오늘의 변화" in report
+        assert "⬆️" in report or "⬇️" in report or "🔄" in report
+
+    def test_daily_delta_with_signal_flip(self):
+        """방향 전환 축은 🔄로 표시됨."""
+        delta = {
+            "axes_delta": {
+                "technical_score": {"prev": -5, "curr": 10, "change": 15},
+            },
+            "alerts": [
+                {"type": "signal_flip", "axis": "technical_score",
+                 "detail": "technical_score bearish→bullish (-5.0 → +10.0)"},
+            ],
+            "overall": {
+                "prev_score": 10.0, "curr_score": 25.0, "change": 15.0,
+                "prev_grade": "약매수", "curr_grade": "매수",
+            },
+        }
+        report = generate_daily_report(_full_indicators(), daily_delta=delta)
+        assert "🔄" in report
+
+    def test_daily_delta_no_alerts(self):
+        """알림이 없으면 '주요 변화 없음' 표시."""
+        delta = {
+            "axes_delta": {
+                "technical_score": {"prev": 10, "curr": 12, "change": 2},
+            },
+            "alerts": [],
+            "overall": {
+                "prev_score": 30.0, "curr_score": 32.0, "change": 2.0,
+                "prev_grade": "매수", "curr_grade": "매수",
+            },
+        }
+        report = generate_daily_report(_full_indicators(), daily_delta=delta)
+        assert "주요 변화 없음" in report
+
+    def test_daily_delta_none_no_section(self):
+        """daily_delta가 None이면 섹션이 없음."""
+        report = generate_daily_report(_full_indicators())
+        assert "오늘의 변화" not in report

@@ -38,6 +38,7 @@ def generate_commentary(
     scenario: dict | None = None,
     pattern_match: dict | None = None,
     daily_delta: dict | None = None,
+    risk_management: dict | None = None,
 ) -> str:
     """분석 결과를 2~3문장 자연어 코멘터리로 변환한다.
 
@@ -153,6 +154,11 @@ def generate_commentary(
     delta_sentence = _build_delta_sentence(daily_delta or {})
     if delta_sentence:
         sentences.append(delta_sentence)
+
+    # --- 4.997) 리스크 관리 문장 ---
+    risk_sentence = _build_risk_management_sentence(risk_management or {})
+    if risk_sentence:
+        sentences.append(risk_sentence)
 
     # --- 5) 시그널 추이 문장 ---
     trend_sentence = _build_signal_trend_sentence(signal_trend or {})
@@ -843,3 +849,36 @@ def _build_delta_sentence(delta: dict) -> str:
         return f"전일 대비 {kr} 점수가 {change:+.1f}점 {direction}하여 주목할 필요가 있습니다."
 
     return ""
+
+
+def _build_risk_management_sentence(rm: dict) -> str:
+    if not rm:
+        return ""
+
+    rr = rm.get("risk_reward", {})
+    guide = rm.get("position_guide", {})
+    entry = rm.get("entry_zone", {})
+
+    rr_ratio = rr.get("ratio")
+    rr_grade = rr.get("grade", "")
+    guide_level = guide.get("level", "")
+    direction = entry.get("direction", "")
+
+    parts: list[str] = []
+
+    if rr_ratio is not None and rr_grade in ("유리", "불리"):
+        if rr_grade == "유리":
+            parts.append(f"리스크 대비 보상 비율이 {rr_ratio:.1f}로 유리한 구간입니다")
+        else:
+            parts.append(f"리스크 대비 보상 비율이 {rr_ratio:.1f}로 불리하여 주의가 필요합니다")
+
+    if guide_level in ("공격적", "관망"):
+        if guide_level == "공격적":
+            parts.append("다수 조건이 유리하여 확대 진입을 고려할 수 있는 구간입니다")
+        else:
+            parts.append("불리 조건이 다수로 진입 대기가 적절합니다")
+
+    if not parts:
+        return ""
+
+    return ". ".join(parts) + "."

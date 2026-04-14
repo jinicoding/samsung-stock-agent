@@ -1066,6 +1066,7 @@ def _build_executive_summary(
     indicators: dict | None = None,
     support_resistance: dict | None = None,
     trend_reversal: dict | None = None,
+    risk_management: dict | None = None,
 ) -> list[str]:
     """핵심 요약(Executive Summary) 섹션을 생성한다.
 
@@ -1156,6 +1157,67 @@ def _build_executive_summary(
 
     if alerts:
         lines.append(f"  ⚠️ {' / '.join(alerts)}")
+
+    # (5) 리스크 관리 요약 (R:R + 포지션 가이드)
+    if risk_management is not None:
+        rr = risk_management.get("risk_reward", {})
+        guide = risk_management.get("position_guide", {})
+        rr_ratio = rr.get("ratio")
+        rr_grade = rr.get("grade", "")
+        guide_level = guide.get("level", "")
+        grade_emoji = {"유리": "✅", "보통": "⚠️", "불리": "🚫"}.get(rr_grade, "")
+        rr_str = f"R:R {rr_ratio:.1f}" if rr_ratio is not None else "R:R 산출불가"
+        lines.append(f"  {grade_emoji} {rr_str}({rr_grade}) | 포지션: {guide_level}")
+
+    lines.append("")
+    return lines
+
+
+def _build_risk_management_section(risk_management: dict) -> list[str]:
+    """리스크 관리(Risk Management) 섹션을 생성한다."""
+    lines: list[str] = []
+    lines.append("<b>🛡️ 리스크 관리</b>")
+
+    entry = risk_management.get("entry_zone", {})
+    stop = risk_management.get("stop_level", {})
+    targets = risk_management.get("target_levels", {})
+    rr = risk_management.get("risk_reward", {})
+    guide = risk_management.get("position_guide", {})
+
+    direction = entry.get("direction", "")
+    lower = entry.get("lower")
+    upper = entry.get("upper")
+    if lower is not None and upper is not None:
+        lines.append(f"  진입: {direction} {_format_price(lower)}~{_format_price(upper)}원")
+
+    stop_price = stop.get("price")
+    stop_method = stop.get("method", "")
+    atr_mult = stop.get("atr_multiplier")
+    if stop_price is not None:
+        mult_str = f" (ATR×{atr_mult:.1f})" if atr_mult is not None else ""
+        lines.append(f"  손절: {_format_price(stop_price)}원 [{stop_method}]{mult_str}")
+
+    t1 = targets.get("target_1", {})
+    t2 = targets.get("target_2", {})
+    t1_price = t1.get("price")
+    t2_price = t2.get("price")
+    if t1_price is not None:
+        lines.append(f"  1차 목표: {_format_price(t1_price)}원 ({t1.get('basis', '')})")
+    if t2_price is not None:
+        lines.append(f"  2차 목표: {_format_price(t2_price)}원 ({t2.get('basis', '')})")
+
+    rr_ratio = rr.get("ratio")
+    rr_grade = rr.get("grade", "")
+    grade_emoji = {"유리": "✅", "보통": "⚠️", "불리": "🚫"}.get(rr_grade, "")
+    if rr_ratio is not None:
+        lines.append(f"  R:R {rr_ratio:.1f} {grade_emoji} {rr_grade}")
+    else:
+        lines.append(f"  R:R 산출불가")
+
+    level = guide.get("level", "")
+    desc = guide.get("description", "")
+    if level:
+        lines.append(f"  포지션: {level} — {desc}")
 
     lines.append("")
     return lines
@@ -1373,6 +1435,7 @@ def generate_daily_report(
     pattern_match: dict | None = None,
     data_health: dict | None = None,
     daily_delta: dict | None = None,
+    risk_management: dict | None = None,
 ) -> str:
     """기술적 지표 dict를 HTML 텔레그램 메시지로 변환한다.
 
@@ -1425,6 +1488,7 @@ def generate_daily_report(
         indicators=indicators,
         support_resistance=support_resistance,
         trend_reversal=trend_reversal,
+        risk_management=risk_management,
     ))
 
     # 0.02) 오늘의 변화 (Executive Summary 바로 아래)
@@ -1435,6 +1499,10 @@ def generate_daily_report(
     # 0.05) 핵심 관찰 포인트
     if watchpoints is not None:
         lines.extend(_build_watchpoints_section(watchpoints, price))
+
+    # 0.07) 리스크 관리
+    if risk_management is not None:
+        lines.extend(_build_risk_management_section(risk_management))
 
     # 0.1) 종합 투자 시그널
     if composite_signal is not None:
@@ -1472,6 +1540,7 @@ def generate_daily_report(
         scenario=scenario,
         pattern_match=pattern_match,
         daily_delta=daily_delta,
+        risk_management=risk_management,
     )
     if commentary:
         lines.append(f"💬 {commentary}")

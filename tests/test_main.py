@@ -447,6 +447,7 @@ def test_pipeline_full(
         pattern_match=None,
         data_health=ANY,
         daily_delta=None,
+        risk_management=ANY,
     )
     mock_send.assert_called_once_with(SAMPLE_REPORT_HTML)
 

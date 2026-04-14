@@ -44,6 +44,7 @@ from src.analysis.timeframe import compute_weekly_indicators, assess_timeframe_a
 from src.analysis.watchpoints import build_watchpoints
 from src.analysis.pattern_match import find_similar_patterns
 from src.analysis.daily_delta import compute_daily_delta
+from src.analysis.risk_management import compute_risk_levels
 from src.data.health import DataHealthTracker
 from src.delivery.telegram_bot import send_message
 
@@ -330,6 +331,33 @@ def main(dry_run: bool = False):
     except Exception as e:
         print(f"[경고] 관찰 포인트 생성 실패: {e}")
 
+    # 3.115) 리스크 관리 수준 분석
+    risk_mgmt = None
+    try:
+        current_price = prices[-1]["close"]
+        nearest_support = sr.get("nearest_support") if sr else None
+        nearest_resistance = sr.get("nearest_resistance") if sr else None
+        rm_atr = vol.get("atr", 0) if vol else 0
+        rm_atr_pct = vol.get("atr_pct", 0) if vol else 0
+        rm_regime = vol.get("volatility_regime", "보통") if vol else "보통"
+        rm_signal_score = sig["score"]
+        rm_convergence = conv.get("convergence_level", "mixed") if conv else "mixed"
+        rm_conviction = scenario.get("conviction", 50.0) if scenario else 50.0
+        if rm_atr > 0:
+            risk_mgmt = compute_risk_levels(
+                current_price=current_price,
+                nearest_support=nearest_support,
+                nearest_resistance=nearest_resistance,
+                atr=rm_atr,
+                atr_pct=rm_atr_pct,
+                volatility_regime=rm_regime,
+                signal_score=rm_signal_score,
+                convergence_level=rm_convergence,
+                conviction=rm_conviction,
+            )
+    except Exception as e:
+        print(f"[경고] 리스크 관리 분석 실패: {e}")
+
     # 3.12) 주간 추이 요약
     weekly = None
     try:
@@ -342,7 +370,7 @@ def main(dry_run: bool = False):
         print(f"[경고] 주간 추이 요약 실패: {e}")
 
     # 4) 리포트 생성
-    report = generate_daily_report(indicators, supply_demand=sd, exchange_rate=er, composite_signal=sig, support_resistance=sr, accuracy_summary=accuracy_summary, relative_strength=rs, trend_reversal=reversal, signal_trend=sig_trend, fundamentals=fund, news_sentiment=news_sentiment, news_headlines=news_headlines, consensus=consensus, weekly_summary=weekly, rel_perf=rel_perf, sox_trend=sox_trend, semiconductor_momentum=semi_momentum, volatility=vol, candlestick=candle, watchpoints=wp, convergence=conv, nasdaq_trend=nasdaq_trend, vix_risk=vix_risk, global_macro_score=global_macro_score_val, timeframe_alignment=timeframe_alignment, weekly_indicators=weekly_indicators, scenario=scenario, pattern_match=pm, data_health=health.summary(), daily_delta=daily_delta)
+    report = generate_daily_report(indicators, supply_demand=sd, exchange_rate=er, composite_signal=sig, support_resistance=sr, accuracy_summary=accuracy_summary, relative_strength=rs, trend_reversal=reversal, signal_trend=sig_trend, fundamentals=fund, news_sentiment=news_sentiment, news_headlines=news_headlines, consensus=consensus, weekly_summary=weekly, rel_perf=rel_perf, sox_trend=sox_trend, semiconductor_momentum=semi_momentum, volatility=vol, candlestick=candle, watchpoints=wp, convergence=conv, nasdaq_trend=nasdaq_trend, vix_risk=vix_risk, global_macro_score=global_macro_score_val, timeframe_alignment=timeframe_alignment, weekly_indicators=weekly_indicators, scenario=scenario, pattern_match=pm, data_health=health.summary(), daily_delta=daily_delta, risk_management=risk_mgmt)
 
     # 5) 발송 또는 출력
     if dry_run:

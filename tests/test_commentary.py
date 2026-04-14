@@ -1157,3 +1157,83 @@ class TestGenerateCommentary:
             self._base_support_resistance(),
         )
         assert "전일 대비" not in result
+
+    def test_risk_management_favorable_rr_mentioned(self):
+        """R:R 유리 시 관련 문장 생성."""
+        rm = {
+            "entry_zone": {"lower": 57100.0, "upper": 61555.0, "direction": "매수", "basis": "test"},
+            "risk_reward": {"ratio": 2.0, "grade": "유리", "risk": 3000.0, "reward": 6000.0},
+            "position_guide": {"level": "표준", "description": "기본", "score": 4},
+        }
+        result = generate_commentary(
+            self._base_indicators(),
+            self._base_supply_demand(),
+            self._base_exchange_rate(),
+            self._base_composite_signal(),
+            self._base_support_resistance(),
+            risk_management=rm,
+        )
+        assert "유리" in result
+
+    def test_risk_management_unfavorable_rr_mentioned(self):
+        """R:R 불리 시 주의 문장 생성."""
+        rm = {
+            "entry_zone": {"lower": 57100.0, "upper": 61555.0, "direction": "매수", "basis": "test"},
+            "risk_reward": {"ratio": 0.5, "grade": "불리", "risk": 5000.0, "reward": 2500.0},
+            "position_guide": {"level": "관망", "description": "대기", "score": 0},
+        }
+        result = generate_commentary(
+            self._base_indicators(),
+            self._base_supply_demand(),
+            self._base_exchange_rate(),
+            self._base_composite_signal(),
+            self._base_support_resistance(),
+            risk_management=rm,
+        )
+        assert "불리" in result
+
+    def test_risk_management_aggressive_position_mentioned(self):
+        """공격적 포지션 가이드 시 관련 문장 생성."""
+        rm = {
+            "entry_zone": {"lower": 57100.0, "upper": 61555.0, "direction": "매수", "basis": "test"},
+            "risk_reward": {"ratio": 2.5, "grade": "유리", "risk": 2000.0, "reward": 5000.0},
+            "position_guide": {"level": "공격적", "description": "확대 진입", "score": 7},
+        }
+        result = generate_commentary(
+            self._base_indicators(),
+            self._base_supply_demand(),
+            self._base_exchange_rate(),
+            self._base_composite_signal(),
+            self._base_support_resistance(),
+            risk_management=rm,
+        )
+        assert "확대 진입" in result
+
+    def test_risk_management_standby_position_mentioned(self):
+        """관망 포지션 가이드 시 진입 대기 문장 생성."""
+        rm = {
+            "entry_zone": {"lower": 57100.0, "upper": 61555.0, "direction": "매수", "basis": "test"},
+            "risk_reward": {"ratio": 0.3, "grade": "불리", "risk": 5000.0, "reward": 1500.0},
+            "position_guide": {"level": "관망", "description": "대기", "score": -1},
+        }
+        result = generate_commentary(
+            self._base_indicators(),
+            self._base_supply_demand(),
+            self._base_exchange_rate(),
+            self._base_composite_signal(),
+            self._base_support_resistance(),
+            risk_management=rm,
+        )
+        assert "진입 대기" in result
+
+    def test_risk_management_none_no_mention(self):
+        """risk_management가 None이면 관련 문장 없음."""
+        result = generate_commentary(
+            self._base_indicators(),
+            self._base_supply_demand(),
+            self._base_exchange_rate(),
+            self._base_composite_signal(),
+            self._base_support_resistance(),
+        )
+        assert "리스크 대비" not in result
+        assert "확대 진입" not in result

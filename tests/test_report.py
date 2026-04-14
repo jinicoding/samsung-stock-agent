@@ -2166,3 +2166,97 @@ class TestDailyDeltaSection:
         """daily_delta가 None이면 섹션이 없음."""
         report = generate_daily_report(_full_indicators())
         assert "오늘의 변화" not in report
+
+    def test_risk_management_section_present(self):
+        """risk_management가 주어지면 섹션이 표시됨."""
+        rm = {
+            "entry_zone": {"lower": 57100.0, "upper": 61555.0, "direction": "매수", "basis": "test"},
+            "stop_level": {"price": 53875.0, "method": "지지선_ATR", "atr_multiplier": 1.5, "regime": "보통"},
+            "target_levels": {
+                "target_1": {"price": 58000.0, "basis": "최근접 저항선"},
+                "target_2": {"price": 64750.0, "basis": "ATR 2.5배"},
+                "direction": "상승",
+            },
+            "risk_reward": {"ratio": 1.8, "grade": "유리", "risk": 3000.0, "reward": 5400.0},
+            "position_guide": {"level": "표준", "description": "보통 조건 — 기본 진입 구간", "score": 4},
+            "summary": "R:R 1.8 — 유리. 표준 포지션.",
+        }
+        report = generate_daily_report(_full_indicators(), risk_management=rm)
+        assert "리스크 관리" in report
+
+    def test_risk_management_shows_entry_zone(self):
+        """진입 구간이 표시됨."""
+        rm = {
+            "entry_zone": {"lower": 57100.0, "upper": 61555.0, "direction": "매수", "basis": "test"},
+            "stop_level": {"price": 53875.0, "method": "ATR_배수", "atr_multiplier": 1.5, "regime": "보통"},
+            "target_levels": {"target_1": {"price": 58000.0, "basis": "저항선"}, "target_2": {"price": 64750.0, "basis": "ATR"}, "direction": "상승"},
+            "risk_reward": {"ratio": 1.8, "grade": "유리", "risk": 3000.0, "reward": 5400.0},
+            "position_guide": {"level": "표준", "description": "기본", "score": 4},
+            "summary": "test",
+        }
+        report = generate_daily_report(_full_indicators(), risk_management=rm)
+        assert "매수" in report
+        assert "57,100" in report
+
+    def test_risk_management_shows_stop_level(self):
+        """손절선이 표시됨."""
+        rm = {
+            "entry_zone": {"lower": 57100.0, "upper": 61555.0, "direction": "매수", "basis": "test"},
+            "stop_level": {"price": 53875.0, "method": "지지선_ATR", "atr_multiplier": 1.5, "regime": "보통"},
+            "target_levels": {"target_1": {"price": 58000.0, "basis": "저항선"}, "target_2": {"price": 64750.0, "basis": "ATR"}, "direction": "상승"},
+            "risk_reward": {"ratio": 1.8, "grade": "유리", "risk": 3000.0, "reward": 5400.0},
+            "position_guide": {"level": "표준", "description": "기본", "score": 4},
+            "summary": "test",
+        }
+        report = generate_daily_report(_full_indicators(), risk_management=rm)
+        assert "손절" in report
+        assert "53,875" in report
+
+    def test_risk_management_shows_rr_ratio(self):
+        """R:R 비율이 표시됨."""
+        rm = {
+            "entry_zone": {"lower": 57100.0, "upper": 61555.0, "direction": "매수", "basis": "test"},
+            "stop_level": {"price": 53875.0, "method": "ATR_배수", "atr_multiplier": 1.5, "regime": "보통"},
+            "target_levels": {"target_1": {"price": 58000.0, "basis": "저항선"}, "target_2": {"price": 64750.0, "basis": "ATR"}, "direction": "상승"},
+            "risk_reward": {"ratio": 1.8, "grade": "유리", "risk": 3000.0, "reward": 5400.0},
+            "position_guide": {"level": "표준", "description": "기본", "score": 4},
+            "summary": "test",
+        }
+        report = generate_daily_report(_full_indicators(), risk_management=rm)
+        assert "R:R 1.8" in report
+        assert "✅" in report
+
+    def test_risk_management_shows_position_guide(self):
+        """포지션 가이드가 표시됨."""
+        rm = {
+            "entry_zone": {"lower": 57100.0, "upper": 61555.0, "direction": "매수", "basis": "test"},
+            "stop_level": {"price": 53875.0, "method": "ATR_배수", "atr_multiplier": 1.5, "regime": "보통"},
+            "target_levels": {"target_1": {"price": 58000.0, "basis": "저항선"}, "target_2": {"price": 64750.0, "basis": "ATR"}, "direction": "상승"},
+            "risk_reward": {"ratio": 0.5, "grade": "불리", "risk": 5000.0, "reward": 2500.0},
+            "position_guide": {"level": "관망", "description": "불리 조건 다수 — 진입 대기", "score": 0},
+            "summary": "test",
+        }
+        report = generate_daily_report(_full_indicators(), risk_management=rm)
+        assert "관망" in report
+        assert "🚫" in report
+
+    def test_risk_management_none_no_section(self):
+        """risk_management가 None이면 섹션이 없음."""
+        report = generate_daily_report(_full_indicators())
+        assert "리스크 관리" not in report
+
+    def test_risk_management_in_executive_summary(self):
+        """R:R이 핵심 요약에도 표시됨."""
+        rm = {
+            "entry_zone": {"lower": 57100.0, "upper": 61555.0, "direction": "매수", "basis": "test"},
+            "stop_level": {"price": 53875.0, "method": "ATR_배수", "atr_multiplier": 1.5, "regime": "보통"},
+            "target_levels": {"target_1": {"price": 58000.0, "basis": "저항선"}, "target_2": {"price": 64750.0, "basis": "ATR"}, "direction": "상승"},
+            "risk_reward": {"ratio": 1.8, "grade": "유리", "risk": 3000.0, "reward": 5400.0},
+            "position_guide": {"level": "표준", "description": "기본", "score": 4},
+            "summary": "test",
+        }
+        sig = {"score": 35.0, "grade": "매수우세", "technical_score": 40.0, "supply_score": 50.0, "exchange_score": -10.0, "weights": {"technical": 40, "supply": 40, "exchange": 20}}
+        report = generate_daily_report(_full_indicators(), composite_signal=sig, risk_management=rm)
+        summary_end = report.find("핵심 관찰 포인트") if "핵심 관찰 포인트" in report else report.find("종합 투자 시그널")
+        summary_section = report[:summary_end] if summary_end > 0 else report
+        assert "포지션: 표준" in summary_section

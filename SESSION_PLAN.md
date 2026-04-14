@@ -1,45 +1,41 @@
 ## Session Plan
 
-Day 24 (2026-04-14 11:30) — 리스크 관리 수준 분석 모듈
+Day 24 (2026-04-14 15:30) — 리스크 관리 파이프라인 통합
 
 ### 자기 평가 요약
 
-911개 테스트 전부 통과, 버그 없음. 커뮤니티 이슈 없음. 11축 분석 + 시나리오 + 패턴 매칭 + 수렴 분석 + 일일 델타까지 완성. 분석 체계는 성숙기에 접어들었다.
+938개 테스트 전부 통과, 버그 없음. 커뮤니티 이슈 없음. Day 24 11:30에 `risk_management.py` 모듈을 구축했으나 파이프라인에 미통합 — main.py, report.py, commentary.py 어디에도 연결되지 않은 상태. 2단계 확장 패턴(모듈→통합)의 두 번째 단계를 완성해야 한다.
 
-**핵심 갭 — 분석과 행동 사이의 간극**: 투자자가 "강력매수신호 +65"를 보고도 "구체적으로 어디서 사고, 어디서 손절하고, 포지션은 얼마나?" 를 알 수 없다. scenario.py는 "어디로 갈 수 있는가"를, watchpoints.py는 "무엇을 주목하는가"를 다루지만, "어떻게 리스크를 관리하는가"는 빠져 있다. 이 갭은 분석 시스템의 실용성을 직접 결정하는 핵심 누락이다.
+### Task 1: 리스크 관리 모듈 리포트·코멘터리·파이프라인 통합 (Risk Management Pipeline Integration)
+Files: src/main.py, src/analysis/report.py, src/analysis/commentary.py, tests/test_report.py, tests/test_commentary.py, tests/test_main.py
+Description: Day 24 11:30에 구축한 risk_management.py 모듈을 일일 파이프라인에 완전 통합한다. 2단계 확장 패턴의 두 번째 단계.
 
-**이전 세션(Day 23)의 Task 2 — 시장 국면 분류**: 미구현 상태이나, 리스크 관리 모듈이 변동성 체제를 이미 활용하므로 국면 분류는 후속 세션으로 연기한다. 리스크 관리가 국면 분류보다 투자자 실용성 측면에서 우선순위가 높다.
+구체적 작업:
+1. **main.py**: `compute_risk_levels()`를 호출하여 결과를 `generate_daily_report()`와 `generate_commentary()`에 전달. 입력값은 기존 파이프라인 변수에서 추출:
+   - current_price: `prices[-1]["close"]`
+   - nearest_support/resistance: `sr`에서 추출
+   - atr/atr_pct/regime: `vol`에서 추출
+   - signal_score: `sig["score"]`
+   - convergence_level: `conv["level"]` if conv else "mixed"
+   - conviction: `scenario["conviction"]` if scenario else 50.0
 
-### Task 1: 리스크 관리 수준 분석 모듈 구축 (Risk Management Levels)
-Files: src/analysis/risk_management.py (신규), tests/test_risk_management.py (신규)
-Description: 기존 데이터(지지/저항, ATR, 변동성 체제, 시그널 강도, 수렴도)를 종합하여 투자자가 즉시 활용할 수 있는 리스크 관리 수준을 산출하는 모듈을 구축한다.
+2. **report.py**: `_build_risk_management_section()` 함수 추가
+   - 진입 구간(lower~upper, direction): 매수/매도/관망 방향 + 가격 범위
+   - 손절선(price, method, ATR배수): 변동성 체제별 손절 수준
+   - 1차/2차 목표가: 저항선 기반 / ATR 배수
+   - R:R 비율 + grade: 유리 ✅ / 보통 ⚠️ / 불리 🚫
+   - 포지션 사이즈 가이드(level, description): 공격적/표준/보수적/관망
+   - `generate_daily_report()`에 `risk_management` 파라미터 추가
+   - 관찰 포인트 섹션 아래에 배치
 
-핵심 기능:
-1. **진입 구간** (entry_zone): 현재가 기준 ATR 비율 범위 내 매수/매도 구간. 시그널 강도에 따라 현재가 근처(강한 시그널) 또는 지지선 근처(약한 시그널)로 조정
-2. **손절 수준** (stop_level): 최근접 지지선 하단 또는 ATR 배수 하방. 변동성 체제에 따라 배수 조정 (고변동성 2.0배, 보통 1.5배, 저변동성 1.0배)
-3. **목표가 수준** (target_levels): 1차 목표(최근접 저항선), 2차 목표(ATR 2.5배). 하락 시그널일 경우 숏 관점 수준
-4. **리스크/리워드 비율**: (1차 목표 - 진입가) / (진입가 - 손절가). 1.5↑ 유리, 1.0~1.5 보통, 1.0↓ 불리
-5. **포지션 사이즈 가이드**: 변동성 체제 + 시그널 확신도 + R:R 비율 기반 4단계 (공격적/표준/보수적/관망). 금액·주수 없음 (투자 조언 금지 원칙)
-6. **compute_risk_levels()** 통합 함수: 위 요소를 하나의 dict로 반환
+3. **commentary.py**: 리스크 관리 자연어 해석 로직 추가
+   - R:R 유리/불리, 포지션 가이드 공격적/관망 등 상황별 자연어 해설
+   - `generate_commentary()`에 `risk_management` 파라미터 추가
 
-설계:
-- scenario.py는 "방향성 시나리오", watchpoints.py는 "관찰 포인트", 이 모듈은 "리스크 관리 수준" — 세 모듈이 상호보완
-- 테스트 우선: 진입구간, 손절, 목표, 비율, 가이드별 경계조건 포함 최소 15개 테스트
-- 투자 조언이 아닌 리스크 프레임으로 표현
+4. **핵심 요약 반영**: `_build_executive_summary()`에 R:R ratio와 포지션 가이드 level 반영
 
-### Task 2: 리스크 관리 리포트·코멘터리·파이프라인 통합 (Risk Management Integration)
-Files: src/analysis/report.py, src/analysis/commentary.py, src/main.py, tests/test_report.py, tests/test_commentary.py, tests/test_main.py
-Description: Task 1의 리스크 관리 모듈을 리포트·코멘터리·일일 파이프라인에 통합한다. 2단계 확장 패턴에 따라 배관까지 완성.
-
-리포트:
-- 관찰 포인트 섹션 아래에 "⚖️ 리스크 관리 수준" 섹션 추가
-- 진입 구간, 손절 수준, 1차/2차 목표, R:R 비율, 포지션 가이드를 HTML로 표시
-- R:R 비율에 따라 시각 신호 (유리 ✅ / 보통 ⚠️ / 불리 🚫)
-
-코멘터리:
-- risk_management_commentary() 추가: R:R 비율과 포지션 가이드를 자연어로 해석
-- 예: "리스크/리워드 비율 2.3으로 유리한 구간. 손절 수준 XX,XXX원, 표준 포지션 적절."
-
-파이프라인:
-- main.py에서 compute_risk_levels() 호출 → report, commentary에 전달
-- 기존 테스트 호환 유지
+5. **테스트**: 리포트·코멘터리·파이프라인 통합 테스트 추가
+   - risk_management 데이터가 리포트 HTML에 표시되는지
+   - 코멘터리에 리스크 관리 해석이 반영되는지
+   - main.py에서 vol/sr/sig/conv/scenario가 None일 때 안전 처리되는지
+   - 기존 테스트 호환 유지 (risk_management=None일 때 섹션 생략)

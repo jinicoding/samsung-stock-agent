@@ -1,19 +1,45 @@
 ## Session Plan
 
-Day 23 (2026-04-13 15:30) — 일일 델타 통합 + 시장 국면 분류
+Day 24 (2026-04-14 11:30) — 리스크 관리 수준 분석 모듈
 
 ### 자기 평가 요약
 
-11축 분석 체계 완성. 904개 테스트 통과, 버그 없음. 커뮤니티 이슈 없음. Day 23 오전(11:30)에 `src/analysis/daily_delta.py`와 `tests/test_daily_delta.py`를 구축 완료했으나, 리포트·코멘터리·파이프라인에 미통합 상태. 이전 세션 플랜의 Task 2를 이번 세션의 Task 1로 승계한다.
+911개 테스트 전부 통과, 버그 없음. 커뮤니티 이슈 없음. 11축 분석 + 시나리오 + 패턴 매칭 + 수렴 분석 + 일일 델타까지 완성. 분석 체계는 성숙기에 접어들었다.
 
-**핵심 갭 1 — 델타 배관 미연결**: daily_delta 모듈은 완성되어 있지만 main.py에서 호출되지 않고, report.py와 commentary.py에 표시되지 않는다. Day 18에서 반복 발생한 배관 누락 패턴과 동일 — 모듈은 있으나 데이터 흐름이 끊김.
+**핵심 갭 — 분석과 행동 사이의 간극**: 투자자가 "강력매수신호 +65"를 보고도 "구체적으로 어디서 사고, 어디서 손절하고, 포지션은 얼마나?" 를 알 수 없다. scenario.py는 "어디로 갈 수 있는가"를, watchpoints.py는 "무엇을 주목하는가"를 다루지만, "어떻게 리스크를 관리하는가"는 빠져 있다. 이 갭은 분석 시스템의 실용성을 직접 결정하는 핵심 누락이다.
 
-**핵심 갭 2 — 시장 국면 판단 부재**: ADX(추세 강도), 변동성 국면, 수렴도, 타임프레임 정합성은 개별적으로 존재하지만, "지금 어떤 시장인가"를 통합 판단하는 상위 계층이 없다. 투자자는 개별 지표를 보고 스스로 국면을 추론해야 하는 상황.
+**이전 세션(Day 23)의 Task 2 — 시장 국면 분류**: 미구현 상태이나, 리스크 관리 모듈이 변동성 체제를 이미 활용하므로 국면 분류는 후속 세션으로 연기한다. 리스크 관리가 국면 분류보다 투자자 실용성 측면에서 우선순위가 높다.
 
-### Task 1: 일일 델타 분석 리포트·코멘터리·파이프라인 통합 (Daily Delta Integration)
-Files: src/main.py, src/analysis/report.py, src/analysis/commentary.py, tests/test_report.py, tests/test_commentary.py
-Description: Day 23 오전에 구축한 `src/analysis/daily_delta.py` 모듈을 리포트·코멘터리·일일 파이프라인에 통합한다. (1) `main.py`에서 시그널 이력 저장 직후 `compute_daily_delta()`를 호출하고 결과를 리포트·코멘터리 생성에 전달. (2) `report.py`에 "📊 오늘의 변화" HTML 섹션 추가 — Executive Summary 아래에 배치. 종합 점수 변화(스파크 바), 주요 축별 변동, 방향 전환 축은 🔄, 유의미 상승은 ⬆️, 유의미 하락은 ⬇️ 표시. 알림이 없으면 "주요 변화 없음". (3) `commentary.py`에 델타 기반 코멘터리 1~2문장 추가 — "전일 대비 수급 점수가 +25점 급등하여 매수 전환" 같은 변화 맥락 해설. alerts에서 가장 중요한 변화를 선택하여 문장화. (4) 테스트: report에 daily_delta 파라미터 전달 시 섹션 렌더링 검증, commentary에 델타 문장 생성 검증.
+### Task 1: 리스크 관리 수준 분석 모듈 구축 (Risk Management Levels)
+Files: src/analysis/risk_management.py (신규), tests/test_risk_management.py (신규)
+Description: 기존 데이터(지지/저항, ATR, 변동성 체제, 시그널 강도, 수렴도)를 종합하여 투자자가 즉시 활용할 수 있는 리스크 관리 수준을 산출하는 모듈을 구축한다.
 
-### Task 2: 시장 국면 분류 모듈 구축 (Market Regime Classification)
-Files: src/analysis/market_regime.py (신규), tests/test_market_regime.py (신규)
-Description: ADX 추세 강도, 변동성 국면(regime), 다축 수렴도(convergence level), 멀티타임프레임 정합성(alignment)을 종합하여 현재 시장 국면을 분류하는 메타 분석 모듈을 구축한다. 5가지 국면: (1) **강세추세** — ADX>25 + 수렴 strong/moderate + 시그널 양수 + 정배열, (2) **약세추세** — ADX>25 + 수렴 strong/moderate + 시그널 음수, (3) **횡보축소** — ADX<20 + 저변동성/밴드폭 수축, (4) **변곡점** — 추세 전환 감지 moderate 이상 OR 수렴 mixed + 높은 변동성, (5) **과도기** — 그 외. 각 국면에 전략 힌트를 반환: 강세추세→"추세추종", 약세추세→"리스크 관리", 횡보축소→"브레이크아웃 대기", 변곡점→"방향 확인 후 진입", 과도기→"관망". 테스트 먼저 작성(최소 10개 시나리오) 후 구현. 리포트 통합은 다음 세션(2단계 확장 패턴).
+핵심 기능:
+1. **진입 구간** (entry_zone): 현재가 기준 ATR 비율 범위 내 매수/매도 구간. 시그널 강도에 따라 현재가 근처(강한 시그널) 또는 지지선 근처(약한 시그널)로 조정
+2. **손절 수준** (stop_level): 최근접 지지선 하단 또는 ATR 배수 하방. 변동성 체제에 따라 배수 조정 (고변동성 2.0배, 보통 1.5배, 저변동성 1.0배)
+3. **목표가 수준** (target_levels): 1차 목표(최근접 저항선), 2차 목표(ATR 2.5배). 하락 시그널일 경우 숏 관점 수준
+4. **리스크/리워드 비율**: (1차 목표 - 진입가) / (진입가 - 손절가). 1.5↑ 유리, 1.0~1.5 보통, 1.0↓ 불리
+5. **포지션 사이즈 가이드**: 변동성 체제 + 시그널 확신도 + R:R 비율 기반 4단계 (공격적/표준/보수적/관망). 금액·주수 없음 (투자 조언 금지 원칙)
+6. **compute_risk_levels()** 통합 함수: 위 요소를 하나의 dict로 반환
+
+설계:
+- scenario.py는 "방향성 시나리오", watchpoints.py는 "관찰 포인트", 이 모듈은 "리스크 관리 수준" — 세 모듈이 상호보완
+- 테스트 우선: 진입구간, 손절, 목표, 비율, 가이드별 경계조건 포함 최소 15개 테스트
+- 투자 조언이 아닌 리스크 프레임으로 표현
+
+### Task 2: 리스크 관리 리포트·코멘터리·파이프라인 통합 (Risk Management Integration)
+Files: src/analysis/report.py, src/analysis/commentary.py, src/main.py, tests/test_report.py, tests/test_commentary.py, tests/test_main.py
+Description: Task 1의 리스크 관리 모듈을 리포트·코멘터리·일일 파이프라인에 통합한다. 2단계 확장 패턴에 따라 배관까지 완성.
+
+리포트:
+- 관찰 포인트 섹션 아래에 "⚖️ 리스크 관리 수준" 섹션 추가
+- 진입 구간, 손절 수준, 1차/2차 목표, R:R 비율, 포지션 가이드를 HTML로 표시
+- R:R 비율에 따라 시각 신호 (유리 ✅ / 보통 ⚠️ / 불리 🚫)
+
+코멘터리:
+- risk_management_commentary() 추가: R:R 비율과 포지션 가이드를 자연어로 해석
+- 예: "리스크/리워드 비율 2.3으로 유리한 구간. 손절 수준 XX,XXX원, 표준 포지션 적절."
+
+파이프라인:
+- main.py에서 compute_risk_levels() 호출 → report, commentary에 전달
+- 기존 테스트 호환 유지

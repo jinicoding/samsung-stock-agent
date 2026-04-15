@@ -1237,3 +1237,60 @@ class TestGenerateCommentary:
         )
         assert "리스크 대비" not in result
         assert "확대 진입" not in result
+
+    def test_market_regime_trending_up_framing(self):
+        """상승 추세장 체제가 프레이밍 문장에 반영됨."""
+        regime = {
+            "regime": "trending_up",
+            "phase": "markup",
+            "confidence": 75,
+            "duration": 12,
+            "interpretation_hints": {},
+            "adx": 30.0,
+            "ma_alignment": "bullish",
+            "bb_pctb": 0.7,
+        }
+        result = generate_commentary(
+            self._base_indicators(),
+            self._base_supply_demand(),
+            self._base_exchange_rate(),
+            self._base_composite_signal(),
+            self._base_support_resistance(),
+            market_regime=regime,
+        )
+        assert "상승 추세장" in result
+
+    def test_market_regime_range_bound_framing(self):
+        """횡보 체제가 프레이밍 문장에 반영됨."""
+        regime = {
+            "regime": "range_bound",
+            "phase": "accumulation",
+            "confidence": 60,
+            "duration": 8,
+            "interpretation_hints": {},
+            "adx": 15.0,
+            "ma_alignment": "mixed",
+            "bb_pctb": 0.5,
+        }
+        result = generate_commentary(
+            self._base_indicators(),
+            self._base_supply_demand(),
+            self._base_exchange_rate(),
+            self._base_composite_signal(),
+            self._base_support_resistance(),
+            market_regime=regime,
+        )
+        assert "횡보" in result
+
+    def test_market_regime_none_no_framing(self):
+        """market_regime=None이면 체제 프레이밍 없음."""
+        result = generate_commentary(
+            self._base_indicators(),
+            self._base_supply_demand(),
+            self._base_exchange_rate(),
+            self._base_composite_signal(),
+            self._base_support_resistance(),
+            market_regime=None,
+        )
+        assert "추세장" not in result
+        assert "횡보" not in result

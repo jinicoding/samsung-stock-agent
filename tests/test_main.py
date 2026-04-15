@@ -332,8 +332,9 @@ SAMPLE_REVERSAL = {
 @patch("src.main.summarize_weekly", return_value=None)
 @patch("src.main.build_watchpoints", return_value=SAMPLE_WATCHPOINTS)
 @patch("src.main.compute_daily_delta", return_value=None)
+@patch("src.main.compute_market_regime", return_value=None)
 def test_pipeline_full(
-    mock_daily_delta, mock_watchpoints, mock_summarize_weekly, mock_sig_hist,
+    mock_market_regime, mock_daily_delta, mock_watchpoints, mock_summarize_weekly, mock_sig_hist,
     mock_init, mock_bf_prices, mock_bf_sd,
     mock_fetch_nasdaq, mock_fetch_vix,
     mock_nasdaq_trend, mock_vix_risk, mock_global_macro_score,
@@ -448,7 +449,9 @@ def test_pipeline_full(
         data_health=ANY,
         daily_delta=None,
         risk_management=ANY,
+        market_regime=None,
     )
+    mock_market_regime.assert_called_once()
     mock_send.assert_called_once_with(SAMPLE_REPORT_HTML)
 
 
@@ -492,8 +495,9 @@ def test_pipeline_full(
 @patch("src.main.backfill_supply_demand")
 @patch("src.main.backfill_prices")
 @patch("src.main.init_db")
+@patch("src.main.compute_market_regime", return_value=None)
 def test_pipeline_dry_run(
-    mock_init, mock_bf_prices, mock_bf_sd,
+    mock_market_regime, mock_init, mock_bf_prices, mock_bf_sd,
     mock_fetch_nasdaq, mock_fetch_vix,
     mock_nasdaq_trend, mock_vix_risk, mock_global_macro_score,
     mock_candlestick, mock_volatility,
@@ -561,8 +565,9 @@ def test_pipeline_dry_run(
 @patch("src.main.backfill_supply_demand")
 @patch("src.main.backfill_prices")
 @patch("src.main.init_db")
+@patch("src.main.compute_market_regime", return_value=None)
 def test_pipeline_with_rs(
-    mock_init, mock_bf_prices, mock_bf_sd,
+    mock_market_regime, mock_init, mock_bf_prices, mock_bf_sd,
     mock_fetch_nasdaq, mock_fetch_vix,
     mock_nasdaq_trend, mock_vix_risk, mock_global_macro_score,
     mock_candlestick, mock_volatility,
@@ -674,8 +679,9 @@ def test_pipeline_with_rs(
 @patch("src.main.backfill_supply_demand")
 @patch("src.main.backfill_prices")
 @patch("src.main.init_db")
+@patch("src.main.compute_market_regime", return_value=None)
 def test_pipeline_kospi_failure_fallback(
-    mock_init, mock_bf_prices, mock_bf_sd,
+    mock_market_regime, mock_init, mock_bf_prices, mock_bf_sd,
     mock_fetch_nasdaq, mock_fetch_vix,
     mock_nasdaq_trend, mock_vix_risk, mock_global_macro_score,
     mock_candlestick, mock_volatility,

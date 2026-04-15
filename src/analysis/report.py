@@ -1173,6 +1173,51 @@ def _build_executive_summary(
     return lines
 
 
+_REGIME_LABELS = {
+    "trending_up": "추세상승",
+    "trending_down": "추세하락",
+    "range_bound": "횡보",
+    "breakout": "돌파",
+    "breakdown": "붕괴",
+}
+
+_PHASE_LABELS = {
+    "accumulation": "매집",
+    "markup": "마크업",
+    "distribution": "분배",
+    "markdown": "마크다운",
+}
+
+
+def _build_market_regime_section(regime: dict) -> list[str]:
+    """시장 체제(Market Regime) 섹션을 생성한다."""
+    lines: list[str] = []
+    regime_name = _REGIME_LABELS.get(regime["regime"], regime["regime"])
+    phase_name = _PHASE_LABELS.get(regime["phase"], regime["phase"])
+    confidence = regime["confidence"]
+    duration = regime["duration"]
+
+    lines.append(f"<b>🌊 시장 체제: {regime_name}</b>")
+    lines.append(f"  국면: {phase_name} | 확신도: {confidence}% | 지속: {duration}일")
+
+    hints = regime.get("interpretation_hints", {})
+    desc = hints.get("description")
+    if desc:
+        lines.append(f"  📋 {desc}")
+
+    rsi_th = hints.get("rsi_thresholds")
+    if rsi_th:
+        lines.append(f"  RSI 기준: 과매수 {rsi_th['overbought']} / 과매도 {rsi_th['oversold']}")
+
+    sr_rel = hints.get("support_resistance_reliability")
+    if sr_rel:
+        rel_label = {"high": "높음", "medium": "보통", "low": "낮음"}.get(sr_rel, sr_rel)
+        lines.append(f"  지지/저항 신뢰도: {rel_label}")
+
+    lines.append("")
+    return lines
+
+
 def _build_risk_management_section(risk_management: dict) -> list[str]:
     """리스크 관리(Risk Management) 섹션을 생성한다."""
     lines: list[str] = []
@@ -1436,6 +1481,7 @@ def generate_daily_report(
     data_health: dict | None = None,
     daily_delta: dict | None = None,
     risk_management: dict | None = None,
+    market_regime: dict | None = None,
 ) -> str:
     """기술적 지표 dict를 HTML 텔레그램 메시지로 변환한다.
 
@@ -1508,6 +1554,10 @@ def generate_daily_report(
     if composite_signal is not None:
         lines.extend(_build_composite_signal_section(composite_signal))
 
+    # 0.15) 시장 체제
+    if market_regime is not None:
+        lines.extend(_build_market_regime_section(market_regime))
+
     # 0.2) 가격 시나리오
     if scenario is not None:
         lines.extend(_build_scenario_section(scenario))
@@ -1541,6 +1591,7 @@ def generate_daily_report(
         pattern_match=pattern_match,
         daily_delta=daily_delta,
         risk_management=risk_management,
+        market_regime=market_regime,
     )
     if commentary:
         lines.append(f"💬 {commentary}")

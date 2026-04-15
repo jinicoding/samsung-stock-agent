@@ -39,6 +39,7 @@ def generate_commentary(
     pattern_match: dict | None = None,
     daily_delta: dict | None = None,
     risk_management: dict | None = None,
+    market_regime: dict | None = None,
 ) -> str:
     """분석 결과를 2~3문장 자연어 코멘터리로 변환한다.
 
@@ -62,6 +63,11 @@ def generate_commentary(
 
     # --- 1) 주요 흐름 문장: 수급 + 기술적 시그널 조합 ---
     sentences.append(_build_flow_sentence(indicators, sd, sig))
+
+    # --- 1.1) 시장 체제 프레이밍 ---
+    regime_sentence = _build_regime_framing(market_regime or {})
+    if regime_sentence:
+        sentences.append(regime_sentence)
 
     # --- 1.5) OBV 다이버전스 문장 ---
     obv_sentence = _build_obv_divergence_sentence(indicators)
@@ -171,6 +177,28 @@ def generate_commentary(
         sentences.append(weekly_sentence)
 
     return " ".join(sentences)
+
+
+_REGIME_FRAMING = {
+    "trending_up": "상승 추세장",
+    "trending_down": "하락 추세장",
+    "range_bound": "횡보 국면",
+    "breakout": "상방 돌파 국면",
+    "breakdown": "하방 붕괴 국면",
+}
+
+
+def _build_regime_framing(regime: dict) -> str:
+    """시장 체제를 코멘터리 프레이밍 문장으로 변환한다."""
+    r = regime.get("regime")
+    if not r:
+        return ""
+    label = _REGIME_FRAMING.get(r, r)
+    confidence = regime.get("confidence", 0)
+    duration = regime.get("duration", 0)
+    if duration > 1:
+        return f"{label}(확신도 {confidence}%)이 {duration}일째 지속되는 가운데,"
+    return f"{label}(확신도 {confidence}%) 진입 초기 국면에서,"
 
 
 def _build_flow_sentence(indicators: dict, sd: dict, sig: dict) -> str:

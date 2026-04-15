@@ -2260,3 +2260,69 @@ class TestDailyDeltaSection:
         summary_end = report.find("핵심 관찰 포인트") if "핵심 관찰 포인트" in report else report.find("종합 투자 시그널")
         summary_section = report[:summary_end] if summary_end > 0 else report
         assert "포지션: 표준" in summary_section
+
+
+class TestMarketRegimeSection:
+    """시장 체제(Market Regime) 섹션 렌더링 테스트."""
+
+    SAMPLE_REGIME = {
+        "regime": "trending_up",
+        "phase": "markup",
+        "confidence": 75,
+        "duration": 12,
+        "interpretation_hints": {
+            "rsi_thresholds": {"overbought": 80, "oversold": 20},
+            "support_resistance_reliability": "low",
+            "volume_confirmation_importance": "medium",
+            "description": "추세장 — RSI 기준 완화, 지지/저항 신뢰도 하향",
+        },
+        "adx": 30.5,
+        "ma_alignment": "bullish",
+        "bb_pctb": 0.72,
+    }
+
+    def test_market_regime_section_present(self):
+        report = generate_daily_report(_full_indicators(), market_regime=self.SAMPLE_REGIME)
+        assert "시장 체제" in report
+
+    def test_market_regime_shows_regime_name(self):
+        report = generate_daily_report(_full_indicators(), market_regime=self.SAMPLE_REGIME)
+        assert "추세상승" in report
+
+    def test_market_regime_shows_phase(self):
+        report = generate_daily_report(_full_indicators(), market_regime=self.SAMPLE_REGIME)
+        assert "마크업" in report
+
+    def test_market_regime_shows_confidence(self):
+        report = generate_daily_report(_full_indicators(), market_regime=self.SAMPLE_REGIME)
+        assert "75%" in report
+
+    def test_market_regime_shows_duration(self):
+        report = generate_daily_report(_full_indicators(), market_regime=self.SAMPLE_REGIME)
+        assert "12일" in report
+
+    def test_market_regime_shows_interpretation(self):
+        report = generate_daily_report(_full_indicators(), market_regime=self.SAMPLE_REGIME)
+        assert "RSI" in report
+
+    def test_market_regime_none_no_section(self):
+        report = generate_daily_report(_full_indicators(), market_regime=None)
+        assert "시장 체제" not in report
+
+    def test_market_regime_range_bound(self):
+        regime = {**self.SAMPLE_REGIME, "regime": "range_bound", "phase": "accumulation"}
+        report = generate_daily_report(_full_indicators(), market_regime=regime)
+        assert "횡보" in report
+        assert "매집" in report
+
+    def test_market_regime_breakdown(self):
+        regime = {**self.SAMPLE_REGIME, "regime": "breakdown", "phase": "markdown"}
+        report = generate_daily_report(_full_indicators(), market_regime=regime)
+        assert "붕괴" in report
+
+    def test_market_regime_after_composite_signal(self):
+        sig = {"score": 35.0, "grade": "매수우세", "technical_score": 40.0, "supply_score": 50.0, "exchange_score": -10.0, "weights": {"technical": 40, "supply": 40, "exchange": 20}}
+        report = generate_daily_report(_full_indicators(), composite_signal=sig, market_regime=self.SAMPLE_REGIME)
+        signal_pos = report.find("종합 판정")
+        regime_pos = report.find("시장 체제")
+        assert signal_pos < regime_pos

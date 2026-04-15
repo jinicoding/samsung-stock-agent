@@ -41,6 +41,7 @@ from src.analysis.volatility import compute_volatility
 from src.analysis.candlestick import detect_candlestick_patterns
 from src.analysis.weekly_summary import summarize_weekly
 from src.analysis.timeframe import compute_weekly_indicators, assess_timeframe_alignment
+from src.analysis.market_regime import compute_market_regime
 from src.analysis.watchpoints import build_watchpoints
 from src.analysis.pattern_match import find_similar_patterns
 from src.analysis.daily_delta import compute_daily_delta
@@ -90,6 +91,13 @@ def main(dry_run: bool = False):
     indicators = compute_technical_indicators(prices)
     sd = analyze_supply_demand(trading, ownership) if trading else None
     er = analyze_exchange_rate(rates, prices) if rates else None
+
+    # 3.35) 시장 체제 인식
+    market_regime = None
+    try:
+        market_regime = compute_market_regime()
+    except Exception as e:
+        print(f"[경고] 시장 체제 분석 실패: {e}")
 
     # 3.4) 멀티타임프레임 분석 (주봉 지표 + 일봉-주봉 정합성)
     weekly_indicators = None
@@ -370,7 +378,7 @@ def main(dry_run: bool = False):
         print(f"[경고] 주간 추이 요약 실패: {e}")
 
     # 4) 리포트 생성
-    report = generate_daily_report(indicators, supply_demand=sd, exchange_rate=er, composite_signal=sig, support_resistance=sr, accuracy_summary=accuracy_summary, relative_strength=rs, trend_reversal=reversal, signal_trend=sig_trend, fundamentals=fund, news_sentiment=news_sentiment, news_headlines=news_headlines, consensus=consensus, weekly_summary=weekly, rel_perf=rel_perf, sox_trend=sox_trend, semiconductor_momentum=semi_momentum, volatility=vol, candlestick=candle, watchpoints=wp, convergence=conv, nasdaq_trend=nasdaq_trend, vix_risk=vix_risk, global_macro_score=global_macro_score_val, timeframe_alignment=timeframe_alignment, weekly_indicators=weekly_indicators, scenario=scenario, pattern_match=pm, data_health=health.summary(), daily_delta=daily_delta, risk_management=risk_mgmt)
+    report = generate_daily_report(indicators, supply_demand=sd, exchange_rate=er, composite_signal=sig, support_resistance=sr, accuracy_summary=accuracy_summary, relative_strength=rs, trend_reversal=reversal, signal_trend=sig_trend, fundamentals=fund, news_sentiment=news_sentiment, news_headlines=news_headlines, consensus=consensus, weekly_summary=weekly, rel_perf=rel_perf, sox_trend=sox_trend, semiconductor_momentum=semi_momentum, volatility=vol, candlestick=candle, watchpoints=wp, convergence=conv, nasdaq_trend=nasdaq_trend, vix_risk=vix_risk, global_macro_score=global_macro_score_val, timeframe_alignment=timeframe_alignment, weekly_indicators=weekly_indicators, scenario=scenario, pattern_match=pm, data_health=health.summary(), daily_delta=daily_delta, risk_management=risk_mgmt, market_regime=market_regime)
 
     # 5) 발송 또는 출력
     if dry_run:

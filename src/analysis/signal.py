@@ -99,18 +99,34 @@ def _clamp(value: float, lo: float = -100.0, hi: float = 100.0) -> float:
     return max(lo, min(hi, value))
 
 
-def _score_technical(tech: dict) -> float:
+def _score_technical(tech: dict, market_regime: dict | None = None) -> float:
     """기술적 지표 → -100~+100 점수.
 
     RSI, MACD 히스토그램, 볼린저 %b, 이평선 괴리율을 종합.
+    market_regime 제공 시 체제별 RSI 임계값을 조정한다.
     """
     scores: list[float] = []
 
-    # RSI (14) — 30 이하 매수 과매도, 70 이상 매도 과매수
+    # 체제별 RSI 임계값 결정
+    rsi_overbought = 70.0
+    rsi_oversold = 30.0
+    if market_regime is not None and market_regime.get("confidence", 0) >= 50:
+        hints = market_regime.get("interpretation_hints", {})
+        thresholds = hints.get("rsi_thresholds", {})
+        rsi_overbought = thresholds.get("overbought", 70.0)
+        rsi_oversold = thresholds.get("oversold", 30.0)
+
+    # RSI 중립점과 스케일링: 중립 = (overbought + oversold) / 2
+    rsi_midpoint = (rsi_overbought + rsi_oversold) / 2.0
+    rsi_half_range = (rsi_overbought - rsi_oversold) / 2.0
+
     rsi = tech.get("rsi_14")
     if rsi is not None:
-        # RSI 50이 중립, 30→+100, 70→-100 (선형)
-        rsi_score = _clamp((50 - rsi) * 5)  # 50→0, 30→+100, 70→-100
+        # RSI midpoint이 중립, oversold→+100, overbought→-100 (선형)
+        if rsi_half_range > 0:
+            rsi_score = _clamp((rsi_midpoint - rsi) / rsi_half_range * 100)
+        else:
+            rsi_score = _clamp((50 - rsi) * 5)
         scores.append(rsi_score)
 
     # MACD 히스토그램 — 양수면 매수, 음수면 매도
@@ -437,6 +453,7 @@ def compute_composite_signal(
     global_macro_score: int | None = None,
     accuracy_summary: dict | None = None,
     timeframe_alignment: dict | None = None,
+    market_regime: dict | None = None,
 ) -> dict:
     """종합 투자 시그널을 계산한다.
 
@@ -467,7 +484,7 @@ def compute_composite_signal(
             semiconductor_score: 반도체 업황 축 점수 (-100~+100) (선택)
             weights: 각 축 가중치 (%)
     """
-    tech_score = _score_technical(technical)
+    tech_score = _score_technical(technical, market_regime=market_regime)
     sup_score = _score_supply(supply_demand)
     fx_score = _score_exchange(exchange_rate)
 
@@ -611,6 +628,8 @@ def compute_composite_signal(
         result["candlestick_score"] = candle_score
     if has_macro:
         result["global_macro_score"] = _clamp(float(global_macro_score))
+    if market_regime is not None:
+        result["market_regime"] = market_regime
     return result
 
 

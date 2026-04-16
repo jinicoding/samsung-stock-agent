@@ -1167,3 +1167,119 @@ class TestTimeframeIntegration:
             _fx(trend="원화약세"), timeframe_alignment=alignment,
         )
         assert -100 <= result["score"] <= 100
+
+
+def _regime(regime="range_bound", confidence=70) -> dict:
+    """시장 체제 분석 결과 stub."""
+    hints_map = {
+        "trending_up": {"rsi_thresholds": {"overbought": 80, "oversold": 20}},
+        "trending_down": {"rsi_thresholds": {"overbought": 80, "oversold": 20}},
+        "range_bound": {"rsi_thresholds": {"overbought": 70, "oversold": 30}},
+        "breakout": {"rsi_thresholds": {"overbought": 80, "oversold": 20}},
+        "breakdown": {"rsi_thresholds": {"overbought": 80, "oversold": 20}},
+    }
+    return {
+        "regime": regime,
+        "phase": "markup",
+        "confidence": confidence,
+        "duration": 5,
+        "interpretation_hints": hints_map.get(regime, hints_map["range_bound"]),
+        "adx": 30.0,
+        "ma_alignment": "bullish",
+        "bb_pctb": 0.6,
+    }
+
+
+class TestMarketRegimeIntegration:
+    """시장 체제 적응형 시그널 스코어링 테스트."""
+
+    def test_none_regime_preserves_behavior(self):
+        """market_regime=None이면 기존 동작 100% 유지."""
+        base = compute_composite_signal(_tech(rsi=30), _supply(), _fx())
+        result = compute_composite_signal(
+            _tech(rsi=30), _supply(), _fx(), market_regime=None,
+        )
+        assert result["technical_score"] == pytest.approx(base["technical_score"])
+        assert result["score"] == pytest.approx(base["score"])
+
+    def test_same_rsi_different_regime_different_score(self):
+        """동일 RSI 30에서 체제가 다르면 기술적 점수가 달라진다."""
+        # 횡보장: RSI 30은 과매도 임계값(30)에 해당 → 강한 매수 신호
+        range_result = compute_composite_signal(
+            _tech(rsi=30), _supply(), _fx(),
+            market_regime=_regime("range_bound", confidence=70),
+        )
+        # 추세 하락장: RSI 30은 과매도 임계값(20)에 미달 → 덜 강한 매수 신호
+        trend_result = compute_composite_signal(
+            _tech(rsi=30), _supply(), _fx(),
+            market_regime=_regime("trending_down", confidence=70),
+        )
+        assert range_result["technical_score"] != trend_result["technical_score"]
+
+    def test_trending_up_rsi_70_not_overbought(self):
+        """추세 상승장에서 RSI 70은 과매수가 아님 (임계값 80)."""
+        # 기본(체제 없음): RSI 70 → 과매수 경계 → 큰 매도 점수
+        base = compute_composite_signal(_tech(rsi=70), _supply(), _fx())
+        # 추세 상승장: RSI 70 → 아직 과매수 아님 (80이 임계값) → 덜 매도
+        trending = compute_composite_signal(
+            _tech(rsi=70), _supply(), _fx(),
+            market_regime=_regime("trending_up", confidence=70),
+        )
+        assert trending["technical_score"] > base["technical_score"]
+
+    def test_range_bound_uses_default_thresholds(self):
+        """횡보장에서는 기본 RSI 임계값(70/30) 유지."""
+        base = compute_composite_signal(_tech(rsi=35), _supply(), _fx())
+        range_result = compute_composite_signal(
+            _tech(rsi=35), _supply(), _fx(),
+            market_regime=_regime("range_bound", confidence=70),
+        )
+        assert range_result["technical_score"] == pytest.approx(
+            base["technical_score"])
+
+    def test_low_confidence_no_adjustment(self):
+        """확신도 50 미만이면 체제 조정 적용하지 않음."""
+        base = compute_composite_signal(_tech(rsi=30), _supply(), _fx())
+        low_conf = compute_composite_signal(
+            _tech(rsi=30), _supply(), _fx(),
+            market_regime=_regime("trending_down", confidence=40),
+        )
+        assert low_conf["technical_score"] == pytest.approx(
+            base["technical_score"])
+
+    def test_breakout_regime_widens_rsi(self):
+        """돌파장에서 RSI 임계값이 80/20으로 완화."""
+        base = compute_composite_signal(_tech(rsi=75), _supply(), _fx())
+        breakout = compute_composite_signal(
+            _tech(rsi=75), _supply(), _fx(),
+            market_regime=_regime("breakout", confidence=70),
+        )
+        # RSI 75: 기본(70 임계)에서는 과매수, 돌파장(80 임계)에서는 아님
+        assert breakout["technical_score"] > base["technical_score"]
+
+    def test_regime_info_in_result(self):
+        """결과에 market_regime 정보가 포함."""
+        result = compute_composite_signal(
+            _tech(), _supply(), _fx(),
+            market_regime=_regime("trending_up", confidence=70),
+        )
+        assert "market_regime" in result
+        assert result["market_regime"]["regime"] == "trending_up"
+
+    def test_score_clamped_with_regime(self):
+        """체제 적용 후에도 -100~+100 범위."""
+        tech = _tech(rsi=10, macd_histogram=1000, bb_pctb=0.0, price_vs_ma5_pct=5.0)
+        result = compute_composite_signal(
+            tech, _supply("buy_dominant"), _fx("원화약세", 2.0),
+            market_regime=_regime("trending_up", confidence=90),
+        )
+        assert -100 <= result["score"] <= 100
+
+    def test_weights_unchanged_with_regime(self):
+        """체제 적용은 가중치에 영향을 주지 않는다."""
+        base = compute_composite_signal(_tech(), _supply(), _fx())
+        result = compute_composite_signal(
+            _tech(), _supply(), _fx(),
+            market_regime=_regime("trending_up", confidence=70),
+        )
+        assert result["weights"] == base["weights"]

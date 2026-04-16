@@ -405,6 +405,7 @@ def test_pipeline_full(
         global_macro_score=SAMPLE_GLOBAL_MACRO_SCORE,
         accuracy_summary=SAMPLE_ACCURACY,
         timeframe_alignment=None,
+        market_regime=None,
     )
     # 수렴 분석 호출 확인
     mock_analyze_conv.assert_called_once()
@@ -617,6 +618,7 @@ def test_pipeline_with_rs(
         global_macro_score=SAMPLE_GLOBAL_MACRO_SCORE,
         accuracy_summary=SAMPLE_ACCURACY,
         timeframe_alignment=None,
+        market_regime=None,
     )
     # report에 RS와 reversal과 fundamentals와 뉴스와 컨센서스와 반도체와 변동성과 캔들스틱이 전달됨
     mock_report.assert_called_once()
@@ -730,6 +732,7 @@ def test_pipeline_kospi_failure_fallback(
         global_macro_score=SAMPLE_GLOBAL_MACRO_SCORE,
         accuracy_summary=SAMPLE_ACCURACY,
         timeframe_alignment=None,
+        market_regime=None,
     )
     # report에 RS=None, 글로벌 매크로 포함
     report_kwargs = mock_report.call_args

@@ -243,7 +243,7 @@ def main(dry_run: bool = False):
     accuracy_summary = accuracy_result["summary"]
 
     # 3.8.5) 종합 투자 시그널
-    sig = compute_composite_signal(indicators, sd or {}, er or {}, relative_strength=rs, trend_reversal=reversal, fundamentals=fund, news_sentiment=news_sentiment, consensus=consensus, semiconductor_momentum=semi_momentum, volatility=vol, candlestick=candle, global_macro_score=global_macro_score_val, accuracy_summary=accuracy_summary, timeframe_alignment=timeframe_alignment)
+    sig = compute_composite_signal(indicators, sd or {}, er or {}, relative_strength=rs, trend_reversal=reversal, fundamentals=fund, news_sentiment=news_sentiment, consensus=consensus, semiconductor_momentum=semi_momentum, volatility=vol, candlestick=candle, global_macro_score=global_macro_score_val, accuracy_summary=accuracy_summary, timeframe_alignment=timeframe_alignment, market_regime=market_regime)
 
     # 3.85) 다축 수렴 분석
     conv = None

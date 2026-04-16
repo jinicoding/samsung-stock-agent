@@ -197,8 +197,19 @@ def _build_regime_framing(regime: dict) -> str:
     confidence = regime.get("confidence", 0)
     duration = regime.get("duration", 0)
     if duration > 1:
-        return f"{label}(확신도 {confidence}%)이 {duration}일째 지속되는 가운데,"
-    return f"{label}(확신도 {confidence}%) 진입 초기 국면에서,"
+        base = f"{label}(확신도 {confidence}%)이 {duration}일째 지속되는 가운데,"
+    else:
+        base = f"{label}(확신도 {confidence}%) 진입 초기 국면에서,"
+
+    # RSI 기준이 기본값(70/30)과 다르면 조정 이유 설명
+    hints = regime.get("interpretation_hints", {})
+    rsi_th = hints.get("rsi_thresholds", {})
+    ob = rsi_th.get("overbought", 70)
+    os_ = rsi_th.get("oversold", 30)
+    if ob != 70 or os_ != 30:
+        base += f" RSI 기준이 {ob}/{os_}로 조정되어 기술적 점수에 반영됨."
+
+    return base
 
 
 def _build_flow_sentence(indicators: dict, sd: dict, sig: dict) -> str:

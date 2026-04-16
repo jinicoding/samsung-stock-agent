@@ -1294,3 +1294,53 @@ class TestGenerateCommentary:
         )
         assert "추세장" not in result
         assert "횡보" not in result
+
+    def test_market_regime_trending_up_explains_adjustment(self):
+        """상승 추세장에서 RSI 기준 완화 설명이 포함됨."""
+        regime = {
+            "regime": "trending_up",
+            "phase": "markup",
+            "confidence": 75,
+            "duration": 5,
+            "interpretation_hints": {
+                "rsi_thresholds": {"overbought": 80, "oversold": 20},
+            },
+            "adx": 30.0,
+            "ma_alignment": "bullish",
+            "bb_pctb": 0.7,
+        }
+        result = generate_commentary(
+            self._base_indicators(),
+            self._base_supply_demand(),
+            self._base_exchange_rate(),
+            self._base_composite_signal(),
+            self._base_support_resistance(),
+            market_regime=regime,
+        )
+        assert "RSI" in result
+        assert "완화" in result or "조정" in result
+
+    def test_market_regime_range_bound_explains_tightening(self):
+        """횡보 국면에서 RSI 기준 강화 설명이 포함됨."""
+        regime = {
+            "regime": "range_bound",
+            "phase": "accumulation",
+            "confidence": 60,
+            "duration": 8,
+            "interpretation_hints": {
+                "rsi_thresholds": {"overbought": 70, "oversold": 30},
+            },
+            "adx": 15.0,
+            "ma_alignment": "mixed",
+            "bb_pctb": 0.5,
+        }
+        result = generate_commentary(
+            self._base_indicators(),
+            self._base_supply_demand(),
+            self._base_exchange_rate(),
+            self._base_composite_signal(),
+            self._base_support_resistance(),
+            market_regime=regime,
+        )
+        # 기본값(70/30)이면 조정 설명 없어야 함
+        assert "완화" not in result

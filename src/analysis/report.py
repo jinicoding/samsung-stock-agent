@@ -1207,7 +1207,12 @@ def _build_market_regime_section(regime: dict) -> list[str]:
 
     rsi_th = hints.get("rsi_thresholds")
     if rsi_th:
-        lines.append(f"  RSI 기준: 과매수 {rsi_th['overbought']} / 과매도 {rsi_th['oversold']}")
+        ob = rsi_th["overbought"]
+        os_ = rsi_th["oversold"]
+        lines.append(f"  RSI 기준: 과매수 {ob} / 과매도 {os_}")
+        if ob != 70 or os_ != 30:
+            direction = "완화" if ob > 70 or os_ < 30 else "강화"
+            lines.append(f"  ⚙️ 체제 조정: {regime_name}에서 RSI 기준 {direction}(기본 70/30 → {ob}/{os_}) → 기술적 점수에 반영")
 
     sr_rel = hints.get("support_resistance_reliability")
     if sr_rel:

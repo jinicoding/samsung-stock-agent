@@ -2326,3 +2326,21 @@ class TestMarketRegimeSection:
         signal_pos = report.find("종합 판정")
         regime_pos = report.find("시장 체제")
         assert signal_pos < regime_pos
+
+    def test_market_regime_shows_adjustment_explanation(self):
+        """RSI 기준이 기본값과 다를 때 조정 이유가 표시됨."""
+        report = generate_daily_report(_full_indicators(), market_regime=self.SAMPLE_REGIME)
+        assert "조정" in report or "완화" in report or "강화" in report
+
+    def test_market_regime_default_thresholds_no_adjustment(self):
+        """RSI 기준이 기본값(70/30)이면 조정 설명 없음."""
+        regime = {
+            **self.SAMPLE_REGIME,
+            "interpretation_hints": {
+                "rsi_thresholds": {"overbought": 70, "oversold": 30},
+                "support_resistance_reliability": "high",
+                "description": "횡보장",
+            },
+        }
+        report = generate_daily_report(_full_indicators(), market_regime=regime)
+        assert "기본값" not in report

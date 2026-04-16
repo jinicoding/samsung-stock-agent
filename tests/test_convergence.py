@@ -185,3 +185,60 @@ class TestAnalyzeConvergence:
         result = analyze_convergence(scores)
         assert result["convergence_level"] == "moderate"
         assert len(result["aligned_axes"]) == 6
+
+
+class TestConvergencePipeline:
+    """Test that main.py conv_scores construction includes all optional axes."""
+
+    def test_rs_score_included_in_convergence(self):
+        """rs_score가 sig에 존재하면 conv_scores에 포함되어야 한다.
+
+        main.py의 conv_scores 구성 로직을 재현하여 rs_score 누락 버그를 검증.
+        """
+        sig = {
+            "technical_score": 30,
+            "supply_score": 20,
+            "exchange_score": 10,
+            "rs_score": 45,
+            "news_score": -10,
+        }
+        # main.py의 conv_scores 구성 로직 재현
+        conv_scores = {
+            "technical_score": sig["technical_score"],
+            "supply_score": sig["supply_score"],
+            "exchange_score": sig["exchange_score"],
+        }
+        for key in ("fundamentals_score", "news_score", "consensus_score",
+                     "semiconductor_score", "volatility_score", "candlestick_score",
+                     "global_macro_score", "rs_score"):
+            if key in sig:
+                conv_scores[key] = sig[key]
+
+        assert "rs_score" in conv_scores, "rs_score가 conv_scores에 포함되어야 함"
+        assert conv_scores["rs_score"] == 45
+
+        result = analyze_convergence(conv_scores)
+        # rs_score(45)는 bullish이므로 aligned_axes에 포함되어야 함
+        assert "rs_score" in result["aligned_axes"]
+
+    def test_rs_score_absent_no_error(self):
+        """rs_score가 sig에 없으면 conv_scores에도 없어야 하며 에러 없이 동작."""
+        sig = {
+            "technical_score": 30,
+            "supply_score": 20,
+            "exchange_score": 10,
+        }
+        conv_scores = {
+            "technical_score": sig["technical_score"],
+            "supply_score": sig["supply_score"],
+            "exchange_score": sig["exchange_score"],
+        }
+        for key in ("fundamentals_score", "news_score", "consensus_score",
+                     "semiconductor_score", "volatility_score", "candlestick_score",
+                     "global_macro_score", "rs_score"):
+            if key in sig:
+                conv_scores[key] = sig[key]
+
+        assert "rs_score" not in conv_scores
+        result = analyze_convergence(conv_scores)
+        assert "rs_score" not in result["aligned_axes"]

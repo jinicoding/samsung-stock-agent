@@ -255,7 +255,7 @@ def main(dry_run: bool = False):
         }
         for key in ("fundamentals_score", "news_score", "consensus_score",
                      "semiconductor_score", "volatility_score", "candlestick_score",
-                     "global_macro_score"):
+                     "global_macro_score", "rs_score"):
             if key in sig:
                 conv_scores[key] = sig[key]
         conv = analyze_convergence(conv_scores)
@@ -315,7 +315,7 @@ def main(dry_run: bool = False):
         }
         for key in ("fundamentals_score", "news_score", "consensus_score",
                      "semiconductor_score", "volatility_score", "candlestick_score",
-                     "global_macro_score"):
+                     "global_macro_score", "rs_score"):
             if key in sig:
                 current_scores[key] = sig[key]
         pm = find_similar_patterns(current_scores, db_module)

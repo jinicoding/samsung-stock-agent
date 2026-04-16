@@ -15,6 +15,7 @@ ALL_AXES = [
     "semiconductor_score",
     "volatility_score",
     "candlestick_score",
+    "rs_score",
 ]
 
 # 방향 분류 임계값

@@ -1,53 +1,37 @@
 ## Session Plan
 
-Day 25 (2026-04-15 15:30) — 시장 체제(Market Regime) 파이프라인 통합 + 체제 기반 시그널 조정
+Day 26 (2026-04-16 11:30) — 시장 체제 적응형 시그널 + 축-가격 상관관계 동태 분석
 
 ### 자기 평가 요약
 
-958개 테스트 전부 통과, 버그 없음. 커뮤니티 이슈 없음. Day 25 11:30에 시장 체제 인식 모듈(`market_regime.py`)을 구축했으나 파이프라인에 미통합 상태. `main.py`에서 호출하지 않고, `report.py`에 표시되지 않으며, `commentary.py`에 반영되지 않는다. 2단계 확장 패턴의 2단계(파이프라인 통합)가 필요한 상태. 체제 인식이 단순 표시를 넘어 실제 시그널 해석에 영향을 미치도록 확장하면, "지금 어떤 장인가"에 따라 같은 RSI 70이라도 추세장에서는 정상, 횡보장에서는 과매수로 달리 해석할 수 있어 분석 품질이 한 단계 올라간다.
+971개 테스트 전부 통과, 버그 없음. 커뮤니티 이슈 없음. Day 25에서 시장 체제 인식 모듈을 구축·통합하여 리포트·코멘터리에 체제 정보가 표시되지만, 핵심 Gap이 남아 있다: (1) 시장 체제가 시그널 해석에 실제로 영향을 미치지 않음 — `signal.py`에 market_regime이 연결되지 않아 추세장과 횡보장에서 동일한 RSI 해석이 적용됨. (2) 10축이 독립적으로 점수를 산출하지만, 삼성전자와 각 외부 변수 간 상관관계의 시간적 변화를 추적하지 않아 "지금 어떤 변수에 가장 민감한가"라는 질문에 답할 수 없음.
 
-### Task 1: 시장 체제(Market Regime) 리포트·코멘터리·파이프라인 통합
-Files: src/main.py, src/analysis/report.py, src/analysis/commentary.py, tests/test_report.py, tests/test_commentary.py, tests/test_main.py
-Description: Day 25 11:30에 구축한 `market_regime.py` 모듈을 일일 파이프라인에 완전 통합한다.
+### Task 1: 시장 체제 적응형 시그널 스코어링 — 체제별 기술적 해석 조정
 
-1. **main.py**: 기술적 지표 계산(3단계) 직후에 `compute_market_regime()` 호출
-   - `from src.analysis.market_regime import compute_market_regime`
-   - try/except로 감싸고 실패 시 None 처리 (기존 패턴과 동일)
-   - 결과를 `generate_daily_report()`와 `generate_commentary()`에 `market_regime=` 파라미터로 전달
+Files: src/analysis/signal.py, src/main.py, tests/test_signal.py
+Description: Day 25에서 구축한 market_regime 모듈의 `interpretation_hints`를 `signal.py`의 `compute_composite_signal()`에 연결하여, 시장 체제에 따라 기술적 지표 해석을 조정한다.
 
-2. **report.py**: 시장 체제 섹션 HTML 렌더링 추가
-   - `generate_daily_report()`에 `market_regime: dict | None = None` 파라미터 추가
-   - 종합 판정 섹션 뒤에 시장 체제 섹션 배치
-   - 체제 한글명(추세상승/추세하락/횡보/돌파/붕괴), 국면(매집/마크업/분배/마크다운), 확신도, 지속 일수를 표시
-   - `interpretation_hints`의 핵심 내용(RSI 기준, 지지/저항 신뢰도)을 해석 가이드로 표시
+1. `compute_composite_signal()`에 `market_regime: dict | None = None` 파라미터 추가
+2. `_score_technical()`에 체제 정보를 전달하여 RSI 임계값을 체제별로 조정:
+   - 추세장(trending_up/down): RSI 80/20 (기존 70/30보다 완화 → 추세 추종 유리)
+   - 횡보장(range_bound): RSI 70/30 (기존 유지 → 평균 회귀 전략)
+   - 돌파장(breakout/breakdown): RSI 80/20 + 볼린저 돌파 가중치 상향
+3. 체제 확신도(confidence)가 50 미만이면 조정을 적용하지 않음 (불확실한 체제에서는 기본 해석 유지)
+4. `main.py`에서 market_regime 결과를 `compute_composite_signal()`에 전달하도록 배관 연결
+5. 테스트: 동일 지표 데이터에 체제만 다를 때 점수가 달라지는 것을 검증, `market_regime=None`일 때 기존 동작 100% 유지
 
-3. **commentary.py**: 체제 맥락을 코멘터리에 프레이밍으로 반영
-   - `generate_commentary()`에 `market_regime: dict | None = None` 파라미터 추가
-   - 체제별 맥락 문장: "상승 추세장(확신도 N%)에서", "횡보 국면이 N일째 지속되는 가운데" 등
-   - 기존 코멘터리의 해석을 보강하는 프레이밍 역할
+이 변경으로 "같은 RSI 30이지만 추세 하락장에서는 조심, 횡보장에서는 매수 기회"라는 맥락 인식이 시그널에 반영된다.
 
-4. **테스트**: 리포트·코멘터리·파이프라인 통합 테스트 추가
-   - 체제 정보가 리포트 HTML에 표시되는지
-   - 코멘터리에 체제 맥락이 반영되는지
-   - `market_regime=None`일 때 안전 처리되는지
+### Task 2: 축-가격 상관관계 동태 분석 모듈 — 민감도 변화 추적
 
-### Task 2: 시장 체제 기반 시그널 해석 조정 (Regime-Aware Signal Contextualization)
-Files: src/analysis/signal.py, tests/test_signal.py
-Description: `market_regime.py`의 `interpretation_hints`를 활용하여 종합 시그널의 기술적 분석 점수를 체제에 맞게 조정한다.
+Files: src/analysis/correlation_dynamics.py (신규), tests/test_correlation_dynamics.py (신규)
+Description: 삼성전자 주가 변동과 각 외부 축(환율, SOX, NASDAQ, VIX) 간의 롤링 상관계수를 추적하여, "지금 삼성전자는 어떤 변수에 가장 민감한가"를 정량화하는 모듈을 구축한다.
 
-1. **signal.py**: `compute_composite_signal()`에 `market_regime: dict | None = None` 파라미터 추가
-   - `market_regime`이 제공되면 `interpretation_hints`를 읽어 기술적 점수를 조정:
-     - 추세장: RSI 과매수/과매도 임계값 80/20 적용 → RSI 기반 감점/가점 완화 (기존 70/30보다 ±15% 범위 축소)
-     - 횡보장: RSI 기준 유지(70/30), 지지/저항 기반 점수의 가중치 +10%
-     - 돌파장: 거래량 확인 없는 돌파 시그널의 점수를 -20% 감쇄
-   - `market_regime=None`일 때 기존 동작 100% 유지 (기본값으로 조정 없음)
-   - 조정 결과를 시그널 dict에 `regime_adjustment` 키로 추가하여 투명성 확보
+1. `signal_history` + `daily_prices` 테이블에서 최근 60일 데이터 조회
+2. 20일 롤링 상관계수를 축별로 계산 (Pearson correlation: 주가 일일수익률 vs 축별 점수 변화)
+3. 상관계수의 최근 변화(강화/약화/전환)를 감지
+4. 결과: `{"correlations": {"exchange": {"current": 0.72, "prev": 0.45, "change": "강화"}, ...}, "primary_driver": "exchange", "primary_correlation": 0.72}`
+5. "삼성전자는 현재 환율 변동에 가장 민감하게 반응 중 (상관 0.72, 20일 전 0.45에서 급등)" 같은 인사이트의 데이터 기반
+6. 테스트: 합성 데이터로 상관계수 계산 정확성, 변화 감지 로직, 엣지 케이스(데이터 부족, 상수 시계열) 검증
 
-2. **main.py**: `compute_composite_signal()` 호출 시 `market_regime` 전달
-   - Task 1에서 이미 변수를 확보하므로 배관만 연결
-
-3. **테스트**: 체제별 시그널 조정 테스트
-   - trending_up 체제에서 RSI 75일 때 과매수 감점이 적용되지 않는지
-   - range_bound 체제에서 RSI 75일 때 과매수 감점이 정상 적용되는지
-   - breakout 체제에서 거래량 미확인 시 감쇄가 작동하는지
-   - `market_regime=None`일 때 기존 테스트 전부 통과하는지
+리포트·코멘터리·파이프라인 통합은 다음 세션(15:30)에서 2단계 패턴으로 진행. 이 세션은 모듈 구축에 집중.

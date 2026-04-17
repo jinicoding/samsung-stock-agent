@@ -296,6 +296,7 @@ def main(dry_run: bool = False):
         volatility_score=sig.get("volatility_score"),
         candlestick_score=sig.get("candlestick_score"),
         global_macro_score=sig.get("global_macro_score"),
+        rs_score=sig.get("rs_score"),
     )
 
     # 3.92) 일일 델타 분석

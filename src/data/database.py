@@ -68,14 +68,15 @@ def init_db() -> None:
             semiconductor_score REAL DEFAULT NULL,
             volatility_score    REAL DEFAULT NULL,
             candlestick_score   REAL DEFAULT NULL,
-            global_macro_score  REAL DEFAULT NULL
+            global_macro_score  REAL DEFAULT NULL,
+            rs_score            REAL DEFAULT NULL
         )
     """)
     # 기존 DB 마이그레이션: 새 컬럼이 없으면 추가
     _new_columns = [
         "fundamentals_score", "news_score", "consensus_score",
         "semiconductor_score", "volatility_score", "candlestick_score",
-        "global_macro_score",
+        "global_macro_score", "rs_score",
     ]
     existing = {row[1] for row in conn.execute("PRAGMA table_info(signal_history)").fetchall()}
     for col in _new_columns:
@@ -283,20 +284,21 @@ def upsert_signal_history(
     volatility_score: float | None = None,
     candlestick_score: float | None = None,
     global_macro_score: float | None = None,
+    rs_score: float | None = None,
 ) -> None:
-    """시그널 이력 단건 삽입/갱신 (10축 점수 지원)."""
+    """시그널 이력 단건 삽입/갱신 (11축 점수 지원)."""
     conn = get_connection()
     conn.execute(
         "INSERT OR REPLACE INTO signal_history "
         "(date, score, grade, technical_score, supply_score, exchange_score, price, "
         "fundamentals_score, news_score, consensus_score, "
         "semiconductor_score, volatility_score, candlestick_score, "
-        "global_macro_score) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "global_macro_score, rs_score) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (date, score, grade, technical_score, supply_score, exchange_score, price,
          fundamentals_score, news_score, consensus_score,
          semiconductor_score, volatility_score, candlestick_score,
-         global_macro_score),
+         global_macro_score, rs_score),
     )
     conn.commit()
     conn.close()
@@ -309,7 +311,7 @@ def get_signal_history(days: int) -> list[dict]:
         "SELECT date, score, grade, technical_score, supply_score, "
         "exchange_score, price, fundamentals_score, news_score, "
         "consensus_score, semiconductor_score, volatility_score, "
-        "candlestick_score, global_macro_score FROM signal_history "
+        "candlestick_score, global_macro_score, rs_score FROM signal_history "
         "ORDER BY date DESC LIMIT ?",
         (days,),
     )

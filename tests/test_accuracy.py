@@ -176,6 +176,7 @@ AXES = [
     "technical_score", "supply_score", "exchange_score",
     "fundamentals_score", "news_score", "consensus_score",
     "semiconductor_score", "volatility_score", "candlestick_score",
+    "global_macro_score", "rs_score",
 ]
 
 
@@ -201,12 +202,14 @@ def _seed_data_with_axes(db):
         "2026-03-10", 30.0, "매수우세", 12.0, 10.0, 8.0, 58200,
         fundamentals_score=5.0, news_score=-3.0, consensus_score=4.0,
         semiconductor_score=6.0, volatility_score=0.0, candlestick_score=2.0,
+        global_macro_score=3.0, rs_score=7.0,
     )
     # 시그널 2: 03-13, 전체적으로 매도. 가격 상승 → 양수축은 hit, 음수축은 miss
     db.upsert_signal_history(
         "2026-03-13", -40.0, "매도우세", -16.0, -14.0, -10.0, 59400,
         fundamentals_score=-8.0, news_score=5.0, consensus_score=-3.0,
         semiconductor_score=-7.0, volatility_score=None, candlestick_score=-4.0,
+        global_macro_score=-5.0, rs_score=-4.0,
     )
 
 
@@ -291,6 +294,35 @@ class TestPerAxisAccuracy:
         # 03-13: (59800-59400)/59400*100 = 0.673%
         expected_avg = ((58600 - 58200) / 58200 * 100 + (59800 - 59400) / 59400 * 100) / 2
         assert tech["avg_return_1d"] == pytest.approx(expected_avg, abs=0.01)
+
+    def test_rs_score_present_in_per_axis(self, temp_db):
+        """rs_score가 per_axis 결과에 포함되는지 검증."""
+        _, db = temp_db
+        _seed_data_with_axes(db)
+        from src.analysis.accuracy import evaluate_signals
+        result = evaluate_signals(db)
+        per_axis = result["summary"]["per_axis"]
+        assert "rs_score" in per_axis
+
+    def test_rs_score_hit_rate(self, temp_db):
+        """rs_score: +7(03-10, 상승→hit), -4(03-13, 상승→miss) → 50%."""
+        _, db = temp_db
+        _seed_data_with_axes(db)
+        from src.analysis.accuracy import evaluate_signals
+        result = evaluate_signals(db)
+        rs = result["summary"]["per_axis"]["rs_score"]
+        assert rs["hit_rate_1d"] == pytest.approx(50.0, abs=0.1)
+        assert rs["evaluated_1d"] == 2
+
+    def test_rs_score_avg_return(self, temp_db):
+        """rs_score의 avg_return은 두 시그널의 평균 forward return."""
+        _, db = temp_db
+        _seed_data_with_axes(db)
+        from src.analysis.accuracy import evaluate_signals
+        result = evaluate_signals(db)
+        rs = result["summary"]["per_axis"]["rs_score"]
+        expected_avg = ((58600 - 58200) / 58200 * 100 + (59800 - 59400) / 59400 * 100) / 2
+        assert rs["avg_return_1d"] == pytest.approx(expected_avg, abs=0.01)
 
     def test_empty_signals_per_axis(self, temp_db):
         """시그널이 없을 때 per_axis도 빈 구조."""

@@ -40,6 +40,7 @@ def generate_commentary(
     daily_delta: dict | None = None,
     risk_management: dict | None = None,
     market_regime: dict | None = None,
+    fibonacci: dict | None = None,
 ) -> str:
     """분석 결과를 2~3문장 자연어 코멘터리로 변환한다.
 
@@ -88,6 +89,11 @@ def generate_commentary(
     tf_sentence = _build_timeframe_sentence(timeframe_alignment or {}, weekly_indicators or {})
     if tf_sentence:
         sentences.append(tf_sentence)
+
+    # --- 1.9) 피보나치 되돌림 문장 ---
+    fib_sentence = _build_fibonacci_sentence(fibonacci or {}, indicators.get("current_price", 0))
+    if fib_sentence:
+        sentences.append(fib_sentence)
 
     # --- 2) 보조 경고/참고 문장: RSI, 볼린저, 지지/저항 ---
     caution = _build_caution_sentence(indicators, sr)
@@ -921,3 +927,38 @@ def _build_risk_management_sentence(rm: dict) -> str:
         return ""
 
     return ". ".join(parts) + "."
+
+
+_FIB_LEVEL_INTERPRETATION = {
+    "0.236": ("매우 얕은 되돌림으로 강한 추세가 유지되고 있습니다", "얕은"),
+    "0.382": ("얕은 되돌림 구간으로 추세의 힘이 강하게 유지되고 있습니다", "얕은"),
+    "0.5": ("중간 되돌림 구간으로 추세의 방향성 확인이 필요합니다", "중간"),
+    "0.618": ("깊은 되돌림 구간으로 추세 약화 가능성에 유의할 필요가 있습니다", "깊은"),
+    "0.786": ("매우 깊은 되돌림으로 추세 전환 가능성이 높아지고 있습니다", "매우 깊은"),
+}
+
+
+def _build_fibonacci_sentence(fib: dict, current_price: float) -> str:
+    """피보나치 되돌림 수준 관련 자연어 문장."""
+    if not fib:
+        return ""
+
+    position = fib.get("position", {})
+    below = position.get("below")
+    above = position.get("above")
+    retracement = fib.get("retracement", {})
+
+    if not below or not retracement:
+        return ""
+
+    interp = _FIB_LEVEL_INTERPRETATION.get(below)
+    if interp:
+        desc, depth = interp
+        ns = position.get("nearest_support")
+        if ns is not None and current_price > 0:
+            dist_pct = (current_price - ns) / current_price * 100
+            if dist_pct < 2.0:
+                return f"피보나치 {below} 되돌림 지지선({int(ns):,}원)에 근접해 있으며, {desc}."
+        return f"현재가가 피보나치 {below}~{above} 구간에 위치하며, {desc}."
+
+    return ""

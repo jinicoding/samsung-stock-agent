@@ -2,7 +2,7 @@
 
 import pytest
 
-from src.analysis.report import generate_daily_report, classify_ma_alignment, assess_volume, assess_market_temperature, classify_macd, classify_bb_position, classify_stochastic, _build_executive_summary
+from src.analysis.report import generate_daily_report, classify_ma_alignment, assess_volume, assess_market_temperature, classify_macd, classify_bb_position, classify_stochastic, _build_executive_summary, _build_fibonacci_section
 
 
 class TestClassifyMaAlignment:
@@ -2344,3 +2344,77 @@ class TestMarketRegimeSection:
         }
         report = generate_daily_report(_full_indicators(), market_regime=regime)
         assert "기본값" not in report
+
+
+SAMPLE_FIBONACCI = {
+    "retracement": {"0.0": 60000, "0.236": 58112, "0.382": 56952, "0.5": 56000, "0.618": 55048, "0.786": 53712, "1.0": 52000},
+    "extension": {"1.0": 68000, "1.272": 70176, "1.618": 72944},
+    "position": {"below": "0.618", "above": "0.5", "nearest_support": 55048, "nearest_resistance": 56000},
+    "swing_high": {"price": 60000, "date": "2026-03-15", "index": 40},
+    "swing_low": {"price": 52000, "date": "2026-03-01", "index": 10},
+    "trend": "up",
+}
+
+SAMPLE_FIBONACCI_EMPTY = {
+    "retracement": {},
+    "extension": {},
+    "position": {"below": None, "above": None, "nearest_support": None, "nearest_resistance": None},
+    "swing_high": None,
+    "swing_low": None,
+    "trend": None,
+}
+
+
+class TestBuildFibonacciSection:
+    """피보나치 되돌림 섹션 렌더링 테스트."""
+
+    def test_section_returns_list_of_strings(self):
+        result = _build_fibonacci_section(SAMPLE_FIBONACCI, 55500)
+        assert isinstance(result, list)
+        assert all(isinstance(line, str) for line in result)
+
+    def test_section_contains_header(self):
+        result = _build_fibonacci_section(SAMPLE_FIBONACCI, 55500)
+        joined = "\n".join(result)
+        assert "피보나치" in joined
+
+    def test_section_shows_retracement_levels(self):
+        result = _build_fibonacci_section(SAMPLE_FIBONACCI, 55500)
+        joined = "\n".join(result)
+        assert "0.382" in joined
+        assert "0.618" in joined
+
+    def test_section_shows_swing_points(self):
+        result = _build_fibonacci_section(SAMPLE_FIBONACCI, 55500)
+        joined = "\n".join(result)
+        assert "60,000" in joined or "60000" in joined
+        assert "52,000" in joined or "52000" in joined
+
+    def test_section_shows_current_position(self):
+        result = _build_fibonacci_section(SAMPLE_FIBONACCI, 55500)
+        joined = "\n".join(result)
+        assert "0.618" in joined or "0.5" in joined
+
+    def test_section_shows_extension_levels(self):
+        result = _build_fibonacci_section(SAMPLE_FIBONACCI, 55500)
+        joined = "\n".join(result)
+        assert "1.618" in joined or "확장" in joined
+
+    def test_empty_fibonacci_returns_empty_or_minimal(self):
+        result = _build_fibonacci_section(SAMPLE_FIBONACCI_EMPTY, 55500)
+        assert len(result) <= 2
+
+    def test_fibonacci_in_full_report(self):
+        report = generate_daily_report(_full_indicators(), fibonacci=SAMPLE_FIBONACCI)
+        assert "피보나치" in report
+
+    def test_fibonacci_none_no_section(self):
+        report = generate_daily_report(_full_indicators(), fibonacci=None)
+        assert "피보나치" not in report
+
+    def test_fibonacci_after_support_resistance(self):
+        sr = {"pivot": {"pp": 55500, "s1": 55000, "s2": 54500, "r1": 56000, "r2": 56500}, "nearest_support": 55000, "nearest_resistance": 56000, "swing_levels": [], "ma_levels": {}}
+        report = generate_daily_report(_full_indicators(), support_resistance=sr, fibonacci=SAMPLE_FIBONACCI)
+        sr_pos = report.find("📐 지지/저항선")
+        fib_pos = report.find("📐 피보나치 되돌림")
+        assert sr_pos < fib_pos

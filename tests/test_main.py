@@ -270,6 +270,15 @@ SAMPLE_VIX_RISK = {
 
 SAMPLE_GLOBAL_MACRO_SCORE = 15
 
+SAMPLE_FIBONACCI = {
+    "retracement": {"0.0": 60000, "0.236": 58112, "0.382": 56952, "0.5": 56000, "0.618": 55048, "0.786": 53712, "1.0": 52000},
+    "extension": {"1.0": 68000, "1.272": 70176, "1.618": 72944},
+    "position": {"below": "0.618", "above": "0.5", "nearest_support": 55048, "nearest_resistance": 56000},
+    "swing_high": {"price": 60000, "date": "2026-03-15", "index": 40},
+    "swing_low": {"price": 52000, "date": "2026-03-01", "index": 10},
+    "trend": "up",
+}
+
 SAMPLE_REPORT_HTML = "<b>삼성전자 일일 분석</b>"
 
 SAMPLE_REVERSAL = {
@@ -333,8 +342,9 @@ SAMPLE_REVERSAL = {
 @patch("src.main.build_watchpoints", return_value=SAMPLE_WATCHPOINTS)
 @patch("src.main.compute_daily_delta", return_value=None)
 @patch("src.main.compute_market_regime", return_value=None)
+@patch("src.main.analyze_fibonacci", return_value=SAMPLE_FIBONACCI)
 def test_pipeline_full(
-    mock_market_regime, mock_daily_delta, mock_watchpoints, mock_summarize_weekly, mock_sig_hist,
+    mock_fibonacci, mock_market_regime, mock_daily_delta, mock_watchpoints, mock_summarize_weekly, mock_sig_hist,
     mock_init, mock_bf_prices, mock_bf_sd,
     mock_fetch_nasdaq, mock_fetch_vix,
     mock_nasdaq_trend, mock_vix_risk, mock_global_macro_score,
@@ -452,7 +462,9 @@ def test_pipeline_full(
         daily_delta=None,
         risk_management=ANY,
         market_regime=None,
+        fibonacci=SAMPLE_FIBONACCI,
     )
+    mock_fibonacci.assert_called_once_with(SAMPLE_PRICES)
     mock_market_regime.assert_called_once()
     mock_send.assert_called_once_with(SAMPLE_REPORT_HTML)
 
@@ -498,8 +510,9 @@ def test_pipeline_full(
 @patch("src.main.backfill_prices")
 @patch("src.main.init_db")
 @patch("src.main.compute_market_regime", return_value=None)
+@patch("src.main.analyze_fibonacci", return_value=SAMPLE_FIBONACCI)
 def test_pipeline_dry_run(
-    mock_market_regime, mock_init, mock_bf_prices, mock_bf_sd,
+    mock_fibonacci, mock_market_regime, mock_init, mock_bf_prices, mock_bf_sd,
     mock_fetch_nasdaq, mock_fetch_vix,
     mock_nasdaq_trend, mock_vix_risk, mock_global_macro_score,
     mock_candlestick, mock_volatility,
@@ -568,8 +581,9 @@ def test_pipeline_dry_run(
 @patch("src.main.backfill_prices")
 @patch("src.main.init_db")
 @patch("src.main.compute_market_regime", return_value=None)
+@patch("src.main.analyze_fibonacci", return_value=SAMPLE_FIBONACCI)
 def test_pipeline_with_rs(
-    mock_market_regime, mock_init, mock_bf_prices, mock_bf_sd,
+    mock_fibonacci, mock_market_regime, mock_init, mock_bf_prices, mock_bf_sd,
     mock_fetch_nasdaq, mock_fetch_vix,
     mock_nasdaq_trend, mock_vix_risk, mock_global_macro_score,
     mock_candlestick, mock_volatility,
@@ -585,7 +599,7 @@ def test_pipeline_with_rs(
     mock_upsert_sig,
     mock_sig_trend, mock_eval, mock_report, mock_send,
 ):
-    """RS + 반도체 + 변동성 + 캔들스틱 + 글로벌매크로 분석이 파이프라인에 통합되어 composite_signal과 report에 전달된다."""
+    """RS + 반도체 + 변동성 + 캔들스틱 + 글로벌매크로 + 피보나치 분석이 파이프라인에 통합되어 composite_signal과 report에 전달된다."""
     from src.main import main
 
     main()
@@ -640,6 +654,9 @@ def test_pipeline_with_rs(
     # 수렴 분석 호출 확인
     mock_analyze_conv.assert_called_once()
     mock_adjust_conv.assert_called_once()
+    # 피보나치 분석 호출 확인
+    mock_fibonacci.assert_called_once_with(SAMPLE_PRICES)
+    assert report_kwargs[1].get("fibonacci") == SAMPLE_FIBONACCI
 
 
 @patch("src.main.send_message")
@@ -683,8 +700,9 @@ def test_pipeline_with_rs(
 @patch("src.main.backfill_prices")
 @patch("src.main.init_db")
 @patch("src.main.compute_market_regime", return_value=None)
+@patch("src.main.analyze_fibonacci", return_value=SAMPLE_FIBONACCI)
 def test_pipeline_kospi_failure_fallback(
-    mock_market_regime, mock_init, mock_bf_prices, mock_bf_sd,
+    mock_fibonacci, mock_market_regime, mock_init, mock_bf_prices, mock_bf_sd,
     mock_fetch_nasdaq, mock_fetch_vix,
     mock_nasdaq_trend, mock_vix_risk, mock_global_macro_score,
     mock_candlestick, mock_volatility,

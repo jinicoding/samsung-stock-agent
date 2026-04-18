@@ -452,6 +452,76 @@ def _build_support_resistance_section(sr: dict, current_price: float) -> list[st
     return lines
 
 
+_FIB_LEVEL_MEANING: dict[str, str] = {
+    "0.236": "약한 되돌림",
+    "0.382": "얕은 되돌림(강한 추세)",
+    "0.5": "중간 되돌림",
+    "0.618": "깊은 되돌림(약한 추세)",
+    "0.786": "매우 깊은 되돌림",
+}
+
+
+def _build_fibonacci_section(fib: dict, current_price: float) -> list[str]:
+    """피보나치 되돌림/확장 분석 결과를 HTML 라인 리스트로."""
+    retracement = fib.get("retracement", {})
+    if not retracement:
+        return []
+
+    lines = []
+    lines.append("")
+    lines.append("<b>📐 피보나치 되돌림</b>")
+
+    swing_high = fib.get("swing_high")
+    swing_low = fib.get("swing_low")
+    trend = fib.get("trend", "up")
+
+    if swing_high and swing_low:
+        trend_kr = "상승" if trend == "up" else "하락"
+        lines.append(
+            f"  스윙 고점: {_format_price(swing_high['price'])}원 ({swing_high['date']}) | "
+            f"스윙 저점: {_format_price(swing_low['price'])}원 ({swing_low['date']})"
+        )
+        lines.append(f"  추세: {trend_kr}")
+
+    # 되돌림 수준 테이블
+    key_levels = ["0.236", "0.382", "0.5", "0.618", "0.786"]
+    for label in key_levels:
+        price_level = retracement.get(label)
+        if price_level is None:
+            continue
+        meaning = _FIB_LEVEL_MEANING.get(label, "")
+        marker = " ◀" if fib.get("position", {}).get("below") == label else ""
+        lines.append(f"  {label}: {_format_price(price_level)}원 {meaning}{marker}")
+
+    # 현재가 위치
+    position = fib.get("position", {})
+    below = position.get("below")
+    above = position.get("above")
+    if below and above:
+        lines.append(f"  현재가 위치: {below} ~ {above} 구간")
+    ns = position.get("nearest_support")
+    nr = position.get("nearest_resistance")
+    if ns is not None:
+        dist_pct = (current_price - ns) / current_price * 100
+        lines.append(f"  피보나치 지지: {_format_price(ns)}원 ({dist_pct:+.1f}%)")
+    if nr is not None:
+        dist_pct = (nr - current_price) / current_price * 100
+        lines.append(f"  피보나치 저항: {_format_price(nr)}원 (+{dist_pct:.1f}%)")
+
+    # 확장 수준
+    extension = fib.get("extension", {})
+    if extension:
+        ext_parts = []
+        for label in ("1.272", "1.618"):
+            ext_price = extension.get(label)
+            if ext_price is not None:
+                ext_parts.append(f"{label}: {_format_price(ext_price)}원")
+        if ext_parts:
+            lines.append(f"  확장 수준: {' | '.join(ext_parts)}")
+
+    return lines
+
+
 _AXIS_KR_NAME: dict[str, str] = {
     "technical_score": "기술적",
     "supply_score": "수급",
@@ -1487,6 +1557,7 @@ def generate_daily_report(
     daily_delta: dict | None = None,
     risk_management: dict | None = None,
     market_regime: dict | None = None,
+    fibonacci: dict | None = None,
 ) -> str:
     """기술적 지표 dict를 HTML 텔레그램 메시지로 변환한다.
 
@@ -1597,6 +1668,7 @@ def generate_daily_report(
         daily_delta=daily_delta,
         risk_management=risk_management,
         market_regime=market_regime,
+        fibonacci=fibonacci,
     )
     if commentary:
         lines.append(f"💬 {commentary}")
@@ -1747,6 +1819,10 @@ def generate_daily_report(
     # 지지/저항선 (선택)
     if support_resistance is not None:
         lines.extend(_build_support_resistance_section(support_resistance, price))
+
+    # 피보나치 되돌림 (선택)
+    if fibonacci is not None:
+        lines.extend(_build_fibonacci_section(fibonacci, price))
 
     # 시그널 정확도 (선택)
     if accuracy_summary is not None:

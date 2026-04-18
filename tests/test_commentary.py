@@ -1344,3 +1344,75 @@ class TestGenerateCommentary:
         )
         # 기본값(70/30)이면 조정 설명 없어야 함
         assert "완화" not in result
+
+    # --- 피보나치 되돌림 코멘터리 테스트 ---
+
+    def _base_fibonacci(self, **overrides):
+        base = {
+            "retracement": {"0.0": 60000, "0.236": 58112, "0.382": 56952, "0.5": 56000, "0.618": 55048, "0.786": 53712, "1.0": 52000},
+            "extension": {"1.0": 68000, "1.272": 70176, "1.618": 72944},
+            "position": {"below": "0.618", "above": "0.5", "nearest_support": 55048, "nearest_resistance": 56000},
+            "swing_high": {"price": 60000, "date": "2026-03-15", "index": 40},
+            "swing_low": {"price": 52000, "date": "2026-03-01", "index": 10},
+            "trend": "up",
+        }
+        base.update(overrides)
+        return base
+
+    def test_fibonacci_near_618_support_mentioned(self):
+        """현재가가 0.618 되돌림 근처 → 깊은 되돌림/약한 추세 언급."""
+        result = generate_commentary(
+            self._base_indicators(current_price=55100),
+            self._base_supply_demand(),
+            self._base_exchange_rate(),
+            self._base_composite_signal(),
+            self._base_support_resistance(),
+            fibonacci=self._base_fibonacci(),
+        )
+        assert "피보나치" in result or "되돌림" in result
+
+    def test_fibonacci_near_382_mentioned(self):
+        """0.382 되돌림 근처 → 얕은 되돌림/강한 추세 언급."""
+        fib = self._base_fibonacci(
+            position={"below": "0.382", "above": "0.236", "nearest_support": 56952, "nearest_resistance": 58112},
+        )
+        result = generate_commentary(
+            self._base_indicators(current_price=57000),
+            self._base_supply_demand(),
+            self._base_exchange_rate(),
+            self._base_composite_signal(),
+            self._base_support_resistance(),
+            fibonacci=fib,
+        )
+        assert "피보나치" in result or "되돌림" in result
+
+    def test_fibonacci_none_no_mention(self):
+        """fibonacci=None이면 피보나치 관련 문장 없음."""
+        result = generate_commentary(
+            self._base_indicators(),
+            self._base_supply_demand(),
+            self._base_exchange_rate(),
+            self._base_composite_signal(),
+            self._base_support_resistance(),
+        )
+        assert "피보나치" not in result
+
+    def test_fibonacci_empty_no_mention(self):
+        """피보나치 데이터가 비어있으면 문장 없음."""
+        empty_fib = {
+            "retracement": {},
+            "extension": {},
+            "position": {"below": None, "above": None, "nearest_support": None, "nearest_resistance": None},
+            "swing_high": None,
+            "swing_low": None,
+            "trend": None,
+        }
+        result = generate_commentary(
+            self._base_indicators(),
+            self._base_supply_demand(),
+            self._base_exchange_rate(),
+            self._base_composite_signal(),
+            self._base_support_resistance(),
+            fibonacci=empty_fib,
+        )
+        assert "피보나치" not in result

@@ -1,17 +1,15 @@
 ## Session Plan
 
-Day 30 (2026-04-20 11:30) — 시그널 성과 백테스팅 프레임워크 구축
+Day 30 (2026-04-20 15:30) — 백테스팅 결과 파이프라인 통합 + 축별 기여도 데이터 품질 개선
 
 ### 자기 평가 요약
 
-1023개 테스트 전부 통과, 커뮤니티 이슈 없음. 11축 분석 체계 + 시장 체제 적응 + 멀티타임프레임 + 리스크 관리 + 피보나치가 모두 완성된 상태. 삼성전자 현재가 218,250원(+1.04%). 28일간 분석 축을 확장해왔으나, "이 시스템이 실제로 정확한가"를 체계적으로 검증하는 백테스팅 프레임워크가 부재하다. evaluate_signals()의 단순 적중률 추적은 있으나, 등급별·점수대별 성과 분석, 연속 성과 추이, 축별 기여도 분석이 없어 시스템 신뢰도를 정량적으로 제시할 수 없다. Day 16의 교훈 "피드백 루프: 예측→기록→검증 루프가 완성되어야 진짜 진화"에서 검증 단계를 체계화하는 것이 이번 진화의 핵심이다.
+1040개 테스트 전부 통과, 커뮤니티 이슈 없음. 11:30 세션에서 백테스팅 모듈(`backtest.py`)을 구축 완료했으나 리포트·코멘터리·파이프라인에 아직 통합되지 않았다. 2단계 확장 패턴(모듈 구축→파이프라인 통합)에 따라 이번 세션은 통합 세션이다. 추가로 `_axis_contribution()`이 원본 축 점수 없이 hit/return에서 방향을 역추정하는 workaround를 사용 중이어서 상관계수 정확도가 떨어지는 데이터 품질 이슈를 발견했다.
 
-### Task 1: 시그널 성과 백테스팅 모듈 구축
+### Task 1: 백테스팅 결과 리포트·코멘터리·파이프라인 통합
+Files: src/analysis/report.py, src/analysis/commentary.py, src/main.py, tests/test_report.py, tests/test_commentary.py, tests/test_main.py
+Description: 11:30 세션에서 구축한 백테스팅 모듈(`backtest.py`)의 결과를 리포트·코멘터리·일일 파이프라인에 통합한다. (1) `report.py`에 백테스팅 성과 섹션을 추가하여, 등급별 평균 수익률·적중률, 점수 구간별 성과, 축별 기여도 순위를 HTML 테이블로 렌더링한다. (2) `commentary.py`에 백테스팅 결과를 자연어로 해석하는 로직을 추가한다 — "강력매수 시그널의 5일 적중률이 N%로, 시그널 신뢰도가 높다/낮다" 등의 맥락 설명. (3) `main.py`에서 `run_backtest()`를 호출하고 결과를 리포트·코멘터리 함수에 전달하도록 배관을 연결한다. 테스트를 먼저 작성한다. 2단계 확장 패턴의 15회째 적용.
 
-Files: src/analysis/backtest.py, tests/test_backtest.py
-Description: signal_history 테이블의 이력 데이터를 기반으로 종합 시그널의 예측 성과를 체계적으로 검증하는 백테스팅 모듈을 구축한다. 핵심 산출 지표: (1) 등급별(강력매수~강력매도) 평균 수익률과 적중률 (1/3/5일), (2) 시그널 점수 구간별 성과 통계 — 어느 점수대에서 시스템이 가장 정확한지, (3) 연속 성과 분석 — 최대 연승/연패, 수익 곡선, (4) 축별 기여도 분석 — 각 축의 시그널 방향과 실제 수익률의 상관을 계산하여 어떤 축이 가장 유용한지 판별. 테스트를 먼저 작성하고 구현한다. database 모듈의 get_signal_history()와 get_prices()를 사용하여 시그널-수익률 매칭을 수행한다. evaluate_signals()의 단순 적중률 추적을 넘어, "이 시스템을 신뢰할 수 있는가"에 대한 정량적 근거를 제공하는 것이 목표다.
-
-### Task 2: 백테스트 결과 리포트·코멘터리·파이프라인 통합
-
-Files: src/analysis/report.py, src/analysis/commentary.py, src/main.py, tests/test_report.py, tests/test_commentary.py
-Description: Task 1에서 구축한 백테스팅 모듈의 결과를 리포트·코멘터리·일일 파이프라인에 통합한다. (1) report.py에 시그널 성과 요약 섹션 추가 — 등급별 적중률 테이블, 현재 등급의 과거 성과, 수익 곡선 트렌드를 HTML로 렌더링. (2) commentary.py에 백테스트 맥락 해석 추가 — "현재 매수우세 판정, 과거 동일 등급에서 5일 적중률 N%"와 같은 맥락 코멘트. (3) main.py에서 백테스트 실행 → 리포트·코멘터리에 전달하는 배관 연결. 투자자가 "이 시그널이 과거에 얼마나 정확했는가"를 직접 확인할 수 있게 하여 시스템 신뢰도를 투명하게 제시하는 것이 목표다. 모듈 구축(Task 1)→파이프라인 통합(Task 2)의 2단계 확장 패턴을 따른다.
+### Task 2: 백테스트 축별 기여도 데이터 품질 개선 — signal_history 원본 점수 직접 활용
+Files: src/data/database.py, src/analysis/backtest.py, tests/test_backtest.py, tests/test_database.py
+Description: 현재 `backtest.py`의 `_axis_contribution()`이 `evaluate_signals()`의 per_axis hit/return 데이터에서 축 방향을 역추정하는 workaround를 사용하고 있어, 상관계수 계산의 정확도가 떨어진다. `database.py`에 signal_history 테이블의 원본 축 점수(technical_score, supply_score 등 11축)와 forward return을 함께 조회하는 헬퍼 함수 `get_signal_scores_with_returns(days)`를 추가하고, `_axis_contribution()`이 이 원본 점수를 직접 사용하여 피어슨 상관계수를 계산하도록 개선한다. 이를 통해 "어떤 축이 실제로 수익률에 가장 기여했는가"를 정확하게 측정할 수 있게 된다.

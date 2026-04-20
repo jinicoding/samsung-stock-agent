@@ -1,15 +1,17 @@
 ## Session Plan
 
-Day 28 (2026-04-18 15:30) — 피보나치 되돌림 리포트·코멘터리·파이프라인 통합
+Day 30 (2026-04-20 11:30) — 시그널 성과 백테스팅 프레임워크 구축
 
 ### 자기 평가 요약
 
-1009개 테스트 전부 통과, 커뮤니티 이슈 없음. Day 28 11:30에 피보나치 되돌림 분석 모듈(`src/analysis/fibonacci.py`, 175줄)을 구축 완료했으나 파이프라인에 미통합 상태. 2단계 확장 패턴(모듈 구축 → 파이프라인 통합)의 두 번째 단계를 실행한다. 피보나치 되돌림은 기존 지지/저항 분석(MA·피벗·스윙 기반)과 독립적인 방법론이므로, 두 방법이 같은 가격대를 가리킬 때 신뢰도가 높아지는 "교차 검증" 효과를 기대할 수 있다.
+1023개 테스트 전부 통과, 커뮤니티 이슈 없음. 11축 분석 체계 + 시장 체제 적응 + 멀티타임프레임 + 리스크 관리 + 피보나치가 모두 완성된 상태. 삼성전자 현재가 218,250원(+1.04%). 28일간 분석 축을 확장해왔으나, "이 시스템이 실제로 정확한가"를 체계적으로 검증하는 백테스팅 프레임워크가 부재하다. evaluate_signals()의 단순 적중률 추적은 있으나, 등급별·점수대별 성과 분석, 연속 성과 추이, 축별 기여도 분석이 없어 시스템 신뢰도를 정량적으로 제시할 수 없다. Day 16의 교훈 "피드백 루프: 예측→기록→검증 루프가 완성되어야 진짜 진화"에서 검증 단계를 체계화하는 것이 이번 진화의 핵심이다.
 
-### Task 1: 피보나치 되돌림 리포트·코멘터리·파이프라인 통합
-Files: src/main.py, src/analysis/report.py, src/analysis/commentary.py, tests/test_report.py, tests/test_commentary.py, tests/test_main.py
-Description: 11:30 세션에서 구축한 피보나치 되돌림 모듈을 일일 파이프라인에 완전 통합한다. (1) `main.py`에서 `analyze_fibonacci(prices)`를 호출하고 결과를 `generate_daily_report()`와 `generate_commentary()`에 전달하는 배관 연결. (2) `report.py`에 피보나치 되돌림/확장 수준, 현재가 위치, 스윙 고점/저점을 HTML 테이블로 렌더링하는 섹션 추가. 기존 지지/저항 섹션 근처에 배치하여 MA 기반 vs 스윙 구조 기반 레벨이 시각적으로 비교되도록 한다. (3) `commentary.py`에 피보나치 데이터를 자연어로 해석하는 로직 추가 — 현재가가 어떤 되돌림 수준 근처에 있는지, 해당 수준의 의미(38.2%는 얕은 되돌림=강한 추세, 61.8%는 깊은 되돌림=약한 추세 등)를 설명. 테스트를 먼저 작성하고 구현한다.
+### Task 1: 시그널 성과 백테스팅 모듈 구축
 
-### Task 2: 피보나치·지지저항 수렴 구간(Confluence Zone) 감지
-Files: src/analysis/support_resistance.py, src/analysis/report.py, tests/test_support_resistance.py, tests/test_report.py
-Description: 피보나치 되돌림 수준과 기존 지지/저항선(MA·피벗·스윙 기반)이 근접하게 겹치는 구간(confluence zone)을 감지하는 기능을 추가한다. (1) `support_resistance.py`에 `find_confluence_zones(fibonacci_levels, sr_levels, tolerance_pct=0.5)` 함수를 구현하여, 피보나치 수준과 기존 S/R 레벨이 ±0.5% 이내에서 겹치는 구간을 탐지. (2) 겹침 개수에 따라 각 존의 강도(strong: 3개 이상 수렴 / moderate: 2개 수렴)를 판정. (3) `report.py`의 지지/저항 섹션에 수렴 존 정보를 "강화된 레벨"로 표시. (4) `main.py`에서 피보나치 결과와 기존 S/R 결과를 `find_confluence_zones()`에 전달하는 배관 연결. 테스트를 먼저 작성하고 구현한다.
+Files: src/analysis/backtest.py, tests/test_backtest.py
+Description: signal_history 테이블의 이력 데이터를 기반으로 종합 시그널의 예측 성과를 체계적으로 검증하는 백테스팅 모듈을 구축한다. 핵심 산출 지표: (1) 등급별(강력매수~강력매도) 평균 수익률과 적중률 (1/3/5일), (2) 시그널 점수 구간별 성과 통계 — 어느 점수대에서 시스템이 가장 정확한지, (3) 연속 성과 분석 — 최대 연승/연패, 수익 곡선, (4) 축별 기여도 분석 — 각 축의 시그널 방향과 실제 수익률의 상관을 계산하여 어떤 축이 가장 유용한지 판별. 테스트를 먼저 작성하고 구현한다. database 모듈의 get_signal_history()와 get_prices()를 사용하여 시그널-수익률 매칭을 수행한다. evaluate_signals()의 단순 적중률 추적을 넘어, "이 시스템을 신뢰할 수 있는가"에 대한 정량적 근거를 제공하는 것이 목표다.
+
+### Task 2: 백테스트 결과 리포트·코멘터리·파이프라인 통합
+
+Files: src/analysis/report.py, src/analysis/commentary.py, src/main.py, tests/test_report.py, tests/test_commentary.py
+Description: Task 1에서 구축한 백테스팅 모듈의 결과를 리포트·코멘터리·일일 파이프라인에 통합한다. (1) report.py에 시그널 성과 요약 섹션 추가 — 등급별 적중률 테이블, 현재 등급의 과거 성과, 수익 곡선 트렌드를 HTML로 렌더링. (2) commentary.py에 백테스트 맥락 해석 추가 — "현재 매수우세 판정, 과거 동일 등급에서 5일 적중률 N%"와 같은 맥락 코멘트. (3) main.py에서 백테스트 실행 → 리포트·코멘터리에 전달하는 배관 연결. 투자자가 "이 시그널이 과거에 얼마나 정확했는가"를 직접 확인할 수 있게 하여 시스템 신뢰도를 투명하게 제시하는 것이 목표다. 모듈 구축(Task 1)→파이프라인 통합(Task 2)의 2단계 확장 패턴을 따른다.

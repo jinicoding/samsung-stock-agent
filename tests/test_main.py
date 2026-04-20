@@ -297,6 +297,14 @@ SAMPLE_REVERSAL = {
 }
 
 
+SAMPLE_BACKTEST = {
+    "grade_performance": {"매수우세": {"count": 10, "avg_return_5d": 1.5, "hit_rate_5d": 65.0}},
+    "score_range_performance": [],
+    "streak_analysis": {"max_win_streak": 5, "max_lose_streak": 3, "equity_curve": []},
+    "axis_contribution": {"technical": {"correlation_1d": 0.4, "contribution_rank": 1}},
+}
+
+
 @patch("src.main.send_message")
 @patch("src.main.generate_daily_report", return_value=SAMPLE_REPORT_HTML)
 @patch("src.main.evaluate_signals", return_value={"details": [], "summary": SAMPLE_ACCURACY})
@@ -343,8 +351,9 @@ SAMPLE_REVERSAL = {
 @patch("src.main.compute_daily_delta", return_value=None)
 @patch("src.main.compute_market_regime", return_value=None)
 @patch("src.main.analyze_fibonacci", return_value=SAMPLE_FIBONACCI)
+@patch("src.analysis.backtest.run_backtest", return_value=SAMPLE_BACKTEST)
 def test_pipeline_full(
-    mock_fibonacci, mock_market_regime, mock_daily_delta, mock_watchpoints, mock_summarize_weekly, mock_sig_hist,
+    mock_backtest, mock_fibonacci, mock_market_regime, mock_daily_delta, mock_watchpoints, mock_summarize_weekly, mock_sig_hist,
     mock_init, mock_bf_prices, mock_bf_sd,
     mock_fetch_nasdaq, mock_fetch_vix,
     mock_nasdaq_trend, mock_vix_risk, mock_global_macro_score,
@@ -463,9 +472,11 @@ def test_pipeline_full(
         risk_management=ANY,
         market_regime=None,
         fibonacci=SAMPLE_FIBONACCI,
+        backtest=SAMPLE_BACKTEST,
     )
     mock_fibonacci.assert_called_once_with(SAMPLE_PRICES)
     mock_market_regime.assert_called_once()
+    mock_backtest.assert_called_once()
     mock_send.assert_called_once_with(SAMPLE_REPORT_HTML)
 
 
@@ -511,8 +522,9 @@ def test_pipeline_full(
 @patch("src.main.init_db")
 @patch("src.main.compute_market_regime", return_value=None)
 @patch("src.main.analyze_fibonacci", return_value=SAMPLE_FIBONACCI)
+@patch("src.analysis.backtest.run_backtest", return_value=SAMPLE_BACKTEST)
 def test_pipeline_dry_run(
-    mock_fibonacci, mock_market_regime, mock_init, mock_bf_prices, mock_bf_sd,
+    mock_backtest, mock_fibonacci, mock_market_regime, mock_init, mock_bf_prices, mock_bf_sd,
     mock_fetch_nasdaq, mock_fetch_vix,
     mock_nasdaq_trend, mock_vix_risk, mock_global_macro_score,
     mock_candlestick, mock_volatility,
@@ -582,8 +594,9 @@ def test_pipeline_dry_run(
 @patch("src.main.init_db")
 @patch("src.main.compute_market_regime", return_value=None)
 @patch("src.main.analyze_fibonacci", return_value=SAMPLE_FIBONACCI)
+@patch("src.analysis.backtest.run_backtest", return_value=SAMPLE_BACKTEST)
 def test_pipeline_with_rs(
-    mock_fibonacci, mock_market_regime, mock_init, mock_bf_prices, mock_bf_sd,
+    mock_backtest, mock_fibonacci, mock_market_regime, mock_init, mock_bf_prices, mock_bf_sd,
     mock_fetch_nasdaq, mock_fetch_vix,
     mock_nasdaq_trend, mock_vix_risk, mock_global_macro_score,
     mock_candlestick, mock_volatility,
@@ -701,8 +714,9 @@ def test_pipeline_with_rs(
 @patch("src.main.init_db")
 @patch("src.main.compute_market_regime", return_value=None)
 @patch("src.main.analyze_fibonacci", return_value=SAMPLE_FIBONACCI)
+@patch("src.analysis.backtest.run_backtest", return_value=SAMPLE_BACKTEST)
 def test_pipeline_kospi_failure_fallback(
-    mock_fibonacci, mock_market_regime, mock_init, mock_bf_prices, mock_bf_sd,
+    mock_backtest, mock_fibonacci, mock_market_regime, mock_init, mock_bf_prices, mock_bf_sd,
     mock_fetch_nasdaq, mock_fetch_vix,
     mock_nasdaq_trend, mock_vix_risk, mock_global_macro_score,
     mock_candlestick, mock_volatility,

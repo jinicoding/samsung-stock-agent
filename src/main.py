@@ -250,6 +250,14 @@ def main(dry_run: bool = False):
     accuracy_result = evaluate_signals(db_module)
     accuracy_summary = accuracy_result["summary"]
 
+    # 3.81) 백테스팅 성과 분석
+    backtest_result = None
+    try:
+        from src.analysis.backtest import run_backtest
+        backtest_result = run_backtest(db_module)
+    except Exception as e:
+        print(f"[경고] 백테스팅 분석 실패: {e}")
+
     # 3.8.5) 종합 투자 시그널
     sig = compute_composite_signal(indicators, sd or {}, er or {}, relative_strength=rs, trend_reversal=reversal, fundamentals=fund, news_sentiment=news_sentiment, consensus=consensus, semiconductor_momentum=semi_momentum, volatility=vol, candlestick=candle, global_macro_score=global_macro_score_val, accuracy_summary=accuracy_summary, timeframe_alignment=timeframe_alignment, market_regime=market_regime)
 
@@ -387,7 +395,7 @@ def main(dry_run: bool = False):
         print(f"[경고] 주간 추이 요약 실패: {e}")
 
     # 4) 리포트 생성
-    report = generate_daily_report(indicators, supply_demand=sd, exchange_rate=er, composite_signal=sig, support_resistance=sr, accuracy_summary=accuracy_summary, relative_strength=rs, trend_reversal=reversal, signal_trend=sig_trend, fundamentals=fund, news_sentiment=news_sentiment, news_headlines=news_headlines, consensus=consensus, weekly_summary=weekly, rel_perf=rel_perf, sox_trend=sox_trend, semiconductor_momentum=semi_momentum, volatility=vol, candlestick=candle, watchpoints=wp, convergence=conv, nasdaq_trend=nasdaq_trend, vix_risk=vix_risk, global_macro_score=global_macro_score_val, timeframe_alignment=timeframe_alignment, weekly_indicators=weekly_indicators, scenario=scenario, pattern_match=pm, data_health=health.summary(), daily_delta=daily_delta, risk_management=risk_mgmt, market_regime=market_regime, fibonacci=fib)
+    report = generate_daily_report(indicators, supply_demand=sd, exchange_rate=er, composite_signal=sig, support_resistance=sr, accuracy_summary=accuracy_summary, relative_strength=rs, trend_reversal=reversal, signal_trend=sig_trend, fundamentals=fund, news_sentiment=news_sentiment, news_headlines=news_headlines, consensus=consensus, weekly_summary=weekly, rel_perf=rel_perf, sox_trend=sox_trend, semiconductor_momentum=semi_momentum, volatility=vol, candlestick=candle, watchpoints=wp, convergence=conv, nasdaq_trend=nasdaq_trend, vix_risk=vix_risk, global_macro_score=global_macro_score_val, timeframe_alignment=timeframe_alignment, weekly_indicators=weekly_indicators, scenario=scenario, pattern_match=pm, data_health=health.summary(), daily_delta=daily_delta, risk_management=risk_mgmt, market_regime=market_regime, fibonacci=fib, backtest=backtest_result)
 
     # 5) 발송 또는 출력
     if dry_run:

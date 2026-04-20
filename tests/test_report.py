@@ -2,7 +2,7 @@
 
 import pytest
 
-from src.analysis.report import generate_daily_report, classify_ma_alignment, assess_volume, assess_market_temperature, classify_macd, classify_bb_position, classify_stochastic, _build_executive_summary, _build_fibonacci_section
+from src.analysis.report import generate_daily_report, classify_ma_alignment, assess_volume, assess_market_temperature, classify_macd, classify_bb_position, classify_stochastic, _build_executive_summary, _build_fibonacci_section, _build_backtest_section
 
 
 class TestClassifyMaAlignment:
@@ -2418,3 +2418,80 @@ class TestBuildFibonacciSection:
         sr_pos = report.find("📐 지지/저항선")
         fib_pos = report.find("📐 피보나치 되돌림")
         assert sr_pos < fib_pos
+
+
+# --- 백테스팅 성과 섹션 ---
+
+SAMPLE_BACKTEST = {
+    "grade_performance": {
+        "강력매수": {"count": 5, "avg_return_1d": 1.2, "hit_rate_1d": 80.0, "avg_return_3d": 2.5, "hit_rate_3d": 75.0, "avg_return_5d": 3.0, "hit_rate_5d": 70.0},
+        "매수우세": {"count": 10, "avg_return_1d": 0.5, "hit_rate_1d": 65.0, "avg_return_3d": 1.0, "hit_rate_3d": 60.0, "avg_return_5d": 1.5, "hit_rate_5d": 55.0},
+        "중립": {"count": 8, "avg_return_1d": 0.0, "hit_rate_1d": 50.0, "avg_return_3d": 0.1, "hit_rate_3d": 48.0, "avg_return_5d": -0.1, "hit_rate_5d": 45.0},
+    },
+    "score_range_performance": [
+        {"range_label": "강력매도 (-100~-60)", "count": 2, "avg_return_1d": -1.0, "hit_rate_1d": 60.0, "avg_return_3d": -2.0, "hit_rate_3d": 55.0, "avg_return_5d": -2.5, "hit_rate_5d": 50.0},
+        {"range_label": "매도우세 (-60~-20)", "count": 3, "avg_return_1d": -0.5, "hit_rate_1d": 55.0, "avg_return_3d": -1.0, "hit_rate_3d": 50.0, "avg_return_5d": -1.2, "hit_rate_5d": 48.0},
+        {"range_label": "중립 (-20~+20)", "count": 8, "avg_return_1d": 0.0, "hit_rate_1d": 50.0, "avg_return_3d": 0.1, "hit_rate_3d": 48.0, "avg_return_5d": -0.1, "hit_rate_5d": 45.0},
+        {"range_label": "매수우세 (+20~+60)", "count": 10, "avg_return_1d": 0.5, "hit_rate_1d": 65.0, "avg_return_3d": 1.0, "hit_rate_3d": 60.0, "avg_return_5d": 1.5, "hit_rate_5d": 55.0},
+        {"range_label": "강력매수 (+60~+100)", "count": 5, "avg_return_1d": 1.2, "hit_rate_1d": 80.0, "avg_return_3d": 2.5, "hit_rate_3d": 75.0, "avg_return_5d": 3.0, "hit_rate_5d": 70.0},
+    ],
+    "streak_analysis": {"max_win_streak": 7, "max_lose_streak": 3, "equity_curve": []},
+    "axis_contribution": {
+        "technical": {"correlation_1d": 0.45, "contribution_rank": 1},
+        "supply": {"correlation_1d": 0.30, "contribution_rank": 2},
+        "exchange": {"correlation_1d": 0.15, "contribution_rank": 3},
+    },
+}
+
+
+class TestBuildBacktestSection:
+    """백테스팅 성과 섹션 렌더링 테스트."""
+
+    def test_section_contains_header(self):
+        result = _build_backtest_section(SAMPLE_BACKTEST)
+        joined = "\n".join(result)
+        assert "백테스팅 성과" in joined
+
+    def test_grade_performance_rendered(self):
+        result = _build_backtest_section(SAMPLE_BACKTEST)
+        joined = "\n".join(result)
+        assert "강력매수" in joined
+        assert "70.0%" in joined
+
+    def test_score_range_rendered(self):
+        result = _build_backtest_section(SAMPLE_BACKTEST)
+        joined = "\n".join(result)
+        assert "강력매도" in joined or "점수 구간" in joined
+
+    def test_axis_contribution_rendered(self):
+        result = _build_backtest_section(SAMPLE_BACKTEST)
+        joined = "\n".join(result)
+        assert "기여도" in joined or "상관" in joined
+
+    def test_streak_rendered(self):
+        result = _build_backtest_section(SAMPLE_BACKTEST)
+        joined = "\n".join(result)
+        assert "연승" in joined or "7" in joined
+
+    def test_none_backtest_returns_empty(self):
+        result = _build_backtest_section(None)
+        assert result == []
+
+    def test_empty_grade_performance(self):
+        bt = {
+            "grade_performance": {},
+            "score_range_performance": [],
+            "streak_analysis": {"max_win_streak": 0, "max_lose_streak": 0, "equity_curve": []},
+            "axis_contribution": {},
+        }
+        result = _build_backtest_section(bt)
+        joined = "\n".join(result)
+        assert "백테스팅 성과" in joined
+
+    def test_backtest_in_full_report(self):
+        report = generate_daily_report(_full_indicators(), backtest=SAMPLE_BACKTEST)
+        assert "백테스팅 성과" in report
+
+    def test_backtest_none_no_section(self):
+        report = generate_daily_report(_full_indicators(), backtest=None)
+        assert "백테스팅 성과" not in report

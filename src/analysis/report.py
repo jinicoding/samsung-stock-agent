@@ -598,6 +598,71 @@ def _build_accuracy_section(
     return lines
 
 
+_GRADE_ORDER = ["강력매수", "매수우세", "중립", "매도우세", "강력매도"]
+
+
+def _build_backtest_section(bt: dict | None) -> list[str]:
+    """백테스팅 성과를 HTML 라인 리스트로."""
+    if bt is None:
+        return []
+
+    lines = ["", "<b>📈 백테스팅 성과</b>"]
+
+    grade_perf = bt.get("grade_performance", {})
+    if grade_perf:
+        lines.append("")
+        lines.append("  <b>등급별 성과</b>")
+        for grade in _GRADE_ORDER:
+            stats = grade_perf.get(grade)
+            if not stats:
+                continue
+            count = stats.get("count", 0)
+            hit_5d = stats.get("hit_rate_5d")
+            ret_5d = stats.get("avg_return_5d")
+            hit_str = f"{hit_5d:.1f}%" if hit_5d is not None else "N/A"
+            ret_str = f"{ret_5d:+.2f}%" if ret_5d is not None else "N/A"
+            lines.append(f"  {grade}: 5일 적중률 {hit_str} | 수익률 {ret_str} ({count}건)")
+
+    score_ranges = bt.get("score_range_performance", [])
+    if score_ranges:
+        lines.append("")
+        lines.append("  <b>점수 구간별 성과</b>")
+        for entry in score_ranges:
+            count = entry.get("count", 0)
+            if count == 0:
+                continue
+            label = entry.get("range_label", "")
+            hit_5d = entry.get("hit_rate_5d")
+            ret_5d = entry.get("avg_return_5d")
+            hit_str = f"{hit_5d:.1f}%" if hit_5d is not None else "N/A"
+            ret_str = f"{ret_5d:+.2f}%" if ret_5d is not None else "N/A"
+            lines.append(f"  {label}: {hit_str} | {ret_str} ({count}건)")
+
+    axis_contrib = bt.get("axis_contribution", {})
+    if axis_contrib:
+        ranked = sorted(
+            ((k, v) for k, v in axis_contrib.items() if v.get("correlation_1d") is not None),
+            key=lambda x: x[1].get("contribution_rank", 99),
+        )
+        if ranked:
+            lines.append("")
+            lines.append("  <b>축별 기여도 순위</b>")
+            for axis, data in ranked:
+                corr = data.get("correlation_1d", 0)
+                rank = data.get("contribution_rank", 0)
+                kr = _AXIS_KR_NAME.get(axis, axis)
+                lines.append(f"  {rank}위 {kr}: 상관계수 {corr:+.3f}")
+
+    streak = bt.get("streak_analysis", {})
+    max_win = streak.get("max_win_streak", 0)
+    max_lose = streak.get("max_lose_streak", 0)
+    if max_win > 0 or max_lose > 0:
+        lines.append(f"  최대 연승 {max_win}회 | 최대 연패 {max_lose}회")
+
+    lines.append("")
+    return lines
+
+
 def _rs_trend_label(trend: str) -> tuple[str, str]:
     """RS 추세를 (라벨, 이모지) 튜플로."""
     if trend == "outperform":
@@ -1558,6 +1623,7 @@ def generate_daily_report(
     risk_management: dict | None = None,
     market_regime: dict | None = None,
     fibonacci: dict | None = None,
+    backtest: dict | None = None,
 ) -> str:
     """기술적 지표 dict를 HTML 텔레그램 메시지로 변환한다.
 
@@ -1669,6 +1735,7 @@ def generate_daily_report(
         risk_management=risk_management,
         market_regime=market_regime,
         fibonacci=fibonacci,
+        backtest=backtest,
     )
     if commentary:
         lines.append(f"💬 {commentary}")
@@ -1827,6 +1894,10 @@ def generate_daily_report(
     # 시그널 정확도 (선택)
     if accuracy_summary is not None:
         lines.extend(_build_accuracy_section(accuracy_summary, composite_signal))
+
+    # 백테스팅 성과 (선택)
+    if backtest is not None:
+        lines.extend(_build_backtest_section(backtest))
 
     # 데이터 상태 (선택)
     if data_health is not None:

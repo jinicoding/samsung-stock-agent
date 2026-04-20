@@ -41,6 +41,7 @@ def generate_commentary(
     risk_management: dict | None = None,
     market_regime: dict | None = None,
     fibonacci: dict | None = None,
+    backtest: dict | None = None,
 ) -> str:
     """분석 결과를 2~3문장 자연어 코멘터리로 변환한다.
 
@@ -171,6 +172,11 @@ def generate_commentary(
     risk_sentence = _build_risk_management_sentence(risk_management or {})
     if risk_sentence:
         sentences.append(risk_sentence)
+
+    # --- 4.998) 백테스팅 성과 문장 ---
+    bt_sentence = _build_backtest_sentence(backtest or {}, sig)
+    if bt_sentence:
+        sentences.append(bt_sentence)
 
     # --- 5) 시그널 추이 문장 ---
     trend_sentence = _build_signal_trend_sentence(signal_trend or {})
@@ -962,3 +968,28 @@ def _build_fibonacci_sentence(fib: dict, current_price: float) -> str:
         return f"현재가가 피보나치 {below}~{above} 구간에 위치하며, {desc}."
 
     return ""
+
+
+def _build_backtest_sentence(bt: dict, sig: dict) -> str:
+    """백테스팅 결과를 자연어 코멘터리로 변환한다."""
+    if not bt:
+        return ""
+
+    grade = sig.get("grade", "")
+    grade_perf = bt.get("grade_performance", {})
+    current_stats = grade_perf.get(grade, {})
+
+    hit_5d = current_stats.get("hit_rate_5d")
+    if hit_5d is None:
+        return ""
+
+    count = current_stats.get("count", 0)
+    if count < 3:
+        return ""
+
+    if hit_5d >= 65:
+        return f"과거 {grade} 시그널의 5일 적중률이 {hit_5d:.0f}%로, 현재 시그널 신뢰도가 높다."
+    elif hit_5d <= 45:
+        return f"과거 {grade} 시그널의 5일 적중률이 {hit_5d:.0f}%에 불과해, 시그널 신뢰에 주의가 필요하다."
+    else:
+        return ""

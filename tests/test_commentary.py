@@ -1416,3 +1416,57 @@ class TestGenerateCommentary:
             fibonacci=empty_fib,
         )
         assert "피보나치" not in result
+
+    # --- 백테스팅 성과 코멘터리 ---
+
+    def test_backtest_high_hit_rate_positive(self):
+        """강력매수 적중률이 높으면 긍정적 코멘터리."""
+        bt = {
+            "grade_performance": {
+                "강력매수": {"count": 10, "avg_return_5d": 2.5, "hit_rate_5d": 78.0},
+            },
+            "score_range_performance": [],
+            "streak_analysis": {"max_win_streak": 5, "max_lose_streak": 2, "equity_curve": []},
+            "axis_contribution": {},
+        }
+        result = generate_commentary(
+            self._base_indicators(),
+            self._base_supply_demand(),
+            self._base_exchange_rate(),
+            self._base_composite_signal(score=70, grade="강력매수"),
+            self._base_support_resistance(),
+            backtest=bt,
+        )
+        assert "적중률" in result or "신뢰" in result
+
+    def test_backtest_low_hit_rate_caution(self):
+        """강력매수 적중률이 낮으면 주의 코멘터리."""
+        bt = {
+            "grade_performance": {
+                "강력매수": {"count": 10, "avg_return_5d": -0.5, "hit_rate_5d": 35.0},
+            },
+            "score_range_performance": [],
+            "streak_analysis": {"max_win_streak": 2, "max_lose_streak": 5, "equity_curve": []},
+            "axis_contribution": {},
+        }
+        result = generate_commentary(
+            self._base_indicators(),
+            self._base_supply_demand(),
+            self._base_exchange_rate(),
+            self._base_composite_signal(score=70, grade="강력매수"),
+            self._base_support_resistance(),
+            backtest=bt,
+        )
+        assert "주의" in result or "낮" in result or "신뢰" in result
+
+    def test_backtest_none_no_mention(self):
+        """백테스트 없으면 관련 문장 없음."""
+        result = generate_commentary(
+            self._base_indicators(),
+            self._base_supply_demand(),
+            self._base_exchange_rate(),
+            self._base_composite_signal(),
+            self._base_support_resistance(),
+            backtest=None,
+        )
+        assert "백테스팅" not in result

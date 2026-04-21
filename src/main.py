@@ -47,6 +47,7 @@ from src.analysis.pattern_match import find_similar_patterns
 from src.analysis.daily_delta import compute_daily_delta
 from src.analysis.risk_management import compute_risk_levels
 from src.analysis.fibonacci import analyze_fibonacci
+from src.analysis.volume_profile import analyze_volume_profile
 from src.data.health import DataHealthTracker
 from src.delivery.telegram_bot import send_message
 
@@ -137,6 +138,13 @@ def main(dry_run: bool = False):
         fib = analyze_fibonacci(prices)
     except Exception as e:
         print(f"[경고] 피보나치 분석 실패: {e}")
+
+    # 3.57) 가격대별 거래량 분석 (Volume Profile)
+    vp = None
+    try:
+        vp = analyze_volume_profile(prices)
+    except Exception as e:
+        print(f"[경고] Volume Profile 분석 실패: {e}")
 
     # 3.6) KOSPI 지수 수집 → 상대강도 분석
     rs = None
@@ -395,7 +403,7 @@ def main(dry_run: bool = False):
         print(f"[경고] 주간 추이 요약 실패: {e}")
 
     # 4) 리포트 생성
-    report = generate_daily_report(indicators, supply_demand=sd, exchange_rate=er, composite_signal=sig, support_resistance=sr, accuracy_summary=accuracy_summary, relative_strength=rs, trend_reversal=reversal, signal_trend=sig_trend, fundamentals=fund, news_sentiment=news_sentiment, news_headlines=news_headlines, consensus=consensus, weekly_summary=weekly, rel_perf=rel_perf, sox_trend=sox_trend, semiconductor_momentum=semi_momentum, volatility=vol, candlestick=candle, watchpoints=wp, convergence=conv, nasdaq_trend=nasdaq_trend, vix_risk=vix_risk, global_macro_score=global_macro_score_val, timeframe_alignment=timeframe_alignment, weekly_indicators=weekly_indicators, scenario=scenario, pattern_match=pm, data_health=health.summary(), daily_delta=daily_delta, risk_management=risk_mgmt, market_regime=market_regime, fibonacci=fib, backtest=backtest_result)
+    report = generate_daily_report(indicators, supply_demand=sd, exchange_rate=er, composite_signal=sig, support_resistance=sr, accuracy_summary=accuracy_summary, relative_strength=rs, trend_reversal=reversal, signal_trend=sig_trend, fundamentals=fund, news_sentiment=news_sentiment, news_headlines=news_headlines, consensus=consensus, weekly_summary=weekly, rel_perf=rel_perf, sox_trend=sox_trend, semiconductor_momentum=semi_momentum, volatility=vol, candlestick=candle, watchpoints=wp, convergence=conv, nasdaq_trend=nasdaq_trend, vix_risk=vix_risk, global_macro_score=global_macro_score_val, timeframe_alignment=timeframe_alignment, weekly_indicators=weekly_indicators, scenario=scenario, pattern_match=pm, data_health=health.summary(), daily_delta=daily_delta, risk_management=risk_mgmt, market_regime=market_regime, fibonacci=fib, backtest=backtest_result, volume_profile=vp)
 
     # 5) 발송 또는 출력
     if dry_run:

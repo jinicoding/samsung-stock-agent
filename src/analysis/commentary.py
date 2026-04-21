@@ -42,6 +42,7 @@ def generate_commentary(
     market_regime: dict | None = None,
     fibonacci: dict | None = None,
     backtest: dict | None = None,
+    volume_profile: dict | None = None,
 ) -> str:
     """분석 결과를 2~3문장 자연어 코멘터리로 변환한다.
 
@@ -95,6 +96,11 @@ def generate_commentary(
     fib_sentence = _build_fibonacci_sentence(fibonacci or {}, indicators.get("current_price", 0))
     if fib_sentence:
         sentences.append(fib_sentence)
+
+    # --- 1.95) Volume Profile 문장 ---
+    vp_sentence = _build_volume_profile_sentence(volume_profile or {})
+    if vp_sentence:
+        sentences.append(vp_sentence)
 
     # --- 2) 보조 경고/참고 문장: RSI, 볼린저, 지지/저항 ---
     caution = _build_caution_sentence(indicators, sr)
@@ -966,6 +972,37 @@ def _build_fibonacci_sentence(fib: dict, current_price: float) -> str:
             if dist_pct < 2.0:
                 return f"피보나치 {below} 되돌림 지지선({int(ns):,}원)에 근접해 있으며, {desc}."
         return f"현재가가 피보나치 {below}~{above} 구간에 위치하며, {desc}."
+
+    return ""
+
+
+def _build_volume_profile_sentence(vp: dict) -> str:
+    """Volume Profile 기반 자연어 문장."""
+    if not vp:
+        return ""
+
+    poc = vp.get("poc")
+    if poc is None:
+        return ""
+
+    position = vp.get("position", {})
+    vs_poc = position.get("vs_poc")
+    in_va = position.get("in_value_area")
+    current_price = vp.get("current_price")
+    value_area = vp.get("value_area", {})
+    vah = value_area.get("vah")
+    val = value_area.get("val")
+
+    if vs_poc == "above" and not in_va and vah is not None:
+        return f"현재가가 거래 밀집대(POC {int(poc):,}원) 위, Value Area 상단({int(vah):,}원)을 돌파하여 추가 상승 모멘텀이 기대됩니다."
+    elif vs_poc == "below" and not in_va and val is not None:
+        return f"현재가가 거래 밀집대(POC {int(poc):,}원) 아래, Value Area 하단({int(val):,}원)을 이탈하여 매물 부담에 유의할 필요가 있습니다."
+    elif in_va:
+        return f"현재가가 거래 밀집 가치 영역(Value Area {int(val):,}~{int(vah):,}원) 내부에서 거래 중이며 POC({int(poc):,}원)가 지지/저항으로 작용할 수 있습니다."
+    elif vs_poc == "above":
+        return f"현재가가 POC({int(poc):,}원) 상회 중으로 거래 밀집대 위에서 거래되고 있습니다."
+    elif vs_poc == "below":
+        return f"현재가가 POC({int(poc):,}원) 하회 중으로 거래 밀집대 아래에서 매물 압력이 예상됩니다."
 
     return ""
 

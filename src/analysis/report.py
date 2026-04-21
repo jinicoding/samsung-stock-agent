@@ -1567,6 +1567,48 @@ def _build_scenario_section(scenario: dict) -> list[str]:
     return lines
 
 
+def _build_volume_profile_section(vp: dict) -> list[str]:
+    """Volume Profile 분석 결과를 HTML 라인 리스트로."""
+    poc = vp.get("poc")
+    if poc is None:
+        return []
+
+    lines = []
+    lines.append("")
+    lines.append("<b>📊 거래량 프로파일 (Volume Profile)</b>")
+
+    value_area = vp.get("value_area", {})
+    vah = value_area.get("vah")
+    val = value_area.get("val")
+
+    lines.append(f"  POC(거래 밀집가): {_format_price(poc)}원")
+    if vah is not None and val is not None:
+        lines.append(f"  Value Area: {_format_price(val)} ~ {_format_price(vah)}원")
+
+    position = vp.get("position", {})
+    vs_poc = position.get("vs_poc")
+    in_va = position.get("in_value_area")
+    current_price = vp.get("current_price")
+
+    if current_price is not None and vs_poc is not None:
+        vs_kr = {"above": "상회", "below": "하회", "at": "일치"}.get(vs_poc, "")
+        va_kr = "VA 내부" if in_va else "VA 외부"
+        lines.append(f"  현재가: {_format_price(current_price)}원 (POC {vs_kr}, {va_kr})")
+
+    hvn = vp.get("hvn", [])
+    lvn = vp.get("lvn", [])
+    if hvn:
+        top_hvn = sorted(hvn, key=lambda x: x["volume"], reverse=True)[:3]
+        hvn_prices = ", ".join(f"{_format_price(h['price'])}원" for h in top_hvn)
+        lines.append(f"  HVN(거래 밀집): {hvn_prices}")
+    if lvn:
+        top_lvn = sorted(lvn, key=lambda x: x["volume"])[:3]
+        lvn_prices = ", ".join(f"{_format_price(l['price'])}원" for l in top_lvn)
+        lines.append(f"  LVN(거래 희박): {lvn_prices}")
+
+    return lines
+
+
 def _build_health_section(health: dict) -> list[str]:
     """데이터 수집 상태 섹션을 생성한다."""
     lines = ["", "<b>📡 데이터 상태</b>"]
@@ -1624,6 +1666,7 @@ def generate_daily_report(
     market_regime: dict | None = None,
     fibonacci: dict | None = None,
     backtest: dict | None = None,
+    volume_profile: dict | None = None,
 ) -> str:
     """기술적 지표 dict를 HTML 텔레그램 메시지로 변환한다.
 
@@ -1736,6 +1779,7 @@ def generate_daily_report(
         market_regime=market_regime,
         fibonacci=fibonacci,
         backtest=backtest,
+        volume_profile=volume_profile,
     )
     if commentary:
         lines.append(f"💬 {commentary}")
@@ -1890,6 +1934,10 @@ def generate_daily_report(
     # 피보나치 되돌림 (선택)
     if fibonacci is not None:
         lines.extend(_build_fibonacci_section(fibonacci, price))
+
+    # 거래량 프로파일 (선택)
+    if volume_profile is not None:
+        lines.extend(_build_volume_profile_section(volume_profile))
 
     # 시그널 정확도 (선택)
     if accuracy_summary is not None:

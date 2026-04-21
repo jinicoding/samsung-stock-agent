@@ -473,6 +473,7 @@ def test_pipeline_full(
         market_regime=None,
         fibonacci=SAMPLE_FIBONACCI,
         backtest=SAMPLE_BACKTEST,
+        volume_profile=ANY,
     )
     mock_fibonacci.assert_called_once_with(SAMPLE_PRICES)
     mock_market_regime.assert_called_once()
